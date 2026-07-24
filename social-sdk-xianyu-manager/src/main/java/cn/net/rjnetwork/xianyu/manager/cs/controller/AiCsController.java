@@ -10,6 +10,8 @@ import cn.net.rjnetwork.xianyu.manager.cs.mapper.AiCsMessageMapper;
 import cn.net.rjnetwork.xianyu.manager.cs.mapper.AiCsPolicyMapper;
 import cn.net.rjnetwork.xianyu.manager.cs.mapper.AiCsSessionMapper;
 import cn.net.rjnetwork.xianyu.manager.cs.engine.AiCsEngine;
+import cn.net.rjnetwork.xianyu.manager.buyer.mapper.AiCsSessionStateMapper;
+import cn.net.rjnetwork.xianyu.manager.buyer.model.AiCsSessionState;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.web.bind.annotation.*;
@@ -30,15 +32,17 @@ public class AiCsController {
     private final AiCsMessageMapper messageMapper;
     private final AiCsKnowledgeMapper knowledgeMapper;
     private final AiCsPolicyMapper policyMapper;
+    private final AiCsSessionStateMapper sessionStateMapper;
 
     public AiCsController(AiCsEngine csEngine, AiCsSessionMapper sessionMapper,
                           AiCsMessageMapper messageMapper, AiCsKnowledgeMapper knowledgeMapper,
-                          AiCsPolicyMapper policyMapper) {
+                          AiCsPolicyMapper policyMapper, AiCsSessionStateMapper sessionStateMapper) {
         this.csEngine = csEngine;
         this.sessionMapper = sessionMapper;
         this.messageMapper = messageMapper;
         this.knowledgeMapper = knowledgeMapper;
         this.policyMapper = policyMapper;
+        this.sessionStateMapper = sessionStateMapper;
     }
 
     // ==================== 消息处理入口 ====================
@@ -103,6 +107,25 @@ public class AiCsController {
         session.setStatus("BLOCKED");
         sessionMapper.updateById(session);
         return ApiResponse.ok(null);
+    }
+
+    // ==================== 议价状态（session-states） ====================
+    // 修复 Bug：前端 aiCs/Index.vue 调 /ai/cs/session-states，但 controller 原本没有该端点，
+    // 全局异常处理器把 404 转成 500，导致议价记录 tab 一打开就报错。
+    // 这里补全端点，分页查询 ai_cs_session_state 表，返回 Page 对象与前端 res.data.records 兼容。
+
+    @GetMapping("/session-states")
+    public ApiResponse<Page<AiCsSessionState>> listSessionStates(
+            @RequestParam(required = false) Long sessionId,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Page<AiCsSessionState> p = new Page<>(page, size);
+        LambdaQueryWrapper<AiCsSessionState> wrapper = new LambdaQueryWrapper<>();
+        if (sessionId != null) {
+            wrapper.eq(AiCsSessionState::getSessionId, sessionId);
+        }
+        wrapper.orderByDesc(AiCsSessionState::getUpdatedAt);
+        return ApiResponse.ok(sessionStateMapper.selectPage(p, wrapper));
     }
 
     // ==================== 消息记录 ====================

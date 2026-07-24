@@ -680,9 +680,12 @@ public class DatabaseInitializer {
         ensureColumn("buyer_profile", "tags", "TEXT");
         ensureColumn("buyer_profile", "notes", "TEXT");
         ensureColumn("buyer_profile", "total_spent", "REAL DEFAULT 0");
-        // ai_cs_session_state 表补齐
+        // ai_cs_session_state 表补齐（继承 BaseEntity，旧库 schema 可能缺 deleted/created_at/updated_at）
         ensureColumn("ai_cs_session_state", "lowest_offer", "REAL");
         ensureColumn("ai_cs_session_state", "current_offer", "REAL");
+        ensureColumn("ai_cs_session_state", "created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+        ensureColumn("ai_cs_session_state", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+        ensureColumn("ai_cs_session_state", "deleted", "INTEGER DEFAULT 0");
     }
 
     private void ensureCircuitBreakerColumns() {

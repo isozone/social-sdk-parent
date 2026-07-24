@@ -906,7 +906,8 @@ CREATE TABLE IF NOT EXISTS ai_cs_session_state (
     closed_at TIMESTAMP,
     closed_reason VARCHAR(64),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted INTEGER DEFAULT 0,
     FOREIGN KEY (session_id) REFERENCES ai_cs_session(id)
 );
 

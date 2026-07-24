@@ -944,6 +944,7 @@ CREATE TABLE IF NOT EXISTS ai_cs_session_state (
     closed_reason VARCHAR(64),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted INTEGER DEFAULT 0,
     FOREIGN KEY (session_id) REFERENCES ai_cs_session(id)
 );
 
