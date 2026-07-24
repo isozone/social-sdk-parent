@@ -53,7 +53,6 @@
             </el-button>
           </template>
         </el-table-column>
-        <template #empty><el-empty description="暂无熔断器记录" /></template>
       </el-table>
 
       <el-empty v-if="!loading && !breakers.length" description="暂无熔断器记录" />

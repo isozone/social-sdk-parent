@@ -25,6 +25,7 @@
           </el-table-column>
           <el-table-column prop="lastMessageAt" label="最后消息" width="180" />
           <el-table-column prop="createdAt" label="创建时间" width="180" />
+          <template #empty><el-empty description="暂无会话" /></template>
         </el-table>
       </div>
 
@@ -43,6 +44,7 @@
               </el-tag>
             </template>
           </el-table-column>
+          <template #empty><el-empty description="暂无议价记录" /></template>
         </el-table>
       </div>
 
@@ -65,6 +67,7 @@
               <el-button size="small" type="danger" link @click="deleteKnowledge(row)">删除</el-button>
             </template>
           </el-table-column>
+          <template #empty><el-empty description="暂无知识条目" /></template>
         </el-table>
       </div>
 

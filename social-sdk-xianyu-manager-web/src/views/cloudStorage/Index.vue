@@ -168,7 +168,6 @@
             </el-button>
           </template>
         </el-table-column>
-        <template #empty><el-empty description="暂无文件" /></template>
       </el-table>
 
       <el-empty v-if="!fileLoading && files.length === 0" description="暂无文件" />

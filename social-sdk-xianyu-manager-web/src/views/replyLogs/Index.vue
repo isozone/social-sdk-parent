@@ -59,6 +59,7 @@
         <el-table-column label="时间" width="180">
           <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
         </el-table-column>
+        <template #empty><el-empty description="暂无回复日志" /></template>
       </el-table>
 
       <div style="margin-top: 16px; display: flex; justify-content: flex-end;">

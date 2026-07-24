@@ -199,6 +199,12 @@ const routes = [
         name: 'Profile',
         component: () => import('@/views/profile/Index.vue'),
         meta: { title: '个人中心' }
+      },
+      {
+        path: 'logs/cookies-refresh',
+        name: 'CookiesRefreshLogs',
+        component: () => import('@/views/logs/cookiesRefresh/Index.vue'),
+        meta: { title: 'Cookie 刷新日志' }
       }
     ]
   }

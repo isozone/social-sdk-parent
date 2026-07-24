@@ -1,10 +1,18 @@
 <template>
-  <div class="page-root">
+  <div class="page-root noflex">
     <el-card style="margin: 0;">
       <template #header>
-        <span>消息通知</span>
+        <div class="card-head">
+          <div class="card-head-left">
+            <div class="card-chip chip-violet"><el-icon><Bell /></el-icon></div>
+            <div class="card-head-text">
+              <span class="card-title">消息通知</span>
+              <span class="card-sub">统一管理通知通道、模板、订阅与投递日志</span>
+            </div>
+          </div>
+        </div>
       </template>
-      <el-tabs v-model="activeTab">
+      <el-tabs v-model="activeTab" class="notify-tabs">
         <el-tab-pane label="通知通道" name="channels" />
         <el-tab-pane label="通知模板" name="templates" />
         <el-tab-pane label="订阅规则" name="subscriptions" />
@@ -14,10 +22,12 @@
 
       <!-- ===================== 通道 ===================== -->
       <div v-show="activeTab === 'channels'">
-        <div style="margin-bottom: 12px; text-align: right;">
-          <el-button type="primary" @click="openChannelDialog()">
-            <el-icon><Plus /></el-icon> 新增通道
-          </el-button>
+        <div class="page-toolbar">
+          <div class="toolbar-right">
+            <el-button type="primary" @click="openChannelDialog()">
+              <el-icon><Plus /></el-icon> 新增通道
+            </el-button>
+          </div>
         </div>
         <el-table :data="channels" stripe v-loading="loadingChannels">
           <el-table-column prop="name" label="名称" min-width="140" />
@@ -47,10 +57,12 @@
 
       <!-- ===================== 模板 ===================== -->
       <div v-show="activeTab === 'templates'">
-        <div style="margin-bottom: 12px; text-align: right;">
-          <el-button type="primary" @click="openTemplateDialog()">
-            <el-icon><Plus /></el-icon> 新增/覆盖模板
-          </el-button>
+        <div class="page-toolbar">
+          <div class="toolbar-right">
+            <el-button type="primary" @click="openTemplateDialog()">
+              <el-icon><Plus /></el-icon> 新增/覆盖模板
+            </el-button>
+          </div>
         </div>
         <el-table :data="templates" stripe v-loading="loadingTemplates">
           <el-table-column label="场景" width="200">
@@ -75,10 +87,12 @@
 
       <!-- ===================== 订阅 ===================== -->
       <div v-show="activeTab === 'subscriptions'">
-        <div style="margin-bottom: 12px; text-align: right;">
-          <el-button type="primary" @click="openSubDialog()">
-            <el-icon><Plus /></el-icon> 新增订阅
-          </el-button>
+        <div class="page-toolbar">
+          <div class="toolbar-right">
+            <el-button type="primary" @click="openSubDialog()">
+              <el-icon><Plus /></el-icon> 新增订阅
+            </el-button>
+          </div>
         </div>
         <el-table :data="subscriptions" stripe v-loading="loadingSubs">
           <el-table-column label="场景" width="200">
@@ -118,13 +132,17 @@
 
       <!-- ===================== 日志 ===================== -->
       <div v-show="activeTab === 'logs'">
-        <el-form inline style="margin-bottom: 12px;">
-          <el-form-item label="场景">
-            <el-select v-model="logScenario" clearable placeholder="全部场景" style="width: 200px;" @change="loadLogs(1)">
-              <el-option v-for="s in scenarios" :key="s.scenario" :label="s.label" :value="s.scenario" />
-            </el-select>
-          </el-form-item>
-        </el-form>
+        <div class="page-toolbar">
+          <div class="toolbar-left">
+            <el-form inline @submit.prevent>
+              <el-form-item label="场景">
+                <el-select v-model="logScenario" clearable placeholder="全部场景" style="width: 200px;" @change="loadLogs(1)">
+                  <el-option v-for="s in scenarios" :key="s.scenario" :label="s.label" :value="s.scenario" />
+                </el-select>
+              </el-form-item>
+            </el-form>
+          </div>
+        </div>
         <el-table :data="logs" stripe v-loading="loadingLogs">
           <el-table-column label="场景" width="200">
             <template #default="{ row }">{{ scenarioLabel(row.scenario) }}</template>
@@ -147,13 +165,14 @@
           <el-table-column prop="createdAt" label="时间" width="180" />
           <template #empty><el-empty description="暂无日志" /></template>
         </el-table>
-        <el-pagination
-          style="margin-top: 12px; justify-content: flex-end;"
-          layout="total, prev, pager, next"
-          :total="logTotal"
-          :current-page="logPage"
-          :page-size="logSize"
-          @current-change="loadLogs" />
+        <div class="log-pager">
+          <el-pagination
+            layout="total, prev, pager, next"
+            :total="logTotal"
+            :current-page="logPage"
+            :page-size="logSize"
+            @current-change="loadLogs" />
+        </div>
       </div>
 
       <!-- ===================== 每日摘要 ===================== -->
@@ -161,7 +180,7 @@
         <el-alert type="info" :closable="false" show-icon style="margin-bottom: 12px;"
           title="每天定时把前一天的站内通知按场景汇总，经指定通道（邮件/短信）一次性发送。">
         </el-alert>
-        <el-form label-width="120px" style="max-width: 640px;" v-loading="loadingDigest">
+        <el-form label-width="120px" class="digest-form" v-loading="loadingDigest">
           <el-form-item label="启用">
             <el-switch v-model="digestForm.enabled" />
           </el-form-item>
@@ -395,7 +414,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, Bell } from '@element-plus/icons-vue'
 import * as notify from '@/api/notification'
 
 const activeTab = ref('channels')
@@ -788,3 +807,12 @@ onMounted(async () => {
   await loadDigest()
 })
 </script>
+
+<style scoped>
+/* 标签页与卡片头之间留出呼吸感 */
+.notify-tabs { margin-top: 4px; }
+/* 日志分页：统一右对齐并留白 */
+.log-pager { margin-top: 12px; display: flex; justify-content: flex-end; }
+/* 摘要表单：限制宽度保证可读性 */
+.digest-form { max-width: 640px; }
+</style>

@@ -4,8 +4,11 @@ import cn.net.rjnetwork.xianyu.manager.account.renew.mapper.CookieRefreshSchedul
 import cn.net.rjnetwork.xianyu.manager.account.renew.mapper.ScheduledCookiesRefreshLogMapper;
 import cn.net.rjnetwork.xianyu.manager.account.renew.model.CookieRefreshSchedule;
 import cn.net.rjnetwork.xianyu.manager.account.renew.model.ScheduledCookiesRefreshLog;
+import cn.net.rjnetwork.xianyu.manager.account.renew.service.ApiCookieRenewService;
 import cn.net.rjnetwork.xianyu.manager.account.renew.service.CookieRenewService;
 import cn.net.rjnetwork.xianyu.manager.common.ApiResponse;
+import cn.net.rjnetwork.xianyu.manager.account.mapper.AccountMapper;
+import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.web.bind.annotation.*;
@@ -20,15 +23,21 @@ import org.springframework.web.bind.annotation.*;
 public class CookieRenewController {
 
     private final CookieRenewService cookieRenewService;
+    private final ApiCookieRenewService apiCookieRenewService;
     private final CookieRefreshScheduleMapper scheduleMapper;
     private final ScheduledCookiesRefreshLogMapper logMapper;
+    private final AccountMapper accountMapper;
 
     public CookieRenewController(CookieRenewService cookieRenewService,
+                                 ApiCookieRenewService apiCookieRenewService,
                                  CookieRefreshScheduleMapper scheduleMapper,
-                                 ScheduledCookiesRefreshLogMapper logMapper) {
+                                 ScheduledCookiesRefreshLogMapper logMapper,
+                                 AccountMapper accountMapper) {
         this.cookieRenewService = cookieRenewService;
+        this.apiCookieRenewService = apiCookieRenewService;
         this.scheduleMapper = scheduleMapper;
         this.logMapper = logMapper;
+        this.accountMapper = accountMapper;
     }
 
     /** 创建/更新账号刷新计划。 */
@@ -57,6 +66,19 @@ public class CookieRenewController {
     @PostMapping("/run")
     public ApiResponse<Long> runManually() {
         return ApiResponse.ok(cookieRenewService.runBatch("MANUAL", true));
+    }
+
+    /**
+     * A2 轻量通道：对单账号执行 MTOP 接口续期。
+     * <p>典型场景：_m_h5_tk token 过期但 cookie2/unb 登录态仍健康，调一次 MTOP 即可续 token，
+     * 无需启动 Chrome 容器。返回 SUCCESS/FAILED/SKIPPED（熔断中）。</p>
+     */
+    @PostMapping("/api-renew/{accountId}")
+    public ApiResponse<String> renewViaApi(@PathVariable Long accountId) {
+        XianyuAccount account = accountMapper.selectById(accountId);
+        if (account == null) return ApiResponse.fail("NOT_FOUND", "账号不存在");
+        ApiCookieRenewService.RenewResult r = apiCookieRenewService.renewViaApi(account);
+        return ApiResponse.ok(r.name());
     }
 
     /** 分页查询批次日志，给前端「Cookie 刷新日志」页用。 */

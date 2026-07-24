@@ -45,6 +45,7 @@
         <el-table-column prop="viewCount" label="浏览量" sortable width="100" />
         <el-table-column prop="favoriteCount" label="收藏数" sortable width="100" />
         <el-table-column prop="todayReplies" label="今日回复" sortable width="100" />
+        <template #empty><el-empty description="暂无账号" /></template>
       </el-table>
     </el-card>
   </div>

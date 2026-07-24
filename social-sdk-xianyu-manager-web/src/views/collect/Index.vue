@@ -53,6 +53,7 @@
             <el-button size="small" link type="danger" @click="handleRemove(row)">移除</el-button>
           </template>
         </el-table-column>
+        <template #empty><el-empty description="暂无收藏" /></template>
       </el-table>
     </el-card>
 

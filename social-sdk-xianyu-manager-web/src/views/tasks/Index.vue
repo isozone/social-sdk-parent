@@ -45,6 +45,7 @@
             <el-button size="small" @click="runNow(row)">立即</el-button>
           </template>
         </el-table-column>
+        <template #empty><el-empty description="暂无任务" /></template>
       </el-table>
     </el-card>
 

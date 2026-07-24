@@ -50,6 +50,7 @@ public class CookieRenewService {
     private final CircuitBreakerService circuitBreaker;
     private final BatchJobService batchJobService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ApiCookieRenewService apiCookieRenewService;
 
     public CookieRenewService(AccountMapper accountMapper,
                               CookieRefreshScheduleMapper scheduleMapper,
@@ -57,7 +58,8 @@ public class CookieRenewService {
                               AccountService accountService,
                               CircuitBreakerService circuitBreaker,
                               BatchJobService batchJobService,
-                              ApplicationEventPublisher eventPublisher) {
+                              ApplicationEventPublisher eventPublisher,
+                              ApiCookieRenewService apiCookieRenewService) {
         this.accountMapper = accountMapper;
         this.scheduleMapper = scheduleMapper;
         this.logMapper = logMapper;
@@ -65,6 +67,7 @@ public class CookieRenewService {
         this.circuitBreaker = circuitBreaker;
         this.batchJobService = batchJobService;
         this.eventPublisher = eventPublisher;
+        this.apiCookieRenewService = apiCookieRenewService;
     }
 
     // ==================== 计划管理 ====================
@@ -183,13 +186,29 @@ public class CookieRenewService {
             }
         }
 
-        // 2. 启动/复用账号独占 Chrome 容器
+        // 2. A2 优先通道：先尝试 MTOP 轻量续期（不启动 Chrome 容器，省资源）
+        //    典型场景：_m_h5_tk token 过期但 cookie2/unb 登录态仍健康，A2 调一次 MTOP 即可续 token。
+        //    A2 成功 → 直接返回；A2 失败 → 降级到 A1 浏览器刷新。
+        try {
+            ApiCookieRenewService.RenewResult apiResult = apiCookieRenewService.renewViaApi(account);
+            if (apiResult == ApiCookieRenewService.RenewResult.SUCCESS) {
+                return RenewResult.SUCCESS;
+            }
+            if (apiResult == ApiCookieRenewService.RenewResult.SKIPPED) {
+                return RenewResult.SKIPPED;
+            }
+            log.info("[A1] A2 API renew failed for account {}, fall back to browser refresh", account.getId());
+        } catch (Exception e) {
+            log.warn("[A1] A2 API renew threw, fall back to browser refresh: {}", e.getMessage());
+        }
+
+        // 3. A1 降级通道：启动/复用账号独占 Chrome 容器
         if (!accountService.launchChromeContainer(account)) {
             circuitBreaker.recordFailure(account.getId(), "COOKIE_RENEW", "Chrome 容器启动失败");
             return RenewResult.FAILED;
         }
 
-        // 3. 通过 CDP Network.getCookies 提取新 Cookie（导航到 goofish.com 后）
+        // 4. 通过 CDP Network.getCookies 提取新 Cookie（导航到 goofish.com 后）
         Optional<String> newCookieOpt = extractCookieViaCdp(account);
         if (newCookieOpt.isEmpty()) {
             circuitBreaker.recordFailure(account.getId(), "COOKIE_RENEW", "CDP 提取 Cookie 失败");
@@ -197,7 +216,7 @@ public class CookieRenewService {
         }
         String newCookie = newCookieOpt.get();
 
-        // 4. 校验新 Cookie 有效性
+        // 5. 校验新 Cookie 有效性
         XianyuLoginApiService.LoginStatusResult verify = new XianyuLoginApiService(newCookie).checkLoginStatus(newCookie);
         if (verify == null || !verify.loggedIn) {
             circuitBreaker.recordFailure(account.getId(), "COOKIE_RENEW", "新 Cookie 校验未通过");
@@ -206,7 +225,7 @@ public class CookieRenewService {
             return RenewResult.FAILED;
         }
 
-        // 5. 写回加密 Cookie + 恢复 ACTIVE
+        // 6. 写回加密 Cookie + 恢复 ACTIVE
         account.setCookieHeader(newCookie);
         account.setStatus("ACTIVE");
         account.setLastError(null);
@@ -290,8 +309,9 @@ public class CookieRenewService {
         batch.setSkippedCount(skipped);
         batch.setStatus(failed > 0 ? (success > 0 ? "PARTIAL" : "FAILED") : "SUCCESS");
         batch.setEndedAt(LocalDateTime.now());
-        if (failureSummary.length() > 2000) failureSummary.setLength(2000);
-        batch.setFailureSummary(failureSummary.toString());
+        String summary = failureSummary == null ? "" : failureSummary;
+        if (summary.length() > 2000) summary = summary.substring(0, 2000);
+        batch.setFailureSummary(summary);
         logMapper.updateById(batch);
     }
 

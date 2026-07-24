@@ -126,6 +126,7 @@
         <el-table-column prop="onSaleCount" label="在售" width="100" />
         <el-table-column prop="ipLocation" label="IP归属" width="120" />
         <el-table-column prop="introduction" label="简介" min-width="200" />
+        <template #empty><el-empty description="暂无卖家" /></template>
       </el-table>
     </div>
   </div>

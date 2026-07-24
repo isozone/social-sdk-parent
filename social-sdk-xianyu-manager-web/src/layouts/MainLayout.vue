@@ -93,6 +93,10 @@
             <span class="menu-icon-box"><el-icon><ChatLineSquare /></el-icon></span>
             <span>自动回复日志</span>
           </el-menu-item>
+          <el-menu-item index="/app/logs/cookies-refresh">
+            <span class="menu-icon-box"><el-icon><Refresh /></el-icon></span>
+            <span>Cookie 刷新日志</span>
+          </el-menu-item>
         </el-menu-item-group>
 
         <el-menu-item-group title="数据资产">
