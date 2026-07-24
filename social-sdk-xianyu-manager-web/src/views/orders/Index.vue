@@ -31,7 +31,7 @@
         </div>
       </template>
 
-      <el-tabs v-model="activeTab" @tab-change="loadOrders">
+      <el-tabs v-model="activeTab" @tab-change="onTabChange">
         <el-tab-pane label="我卖出的" name="SOLD" />
         <el-tab-pane label="我买到的" name="BOUGHT" />
         <el-tab-pane label="全部" name="ALL" />
@@ -287,6 +287,12 @@ async function loadOrders() {
     }
   } catch (e) {}
   finally { loading.value = false }
+}
+
+// 切换 tab 时重置分页到第 1 页，否则会停留在可能不存在的页码上导致列表空白
+function onTabChange() {
+  page.value = 1
+  loadOrders()
 }
 
 // 同步订单

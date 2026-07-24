@@ -331,6 +331,21 @@ public class XianyuCaptchaSolver {
             return CaptchaResult.fail("导航到闲鱼消息页失败：" + e.getMessage());
         }
 
+        // 5a-bis. 关键修复：导航后再补注一次登录 cookie。
+        // 第一次注入+导航后，goofish.com/im 的 JS 会检测到登录态并尝试调 pc.login.token，
+        // 但首帧的 cookie 可能因"cookie store 未激活"未生效，导致 JS 误判为未登录跳到 login.taobao.com。
+        // 这里在页面已加载（cookie store 已激活）后补注一次，再用 Page.reload 让 goofish 重新读取登录态。
+        if (loginCookieHeader != null && !loginCookieHeader.isBlank()) {
+            try {
+                injectAccountCookies(cdpEndpoint, loginCookieHeader, imCookieHeader);
+                log.info("[CDP-AUTH] 导航后补注一次登录 cookie（cookie store 已激活）");
+                reloadImPage(cdpEndpoint);
+                Thread.sleep(5000);
+            } catch (Exception e) {
+                log.warn("[CDP-AUTH] 导航后补注 cookie 失败: {}", e.getMessage());
+            }
+        }
+
         // 5a. 空白页处理：第一次打开 goofish 时页面可能是空白的（无 body 内容、无 iframe），
         // 必须刷新才能让页面正常渲染，触发 pc.login.token / 滑块。
         try {
@@ -1576,17 +1591,22 @@ public class XianyuCaptchaSolver {
     }
 
     /**
-     * 通过 CDP {@code Network.setCookies} 把账号登录 cookie + IM cookie 注入到 Chrome 容器。
-     * <p>关键用途：新启动的 Chrome 容器是空白 profile，没有闲鱼登录态；
-     * 打开 {@code https://www.goofish.com/im} 会跳到登录页，{@code pc.login.token} 永远拿不到 token。
-     * 注入登录 cookie 后网页版一开始就处于已登录状态，IM 页才能正常触发风控/滑块流程。</p>
+     * 把账号登录 cookie + IM cookie 注入到该账号独占的 Chrome 容器。
      *
-     * <p>实现：把 {@code loginCookieHeader} 与 {@code imCookieHeader}（cookie header 形式）
-     * 解析成 CDP cookie 数组，对 goofish.com / taobao.com / aliyun.com 等相关域统一注入。</p>
+     * <p><b>关键修复（登录页卡死根因）：</b>旧实现用 {@code Network.setCookies} + {@code domain} 字段
+     * 跨多域注入。但 CDP 实测：当当前页面是 {@code about:blank}（导航前），cookie store 对目标域
+     * 尚未"激活"，{@code Network.setCookies} 虽然返回成功，cookie 却不会在下一次 {@code Page.navigate}
+     * 时被发送——结果是 goofish.com/im 看到无登录态，JS 跳转到 login.taobao.com，页面"停在登录页"。</p>
      *
-     * @param cdpEndpoint      页面级 CDP WebSocket 端点
-     * @param loginCookieHeader 账号登录 cookie（如 {@code _m_h5_tk=xxx; cookie2=yyy}）
-     * @param imCookieHeader   IM 滑块验证 cookie（x5sec 等），可空
+     * <p><b>修复方案：</b>改用 CDP 文档推荐的 <b>url-based</b> cookie 设置：
+     * 对每个目标域构造一个该域的代表性 URL（如 {@code https://www.goofish.com/}），
+     * 用 {@code Network.setCookies} 的 {@code url} 参数而非 {@code domain}。
+     * Chrome 会根据 URL 自动推导 domain/path，并把 cookie 直接写入对应域的 cookie store，
+     * 不依赖"当前页面已加载该域"。这是 puppeteer/playwright 都采用的标准做法。</p>
+     *
+     * @param cdpEndpoint        该账号 Chrome 容器的 CDP WebSocket 端点
+     * @param loginCookieHeader  账号登录 cookie（cookie header 形式，如 {@code k1=v1; k2=v2}）
+     * @param imCookieHeader     IM 滑块验证 cookie（x5sec 等），与登录 cookie 合并注入
      */
     private void injectAccountCookies(String cdpEndpoint, String loginCookieHeader, String imCookieHeader)
             throws Exception {
@@ -1605,29 +1625,35 @@ public class XianyuCaptchaSolver {
         Socket socket = null;
         try {
             socket = openWebSocket(cdpEndpoint);
+            // 必须先 Network.enable，否则 Network.setCookies 不会被接受
             sendCommand(socket, "Network.enable", new LinkedHashMap<>());
 
-            // 对所有相关域注入同一组 cookie，确保 goofish.com / taobao.com 等子域都能读到
-            List<String> domains = List.of(
-                    ".goofish.com", "goofish.com",
-                    ".taobao.com", "taobao.com",
-                    ".tmall.com", "tmall.com",
-                    ".aliyun.com", "aliyun.com",
-                    ".alicdn.com", "alicdn.com"
+            // 每个目标域构造一个代表性 URL，用 url-based cookie 设置。
+            // 代表性 URL 取该域根路径，Chrome 会自动推导 domain 为该 URL 的 host。
+            // 这里只取 goofish + taobao 两个核心域——IM 链路只依赖这两个域的 cookie，
+            // 旧实现把 tmall/aliyun/alicdn 也注入是冗余的，且 alicdn 是 CDN，注入反而可能干扰资源加载。
+            List<String> targetUrls = List.of(
+                    "https://www.goofish.com/",
+                    "https://h5api.m.goofish.com/",
+                    "https://www.taobao.com/",
+                    "https://login.taobao.com/"
             );
+
             List<Map<String, Object>> cookieList = new ArrayList<>();
             for (Map.Entry<String, String> entry : merged.entrySet()) {
                 String name = entry.getKey();
                 String value = entry.getValue();
                 if (name == null || name.isBlank() || value == null) continue;
-                for (String domain : domains) {
+                for (String url : targetUrls) {
                     Map<String, Object> cookie = new LinkedHashMap<>();
                     cookie.put("name", name);
                     cookie.put("value", value);
-                    cookie.put("domain", domain);
+                    // 关键：用 url 而非 domain。Chrome 根据 url 自动设置 domain 为该 url 的 host，
+                    // path 为 "/"。这种方式不依赖"当前页面已加载该域"，cookie 直接写入对应域的 cookie store。
+                    cookie.put("url", url);
                     cookie.put("path", "/");
-                    cookie.put("httpOnly", false);
                     cookie.put("secure", true);
+                    // sameSite=None 必须配合 secure=true，否则 cookie 会被 Chrome 拒绝
                     cookie.put("sameSite", "None");
                     cookieList.add(cookie);
                 }
@@ -1636,8 +1662,8 @@ public class XianyuCaptchaSolver {
             Map<String, Object> params = new LinkedHashMap<>();
             params.put("cookies", cookieList);
             sendCommand(socket, "Network.setCookies", params);
-            log.info("[CDP-AUTH] 注入 {} 个 cookie（{} 个唯一键，跨 {} 个域）",
-                    cookieList.size(), merged.size(), domains.size() / 2);
+            log.info("[CDP-AUTH] 注入 {} 个 cookie（{} 个唯一键，跨 {} 个 url）",
+                    cookieList.size(), merged.size(), targetUrls.size());
         } finally {
             if (socket != null) {
                 try { socket.close(); } catch (IOException ignored) {}

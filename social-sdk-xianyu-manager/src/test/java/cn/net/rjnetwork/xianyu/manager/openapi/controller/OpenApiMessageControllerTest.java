@@ -39,26 +39,28 @@ class OpenApiMessageControllerTest {
     }
 
     @Test
-    void list_emptyBound_returnsAll() {
+    void list_emptyBound_returnsEmpty() {
+        // 安全修复：应用未绑定任何账号时返回空列表，而非「返回所有账号消息」。
+        // 旧实现是全表扫描后在 Java 层 filter，bound 为空时 filter 不生效 → 越权返回全表。
         OpenApp app = TestOpenApp.enabled("ak_x");
         OpenApiContext.setOpenApp(app);
         when(openAppService.getBoundAccountIds(app)).thenReturn(Set.of());
-        when(messageMapper.selectList(any())).thenReturn(List.of(msg(1L, 10L), msg(2L, 20L)));
 
         var resp = controller.list(null);
 
         assertEquals("OK", resp.getCode());
-        assertEquals(2, resp.getData().size());
-        verify(openAppService).assertAccountAccessible(app, null);
+        assertTrue(resp.getData().isEmpty());
+        verify(messageMapper, never()).selectList(any());
     }
 
     @Test
     void list_boundFilter_onlyReturnsBoundAccounts() {
+        // 安全修复：过滤条件下推到 SQL（accountId IN (bound)），由 messageMapper.selectList(wrapper) 返回已过滤列表。
+        // 测试不再 mock「未过滤的全表」，而是 mock「按 bound 过滤后的结果」，验证 controller 把 bound 透传给 wrapper。
         OpenApp app = TestOpenApp.bound("ak_x", 10L);
         OpenApiContext.setOpenApp(app);
         when(openAppService.getBoundAccountIds(app)).thenReturn(Set.of(10L));
-        when(messageMapper.selectList(any())).thenReturn(List.of(
-                msg(1L, 10L), msg(2L, 20L)));
+        when(messageMapper.selectList(any())).thenReturn(List.of(msg(1L, 10L)));
 
         var resp = controller.list(null);
 
@@ -68,15 +70,29 @@ class OpenApiMessageControllerTest {
 
     @Test
     void list_accountIdFilter_appliesOnTopOfBound() {
+        // 安全修复：accountId 必须在 bound 集合内，否则返回空（防止调用方传入未绑定的 accountId 越权）。
         OpenApp app = TestOpenApp.enabled("ak_x");
         OpenApiContext.setOpenApp(app);
-        when(openAppService.getBoundAccountIds(app)).thenReturn(Set.of());
-        when(messageMapper.selectList(any())).thenReturn(List.of(msg(1L, 10L), msg(2L, 20L)));
+        when(openAppService.getBoundAccountIds(app)).thenReturn(Set.of(20L));
+        when(messageMapper.selectList(any())).thenReturn(List.of(msg(2L, 20L)));
 
         var resp = controller.list(20L);
 
         assertEquals(1, resp.getData().size());
         assertEquals(20L, resp.getData().get(0).getAccountId());
+    }
+
+    @Test
+    void list_accountIdNotInBound_returnsEmpty() {
+        // 安全修复：accountId 不在 bound 集合内时直接返回空，不查库。
+        OpenApp app = TestOpenApp.enabled("ak_x");
+        OpenApiContext.setOpenApp(app);
+        when(openAppService.getBoundAccountIds(app)).thenReturn(Set.of(10L));
+
+        var resp = controller.list(20L);
+
+        assertTrue(resp.getData().isEmpty());
+        verify(messageMapper, never()).selectList(any());
     }
 
     @Test

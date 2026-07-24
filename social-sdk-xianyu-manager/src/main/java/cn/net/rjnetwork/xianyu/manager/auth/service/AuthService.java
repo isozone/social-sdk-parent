@@ -1,8 +1,10 @@
 package cn.net.rjnetwork.xianyu.manager.auth.service;
 
+import cn.net.rjnetwork.xianyu.manager.auth.dto.ChangePasswordRequest;
 import cn.net.rjnetwork.xianyu.manager.auth.dto.JwtResponse;
 import cn.net.rjnetwork.xianyu.manager.auth.dto.JwtResponse.AdminUserInfo;
 import cn.net.rjnetwork.xianyu.manager.auth.dto.LoginRequest;
+import cn.net.rjnetwork.xianyu.manager.auth.dto.UpdateProfileRequest;
 import cn.net.rjnetwork.xianyu.manager.auth.mapper.AdminUserMapper;
 import cn.net.rjnetwork.xianyu.manager.auth.model.AdminUser;
 import cn.net.rjnetwork.xianyu.manager.auth.security.JwtUtils;
@@ -63,5 +65,44 @@ public class AuthService {
         user.setDisplayName("管理员");
         user.setRoleLevel(9);
         adminUserMapper.insert(user);
+    }
+
+    /**
+     * 更新当前管理员的个人资料（昵称 / 邮箱 / 手机号）。
+     * 仅更新请求中非空字段，username 与 roleLevel 不可修改。
+     */
+    @Transactional
+    public AdminUser updateProfile(String username, UpdateProfileRequest request) {
+        AdminUser user = findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("用户不存在"));
+        if (request.getDisplayName() != null) {
+            user.setDisplayName(request.getDisplayName());
+        }
+        if (request.getEmail() != null) {
+            user.setEmail(request.getEmail());
+        }
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone());
+        }
+        adminUserMapper.updateById(user);
+        return user;
+    }
+
+    /**
+     * 修改当前管理员的登录密码。
+     * 需要先校验原密码正确，再使用 PasswordEncoder 重新编码新密码。
+     */
+    @Transactional
+    public void changePassword(String username, ChangePasswordRequest request) {
+        AdminUser user = findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("用户不存在"));
+        if (!passwordEncoder.matches(request.getOldPassword(), user.getPasswordHash())) {
+            throw new IllegalArgumentException("原密码不正确");
+        }
+        if (request.getNewPassword().equals(request.getOldPassword())) {
+            throw new IllegalArgumentException("新密码不能与原密码相同");
+        }
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        adminUserMapper.updateById(user);
     }
 }

@@ -86,11 +86,11 @@
                 :class="{ mine: msg.direction === 'OUTGOING' }"
               >
                 <div class="msg-time" v-if="msg.messageTime">
-                  <span>{{ formatTime(msg.messageTime.toString()) }}</span>
+                  <span>{{ formatTime(msg.messageTime) }}</span>
                 </div>
                 <div class="msg-row">
                   <el-avatar v-if="msg.direction === 'INCOMING'" :size="32">
-                    {{ avatarText(selectedSessionData.counterpartyName || '') }}
+                    {{ avatarText(selectedSessionData.counterpartyName || selectedSessionData.counterpartyId || '') }}
                   </el-avatar>
                   <div class="bubble">
                     <div v-if="isJsonCard(msg.content)" class="bubble-card">
@@ -279,38 +279,48 @@ function scrollToBottom() {
   })
 }
 
+// 前端兜底分组：/sessions 为空时从 /messages/list 重建会话列表。
+// 关键修复（Bug C）：之前 peerName/peerAvatar/peerId 只在 INCOMING 时取，OUTGOING 时回退 old/''。
+// 当会话最新一条是 OUTGOING（自己发的），peerName 会变成空字符串 → 列表显示"未知用户"。
+// 修复思路：peer 信息在 INCOMING 消息上「累积填充」，OUTGOING 消息只更新 lastContent/lastTime/direction，
+// 不覆盖已找到的 peer 信息。这样即使最新一条是自己发的，也能正确显示对方名/头像。
 function buildSessionsFromMessages(rows) {
   const map = new Map()
   for (const msg of rows || []) {
     if (!msg?.sessionId) continue
-    const old = map.get(msg.sessionId)
-    const oldTime = old?.lastTime || ''
-    const msgTime = msg.messageTime ? String(msg.messageTime) : ''
-    if (!old || msgTime >= oldTime) {
-      const peerName = msg.direction === 'INCOMING'
-        ? msg.senderName
-        : (old?.counterpartyName || old?.counterpartyId || '')
-      const peerId = msg.direction === 'INCOMING'
-        ? msg.senderId
-        : (old?.counterpartyId || '')
-      const peerAvatar = msg.direction === 'INCOMING'
-        ? msg.senderAvatar
-        : (old?.counterpartyAvatar || '')
-      map.set(msg.sessionId, {
-        sessionId: msg.sessionId,
-        counterpartyName: peerName || peerId || '未知用户',
-        counterpartyId: peerId,
-        counterpartyAvatar: peerAvatar,
-        lastContent: msg.content,
-        contentType: msg.msgType || 'TEXT',
-        lastTime: msgTime,
-        direction: msg.direction
-      })
-    } else if (msg.direction === 'INCOMING') {
-      old.counterpartyName = old.counterpartyName || msg.senderName || msg.senderId
-      old.counterpartyId = old.counterpartyId || msg.senderId
-      old.counterpartyAvatar = old.counterpartyAvatar || msg.senderAvatar
+    const old = map.get(msg.sessionId) || {
+      sessionId: msg.sessionId,
+      counterpartyName: '',
+      counterpartyId: '',
+      counterpartyAvatar: '',
+      lastContent: '',
+      contentType: 'TEXT',
+      lastTime: '',
+      direction: msg.direction
     }
+    const oldTime = old.lastTime || ''
+    const msgTime = msg.messageTime ? String(msg.messageTime) : ''
+
+    // INCOMING 消息：累积填充 peer 信息（不覆盖已有非空值，保留最早找到的稳定展示）
+    if (msg.direction === 'INCOMING') {
+      if (!old.counterpartyName) old.counterpartyName = msg.senderName || msg.senderId || ''
+      if (!old.counterpartyId) old.counterpartyId = msg.senderId || ''
+      if (!old.counterpartyAvatar) old.counterpartyAvatar = msg.senderAvatar || ''
+    }
+
+    // 更新「最后消息」字段：只在 msgTime 更新时刷新（按时间排序，最新覆盖）
+    if (!oldTime || msgTime >= oldTime) {
+      old.lastContent = msg.content
+      old.contentType = msg.msgType || 'TEXT'
+      old.lastTime = msgTime
+      old.direction = msg.direction
+    }
+
+    map.set(msg.sessionId, old)
+  }
+  // 兜底：peerName 仍空时优先用 peerId，再不行显示"未知用户"
+  for (const s of map.values()) {
+    if (!s.counterpartyName) s.counterpartyName = s.counterpartyId || '未知用户'
   }
   return Array.from(map.values())
 }

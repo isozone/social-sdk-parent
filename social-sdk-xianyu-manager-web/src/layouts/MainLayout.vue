@@ -130,6 +130,12 @@
           <span class="menu-icon-box"><el-icon><Warning /></el-icon></span>
           <span>熔断器管理</span>
         </el-menu-item>
+        <el-menu-item-group title="系统">
+          <el-menu-item index="/app/profile">
+            <span class="menu-icon-box"><el-icon><User /></el-icon></span>
+            <span>个人中心</span>
+          </el-menu-item>
+        </el-menu-item-group>
       </el-menu>
     </el-aside>
     <el-container>
@@ -166,7 +172,15 @@
           </span>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+              <el-dropdown-item command="profile">
+                <el-icon><User /></el-icon> 个人中心
+              </el-dropdown-item>
+              <el-dropdown-item command="changePassword">
+                <el-icon><Lock /></el-icon> 修改密码
+              </el-dropdown-item>
+              <el-dropdown-item divided command="logout">
+                <el-icon><SwitchButton /></el-icon> 退出登录
+              </el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -424,7 +438,7 @@ import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { DataAnalysis, User, Goods, ChatDotRound, List, Operation, Money, Star, Cpu, Promotion, Van, UploadFilled, Monitor, Document, Bell, UserFilled, ArrowDown, FullScreen, Shop, Medal, Connection, Service, Sunrise, Switch, Timer, Setting, TrendCharts, Compass, Search, Download, Check, InfoFilled, Warning } from '@element-plus/icons-vue'
+import { DataAnalysis, User, Goods, ChatDotRound, List, Operation, Money, Star, Cpu, Promotion, Van, UploadFilled, Monitor, Document, Bell, UserFilled, ArrowDown, FullScreen, Shop, Medal, Connection, Service, Sunrise, Switch, Timer, Setting, TrendCharts, Compass, Search, Download, Check, InfoFilled, Warning, Lock, SwitchButton } from '@element-plus/icons-vue'
 import * as notify from '@/api/notification'
 import { getChromeConfig, detectChrome, saveChromeConfig, downloadChrome, validateChromePath } from '@/api/chrome'
 
@@ -455,7 +469,8 @@ const breadcrumbMap = {
   '/app/market': ['数据资产', '市场情报'],
   '/app/buyer': ['数据资产', '买家画像'],
   '/app/accounts': ['账号管理'],
-  '/app/circuit-breaker': ['数据资产', '熔断器管理']
+  '/app/circuit-breaker': ['数据资产', '熔断器管理'],
+  '/app/profile': ['系统', '个人中心']
 }
 
 const currentBreadcrumb = computed(() => breadcrumbMap[route.path] || ['管理后台'])
@@ -483,7 +498,8 @@ const pageIconMap = {
   '/app/market': '🧭',
   '/app/buyer': '👤',
   '/app/circuit-breaker': '⚠️',
-  '/app/accounts': '👤'
+  '/app/accounts': '👤',
+  '/app/profile': '👤'
 }
 
 const currentIcon = computed(() => pageIconMap[route.path] || '📄')
@@ -509,7 +525,8 @@ const titleMap = {
   '/app/ai-cs': 'AI 客服',
   '/app/tasks': '监控任务',
   '/app/reviews': '评价与信用',
-  '/app/polish': '商品擦亮'
+  '/app/polish': '商品擦亮',
+  '/app/profile': '个人中心'
 }
 
 const currentTitle = computed(() => titleMap[route.path] || '管理后台')
@@ -519,7 +536,11 @@ function openDataBoard() {
 }
 
 function handleCommand(cmd) {
-  if (cmd === 'logout') {
+  if (cmd === 'profile') {
+    router.push('/app/profile')
+  } else if (cmd === 'changePassword') {
+    router.push('/app/profile')
+  } else if (cmd === 'logout') {
     ElMessageBox.confirm('确认退出登录？', '提示', { type: 'warning' }).then(() => {
       authStore.logout()
       router.push('/login')

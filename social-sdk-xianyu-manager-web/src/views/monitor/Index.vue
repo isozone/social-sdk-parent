@@ -51,19 +51,22 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { getDashboard, clearCache } from '@/api/monitor'
+// 修复 Bug：statCards 之前用字符串 icon 名（'User' 等），但 <component :is="..."> 需要组件引用而非字符串名，
+// 导致统计卡片的图标渲染不出来。改为直接导入 Element Plus 图标组件作为 icon 值。
+import { User, CircleCheck, Goods, Shop, ChatLineRound, View, Star, Warning } from '@element-plus/icons-vue'
 
 const overview = ref({})
 const accounts = ref([])
 
 const statCards = computed(() => [
-  { title: '总账号数', value: overview.value.totalAccounts || 0, icon: 'User', color: '#409EFF' },
-  { title: '在线账号', value: overview.value.onlineAccounts || 0, icon: 'CircleCheck', color: '#67C23A' },
-  { title: '总商品数', value: overview.value.totalProducts || 0, icon: 'Goods', color: '#E6A23C' },
-  { title: '在售商品', value: overview.value.onSaleProducts || 0, icon: 'Shop', color: '#F56C6C' },
-  { title: '今日回复', value: overview.value.todayReplies || 0, icon: 'ChatLineRound', color: '#909399' },
-  { title: '总浏览量', value: overview.value.totalViews || 0, icon: 'View', color: '#73C0DE' },
-  { title: '总收藏', value: overview.value.totalFavorites || 0, icon: 'Star', color: '#FC8452' },
-  { title: '异常账号', value: overview.value.cookieExpiredAccounts || 0, icon: 'Warning', color: '#EE6666' }
+  { title: '总账号数', value: overview.value.totalAccounts || 0, icon: User, color: '#409EFF' },
+  { title: '在线账号', value: overview.value.onlineAccounts || 0, icon: CircleCheck, color: '#67C23A' },
+  { title: '总商品数', value: overview.value.totalProducts || 0, icon: Goods, color: '#E6A23C' },
+  { title: '在售商品', value: overview.value.onSaleProducts || 0, icon: Shop, color: '#F56C6C' },
+  { title: '今日回复', value: overview.value.todayReplies || 0, icon: ChatLineRound, color: '#909399' },
+  { title: '总浏览量', value: overview.value.totalViews || 0, icon: View, color: '#73C0DE' },
+  { title: '总收藏', value: overview.value.totalFavorites || 0, icon: Star, color: '#FC8452' },
+  { title: '异常账号', value: overview.value.cookieExpiredAccounts || 0, icon: Warning, color: '#EE6666' }
 ])
 
 function statusType(status) {

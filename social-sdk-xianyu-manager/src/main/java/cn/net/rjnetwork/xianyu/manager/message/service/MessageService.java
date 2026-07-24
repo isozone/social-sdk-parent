@@ -82,10 +82,12 @@ public class MessageService {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("sessionId", sid);
 
-            // 取该会话最新一条消息作为“最后消息”
-            List<XianyuMessage> latest = messageMapper.selectBySession(accountId, sid, 1);
-            if (!latest.isEmpty()) {
-                XianyuMessage last = latest.get(0);
+            // 取该会话最新一条消息作为“最后消息”。
+            // 关键：用 selectLatestBySession（ORDER BY message_time DESC, id DESC LIMIT 1），
+            // 而不是 selectBySession(..., 1) —— 后者外层会再排一次 ASC，且当多条消息同一秒时
+            // 仅按 message_time DESC 取 LIMIT 1 可能取到中间一条，导致会话列表显示错误摘要。
+            XianyuMessage last = messageMapper.selectLatestBySession(accountId, sid);
+            if (last != null) {
                 row.put("lastContent", last.getContent());
                 row.put("contentType", last.getMsgType() != null ? last.getMsgType() : "TEXT");
                 row.put("lastTime", last.getMessageTime() != null ? last.getMessageTime().toString() : null);
@@ -93,13 +95,11 @@ public class MessageService {
             }
 
             // 会话标题必须取“对方”信息：按 senderId 排除当前账号自己。
-            // 历史库里曾有 direction 全写成 INCOMING 的数据，不能再依赖 direction='INCOMING' 判断对方。
+            // 历史库里曾有 direction 全写成 INCOMING 的数据，不能再依赖 direction='INCOMING' 判断对方，
+            // 因此废弃 selectLatestIncoming 兜底，统一用 selectLatestPeerMessage。
             String selfUserId = extractSelfUserId(accountId);
             XianyuMessage peerMsg = messageMapper.selectLatestPeerMessage(
-                    accountId, sid, selfUserId, ensureGoofishSuffix(selfUserId));
-            if (peerMsg == null) {
-                peerMsg = messageMapper.selectLatestIncoming(accountId, sid);
-            }
+                    accountId, sid, stripGoofishSuffix(selfUserId), ensureGoofishSuffix(selfUserId));
             String peer = peerMsg != null ? peerMsg.getSenderName() : null;
             String peerId = peerMsg != null ? peerMsg.getSenderId() : null;
             String peerAvatar = peerMsg != null ? peerMsg.getSenderAvatar() : null;
@@ -1174,27 +1174,34 @@ public class MessageService {
     }
 
     /**
-     * 从账号 cookie 里提取 selfUserId（闲鱼 cookie 的 unb 字段或 userId 字段）
-     * 用于判消息 direction：senderId == selfId 则 OUTGOING（自己发的），否则 INCOMING（对方发的）
+     * 提取当前账号 selfUserId，用于判消息方向：senderId == selfId 则 OUTGOING，否则 INCOMING。
      */
     private String extractSelfUserId(Long accountId) {
         try {
             XianyuAccount acc = accountMapper.selectById(accountId);
-            if (acc == null || acc.getCookieHeader() == null) return "";
-            String cookie = acc.getCookieHeader();
-            // cookie 形如 "key1=val1; key2=val2; ..."，找 unb= 或 userId= 字段
-            for (String seg : cookie.split(";")) {
-                seg = seg.trim();
-                if (seg.startsWith("unb=")) return seg.substring(4).trim();
-                if (seg.startsWith("_m_h5_tk=")) {
-                    // _m_h5_tk 形如 "token_userid_timestamp"，第二个是 userId
-                    String val = seg.substring("_m_h5_tk=".length());
-                    String[] parts = val.split("_");
-                    if (parts.length >= 2) return parts[1];
-                }
+            if (acc == null) return "";
+            if (acc.getUserId() != null && !acc.getUserId().isBlank()) {
+                return stripGoofishSuffix(acc.getUserId());
             }
+            String cookie = acc.getCookieHeader();
+            String unb = cookieValue(cookie, "unb");
+            if (!unb.isBlank()) return stripGoofishSuffix(unb);
+            String userId = cookieValue(cookie, "userId");
+            if (!userId.isBlank()) return stripGoofishSuffix(userId);
         } catch (Exception e) {
             log.warn("[MESSAGE] extractSelfUserId failed for account {}: {}", accountId, e.getMessage());
+        }
+        return "";
+    }
+
+    private String cookieValue(String cookie, String name) {
+        if (cookie == null || cookie.isBlank() || name == null || name.isBlank()) return "";
+        String prefix = name + "=";
+        for (String seg : cookie.split(";")) {
+            String trimmed = seg.trim();
+            if (trimmed.startsWith(prefix)) {
+                return trimmed.substring(prefix.length()).trim();
+            }
         }
         return "";
     }
@@ -1267,10 +1274,9 @@ public class MessageService {
             throw new IllegalStateException("无法从账号 cookie 提取 selfUserId，请重新登录");
         }
         XianyuMessage peerMsg = messageMapper.selectLatestPeerMessage(
-                request.getAccountId(), request.getSessionId(), selfUserId, ensureGoofishSuffix(selfUserId));
-        if (peerMsg == null) {
-            peerMsg = messageMapper.selectLatestIncoming(request.getAccountId(), request.getSessionId());
-        }
+                request.getAccountId(), request.getSessionId(), stripGoofishSuffix(selfUserId), ensureGoofishSuffix(selfUserId));
+        // 废弃 selectLatestIncoming 兜底：历史数据 direction 全是 INCOMING，
+        // 会让「自己发的消息」被误判为对方，发送时 actualReceivers 把自己的 id 当对方塞进去，被服务端拒绝。
         String peerUserId = peerMsg != null ? peerMsg.getSenderId() : "";
         if (peerUserId.isBlank()) {
             // 该会话还没收到过对方消息（刚发起的会话），用 sessionId 兜底

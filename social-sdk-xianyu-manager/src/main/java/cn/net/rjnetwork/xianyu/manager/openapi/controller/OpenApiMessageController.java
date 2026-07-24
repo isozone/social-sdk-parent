@@ -39,10 +39,27 @@ public class OpenApiMessageController {
         OpenApp app = OpenApiContext.getOpenApp();
         openAppService.assertAccountAccessible(app, accountId);
 
+        // 修复 Bug：原实现 messageMapper.selectList(new LambdaQueryWrapper<>()) 会把整张 xianyu_message
+        // 表加载到内存再在 Java 层 filter，消息量大时 OOM；且 assertAccountAccessible 只校验传入的 accountId，
+        // 若调用方不传 accountId 则返回所有账号消息（越权）。
+        // 修复：把过滤条件下推到 SQL —— bound 为空返回空（应用未绑定任何账号），否则用 IN 限定账号范围，
+        // accountId 非空时再 AND 一次。
         Set<Long> bound = openAppService.getBoundAccountIds(app);
-        List<OpenApiMessageVO> result = messageMapper.selectList(new LambdaQueryWrapper<XianyuMessage>()).stream()
-                .filter(m -> bound.isEmpty() || bound.contains(m.getAccountId()))
-                .filter(m -> accountId == null || m.getAccountId().equals(accountId))
+        if (bound.isEmpty()) {
+            return OpenApiResponse.ok(List.of());
+        }
+        LambdaQueryWrapper<XianyuMessage> wrapper = new LambdaQueryWrapper<XianyuMessage>()
+                .in(XianyuMessage::getAccountId, bound)
+                .orderByDesc(XianyuMessage::getMessageTime);
+        if (accountId != null) {
+            if (!bound.contains(accountId)) {
+                return OpenApiResponse.ok(List.of());
+            }
+            wrapper.eq(XianyuMessage::getAccountId, accountId);
+        }
+        // 限制最多返回 200 条，防止极端数据量拖垮接口
+        wrapper.last("LIMIT 200");
+        List<OpenApiMessageVO> result = messageMapper.selectList(wrapper).stream()
                 .map(this::toVo)
                 .toList();
         return OpenApiResponse.ok(result);

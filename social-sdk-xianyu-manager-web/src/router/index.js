@@ -193,6 +193,12 @@ const routes = [
         name: 'CircuitBreaker',
         component: () => import('@/views/circuitBreaker/Index.vue'),
         meta: { title: '熔断器管理' }
+      },
+      {
+        path: 'profile',
+        name: 'Profile',
+        component: () => import('@/views/profile/Index.vue'),
+        meta: { title: '个人中心' }
       }
     ]
   }

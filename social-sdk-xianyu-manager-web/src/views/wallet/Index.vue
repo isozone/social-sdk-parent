@@ -80,7 +80,14 @@ const syncOk = ref(true)
 async function loadAccounts() {
   try {
     const res = await api.get('/accounts')
-    if (res.success) accounts.value = res.data
+    if (res.success) {
+      accounts.value = res.data
+      // 默认选中第一个账号，否则钱包页打开时 selectedAccountId 一直为 null，数据不加载
+      if (accounts.value.length > 0 && !selectedAccountId.value) {
+        selectedAccountId.value = accounts.value[0].id
+        await loadWallet()
+      }
+    }
   } catch (e) {}
 }
 

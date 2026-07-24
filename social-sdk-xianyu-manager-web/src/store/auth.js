@@ -36,11 +36,16 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  /** 用接口返回的个人信息（含 email/phone 等）合并到本地 store */
+  function applyProfile(profile) {
+    user.value = { ...(user.value || {}), ...profile }
+  }
+
   function logout() {
     token.value = ''
     user.value = null
     localStorage.removeItem('token')
   }
 
-  return { token, user, isLoggedIn, login, fetchProfile, logout }
+  return { token, user, isLoggedIn, login, fetchProfile, applyProfile, logout }
 })

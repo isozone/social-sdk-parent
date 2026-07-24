@@ -5,7 +5,10 @@ import cn.net.rjnetwork.xianyu.manager.monitor.model.MonitorResult;
 import cn.net.rjnetwork.xianyu.manager.monitor.model.MonitorTask;
 import cn.net.rjnetwork.xianyu.manager.monitor.service.MonitorResultService;
 import cn.net.rjnetwork.xianyu.manager.monitor.service.MonitorService;
+import cn.net.rjnetwork.xianyu.manager.monitor.service.MonitorTaskRunner;
 import cn.net.rjnetwork.xianyu.manager.monitor.service.MonitorTaskService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -15,14 +18,19 @@ import java.util.Map;
 @RequestMapping("/api/monitor")
 public class MonitorController {
 
+    private static final Logger logger = LoggerFactory.getLogger(MonitorController.class);
+
     private final MonitorTaskService taskService;
     private final MonitorResultService resultService;
     private final MonitorService monitorService;
+    private final MonitorTaskRunner taskRunner;
 
-    public MonitorController(MonitorTaskService taskService, MonitorResultService resultService, MonitorService monitorService) {
+    public MonitorController(MonitorTaskService taskService, MonitorResultService resultService,
+                             MonitorService monitorService, MonitorTaskRunner taskRunner) {
         this.taskService = taskService;
         this.resultService = resultService;
         this.monitorService = monitorService;
+        this.taskRunner = taskRunner;
     }
 
     /**
@@ -97,14 +105,14 @@ public class MonitorController {
     public ApiResponse<String> runNow(@PathVariable Long id) {
         MonitorTask task = taskService.get(id);
         if (task == null) return ApiResponse.error("任务不存在");
-        // 异步执行
+        // 异步执行，避免阻塞 HTTP 请求
         new Thread(() -> {
             try {
-                // 通过 application context 获取 runner 执行
+                taskRunner.executeTask(task);
             } catch (Exception e) {
-                // log
+                logger.error("手动触发任务 {} 执行失败", task.getId(), e);
             }
-        }).start();
+        }, "monitor-run-" + id).start();
         return ApiResponse.success("已触发执行");
     }
 

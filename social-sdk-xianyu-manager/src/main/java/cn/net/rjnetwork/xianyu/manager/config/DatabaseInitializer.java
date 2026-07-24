@@ -61,6 +61,27 @@ public class DatabaseInitializer {
         }
     }
 
+    private boolean indexExists(java.sql.Connection conn, String table, String indexName) {
+        if (indexName == null || indexName.isBlank()) return false;
+        String sql;
+        if (isSqlite()) {
+            sql = "SELECT name FROM sqlite_master WHERE type='index' AND name='" + indexName + "'";
+        } else if ("postgres".equals(dialect())) {
+            sql = "SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND indexname = '" + indexName + "' LIMIT 1";
+        } else {
+            sql = "SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() "
+                    + "AND index_name = '" + indexName + "'"
+                    + (table == null || table.isBlank() ? "" : " AND table_name = '" + table + "'")
+                    + " LIMIT 1";
+        }
+        try (java.sql.Statement st = conn.createStatement();
+             java.sql.ResultSet rs = st.executeQuery(sql)) {
+            return rs.next();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     /**
      * 查列是否存在（多方言）。
      * SQLite: sqlite_master 的 sql 字段正则匹配；MySQL/PG: information_schema.columns。
@@ -130,6 +151,7 @@ public class DatabaseInitializer {
             ensureMessageColumns();
             ensureOpenAppTable();
             ensureImColumns();
+            ensureAccountIdentityFromCookie();
             ensureRuleColumns();
             // ===== 新增模块的列补齐 =====
             ensureMarketColumns();
@@ -277,6 +299,12 @@ public class DatabaseInitializer {
             int ok = 0, skip = 0;
             Exception firstHardError = null;
             for (String sql : stmts) {
+                String[] indexParts = createIndexParts(sql);
+                if (indexParts != null && indexExists(conn, indexParts[1], indexParts[0])) {
+                    skip++;
+                    logger.debug("schema index skipped (already exists): {}", indexParts[0]);
+                    continue;
+                }
                 try {
                     st.execute(sql);
                     ok++;
@@ -385,6 +413,69 @@ public class DatabaseInitializer {
     private void ensureRuleColumns() {
         ensureColumn("xianyu_keyword_rule", "action", "VARCHAR(16)");
         ensureColumn("xianyu_keyword_rule", "action_target_item_id", "VARCHAR(64)");
+    }
+
+    private void ensureAccountIdentityFromCookie() {
+        try (java.sql.Connection conn = dataSource.getConnection()) {
+            if (!tableExists(conn, "xianyu_account")) return;
+            try (java.sql.PreparedStatement query = conn.prepareStatement(
+                    "SELECT id, account_name, user_id, display_name, cookie_header FROM xianyu_account WHERE deleted = 0");
+                 java.sql.ResultSet rs = query.executeQuery();
+                 java.sql.PreparedStatement update = conn.prepareStatement(
+                         "UPDATE xianyu_account SET user_id = ?, display_name = ? WHERE id = ?")) {
+                int updated = 0;
+                while (rs.next()) {
+                    String userId = trim(rs.getString("user_id"));
+                    String displayName = trim(rs.getString("display_name"));
+                    String accountName = trim(rs.getString("account_name"));
+                    String cookie = rs.getString("cookie_header");
+                    String cookieUserId = firstNotBlank(cookieValue(cookie, "unb"), cookieValue(cookie, "userId"));
+                    String resolvedUserId = firstNotBlank(userId, stripGoofishSuffix(cookieUserId));
+                    String resolvedDisplayName = firstNotBlank(displayName, accountName, cookieValue(cookie, "tracknick"));
+                    if (resolvedUserId.equals(userId) && resolvedDisplayName.equals(displayName)) continue;
+                    update.setString(1, resolvedUserId);
+                    update.setString(2, resolvedDisplayName);
+                    update.setLong(3, rs.getLong("id"));
+                    update.addBatch();
+                    updated++;
+                }
+                if (updated > 0) {
+                    update.executeBatch();
+                    logger.info("Backfilled {} xianyu_account identity rows from cookie", updated);
+                }
+            }
+        } catch (Exception e) {
+            logger.warn("ensureAccountIdentityFromCookie skipped: {}", e.getMessage());
+        }
+    }
+
+    private String cookieValue(String cookie, String name) {
+        if (cookie == null || cookie.isBlank() || name == null || name.isBlank()) return "";
+        String prefix = name + "=";
+        for (String seg : cookie.split(";")) {
+            String trimmed = seg.trim();
+            if (trimmed.startsWith(prefix)) return trimmed.substring(prefix.length()).trim();
+        }
+        return "";
+    }
+
+    private String firstNotBlank(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            String trimmed = trim(value);
+            if (!trimmed.isEmpty()) return trimmed;
+        }
+        return "";
+    }
+
+    private String trim(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private String stripGoofishSuffix(String userId) {
+        String trimmed = trim(userId);
+        int at = trimmed.indexOf('@');
+        return at > 0 ? trimmed.substring(0, at) : trimmed;
     }
 
     /**

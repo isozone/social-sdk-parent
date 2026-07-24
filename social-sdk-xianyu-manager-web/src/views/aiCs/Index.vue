@@ -118,12 +118,16 @@ const knowledgeForm = ref({
 
 async function loadData() {
   try {
-    const [sr, kr] = await Promise.all([
+    const [sr, kr, ssr] = await Promise.all([
       api.get('/ai/cs/sessions?page=1&size=50'),
-      api.get('/ai/cs/knowledge')
+      api.get('/ai/cs/knowledge'),
+      api.get('/ai/cs/session-states?page=1&size=50')
     ])
-    if (sr.success) sessions.value = sr.data?.records || []
-    if (kr.success) knowledgeList.value = kr.data?.records || []
+    if (sr.success) sessions.value = sr.data?.records || sr.data || []
+    if (kr.success) knowledgeList.value = kr.data?.records || kr.data || []
+    // 修复 Bug：之前议价记录 tab 永远空 —— sessionStates 从未被加载。
+    // 现在并行拉取 /ai/cs/session-states，兼容裸数组和分页对象两种返回格式。
+    if (ssr && ssr.success) sessionStates.value = ssr.data?.records || ssr.data || []
   } catch (e) {}
 }
 
