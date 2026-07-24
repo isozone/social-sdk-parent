@@ -352,6 +352,15 @@ public class DatabaseInitializer {
         return line;
     }
 
+    private String[] createIndexParts(String sql) {
+        if (sql == null) return null;
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("(?is)^\\s*CREATE\\s+(?:UNIQUE\\s+)?INDEX(?:\\s+IF\\s+NOT\\s+EXISTS)?\\s+[`\\\"]?([a-zA-Z0-9_]+)[`\\\"]?\\s+ON\\s+[`\\\"]?([a-zA-Z0-9_]+)[`\\\"]?\\s*\\(")
+                .matcher(sql);
+        if (!m.find()) return null;
+        return new String[] { m.group(1), m.group(2) };
+    }
+
     private void ensureProductColumns() {
         ensureColumn("xianyu_product", "image_url", "VARCHAR(512)");
         ensureColumn("xianyu_product", "raw_data", "TEXT");
