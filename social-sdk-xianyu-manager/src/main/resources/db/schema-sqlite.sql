@@ -1019,3 +1019,60 @@ CREATE INDEX idx_local_product_account ON local_product(account_id);
 CREATE INDEX idx_local_product_status ON local_product(status);
 CREATE INDEX idx_local_product_deleted ON local_product(deleted);
 
+
+-- ======================== 批次日志通用框架（B9） ========================
+CREATE TABLE IF NOT EXISTS batch_job (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_type        VARCHAR(64) NOT NULL,
+    job_code        VARCHAR(128),
+    trigger_source  VARCHAR(16) DEFAULT 'SCHEDULER',
+    status          VARCHAR(16) DEFAULT 'RUNNING',
+    total_count     INTEGER DEFAULT 0,
+    success_count   INTEGER DEFAULT 0,
+    failed_count    INTEGER DEFAULT 0,
+    skipped_count   INTEGER DEFAULT 0,
+    started_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at        DATETIME,
+    summary         VARCHAR(512),
+    failure_summary VARCHAR(2000),
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted         INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_batch_job_type ON batch_job(job_type, started_at);
+CREATE INDEX IF NOT EXISTS idx_batch_job_status ON batch_job(status, deleted);
+
+CREATE TABLE IF NOT EXISTS batch_job_item (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    batch_id        INTEGER NOT NULL,
+    item_key        VARCHAR(128),
+    item_label      VARCHAR(256),
+    status          VARCHAR(16),
+    duration_ms     INTEGER,
+    failure_reason  VARCHAR(512),
+    detail          TEXT,
+    started_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at        DATETIME,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted         INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_batch_item_batch ON batch_job_item(batch_id);
+CREATE INDEX IF NOT EXISTS idx_batch_item_status ON batch_job_item(status, deleted);
+
+-- ======================== I7 schema 迁移版本表 ========================
+CREATE TABLE IF NOT EXISTS schema_migration (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    namespace       VARCHAR(64) NOT NULL,
+    version         VARCHAR(32) NOT NULL,
+    description     VARCHAR(256),
+    duration_ms     INTEGER,
+    status          VARCHAR(16),
+    failure_reason  VARCHAR(512),
+    executed_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted         INTEGER DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_schema_migration_ns_ver ON schema_migration(namespace, version);
+CREATE INDEX IF NOT EXISTS idx_schema_migration_status ON schema_migration(status, deleted);

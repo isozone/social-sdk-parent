@@ -328,7 +328,7 @@ import { Plus, Search, Edit, Delete, ChatDotRound, Promotion, Cpu, Refresh } fro
 import api from '@/api/request'
 
 // ===== 厂商类型映射 =====
-const TYPE_COLOR = { OPENAI_COMPATIBLE: '#409EFF', CLAUDE: '#d97706', CUSTOM: '#909399' }
+const TYPE_COLOR = { OPENAI_COMPATIBLE: '#7c3aed', CLAUDE: '#d97706', CUSTOM: '#909399' }
 const TYPE_TAG = { OPENAI_COMPATIBLE: 'primary', CLAUDE: 'warning', CUSTOM: 'info' }
 const TYPE_LABEL = { OPENAI_COMPATIBLE: 'OpenAI 兼容', CLAUDE: 'Claude', CUSTOM: '自定义' }
 const typeColor = (t) => TYPE_COLOR[t] || '#909399'
@@ -594,7 +594,7 @@ onMounted(() => { loadProviders() })
   padding: 1px 8px;
   font-size: 12px;
   font-weight: 600;
-  color: #409eff;
+  color: #7c3aed;
   background: #ecf5ff;
   border-radius: 10px;
 }
@@ -624,8 +624,8 @@ onMounted(() => { loadProviders() })
   background: #f5faff;
 }
 .vendor-item.is-active {
-  border-color: #409eff;
-  border-left-color: #409eff;
+  border-color: #7c3aed;
+  border-left-color: #7c3aed;
   background: #ecf5ff;
   box-shadow: 0 2px 8px rgba(64, 158, 255, 0.12);
 }
@@ -773,7 +773,7 @@ onMounted(() => { loadProviders() })
 }
 .fetch-tip code {
   background: #f4f4f5;
-  color: #409eff;
+  color: #7c3aed;
   padding: 1px 6px;
   border-radius: 4px;
   font-size: 12px;
@@ -856,7 +856,7 @@ onMounted(() => { loadProviders() })
 }
 .bubble--user {
   align-self: flex-end;
-  background: #409eff;
+  background: #7c3aed;
   color: #fff;
   border-bottom-right-radius: 2px;
 }

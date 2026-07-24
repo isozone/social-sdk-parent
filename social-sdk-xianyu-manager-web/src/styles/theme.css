@@ -54,6 +54,11 @@
 .el-card__header {
   border-bottom: 1px solid var(--border);
   padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 /* ===== 图标 chip：统一卡片头/区块的图标容器 ===== */

@@ -100,7 +100,7 @@
                       <el-button
                         v-if="parseJsonCard(msg.content).buttonText"
                         size="small"
-                        :color="parseJsonCard(msg.content).buttonBgColor || '#409eff'"
+                        :color="parseJsonCard(msg.content).buttonBgColor || '#7c3aed'"
                         class="card-btn"
                         @click="parseJsonCard(msg.content).targetUrl && window.open(parseJsonCard(msg.content).targetUrl, '_blank')"
                       >{{ parseJsonCard(msg.content).buttonText }}</el-button>

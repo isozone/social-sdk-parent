@@ -1,6 +1,7 @@
 package cn.net.rjnetwork.xianyu.manager.config;
 
 import cn.net.rjnetwork.xianyu.manager.auth.service.AuthService;
+import cn.net.rjnetwork.xianyu.manager.config.migration.MigrationExecutor;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +31,7 @@ public class DatabaseInitializer {
     private final DataSource dataSource;
     private final AuthService authService;
     private final cn.net.rjnetwork.xianyu.manager.config.db.DatabaseProvider databaseProvider;
+    private final MigrationExecutor migrationExecutor;
 
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -115,10 +117,12 @@ public class DatabaseInitializer {
     }
 
     public DatabaseInitializer(DataSource dataSource, AuthService authService,
-                               cn.net.rjnetwork.xianyu.manager.config.db.DatabaseProvider databaseProvider) {
+                               cn.net.rjnetwork.xianyu.manager.config.db.DatabaseProvider databaseProvider,
+                               MigrationExecutor migrationExecutor) {
         this.dataSource = dataSource;
         this.authService = authService;
         this.databaseProvider = databaseProvider;
+        this.migrationExecutor = migrationExecutor;
     }
 
     @PostConstruct
@@ -161,6 +165,8 @@ public class DatabaseInitializer {
             ensureCircuitBreakerColumns();
             ensureAiCsSessionStateColumns();
             ensureAutoReplyLogTable();
+            // ===== B9 批次日志框架：batch_job / batch_job_item 旧库补建 =====
+            ensureBatchTables();
 
             // ===== proxy 模块表初始化（proxy_account_binding / proxy_cool_down / proxy_audit_log）=====
             // proxy 模块的 schema 文件在 social-sdk-proxys/db/proxy-bindings.sql，
@@ -180,6 +186,15 @@ public class DatabaseInitializer {
             logger.info("Default admin account initialized (username: admin, password: admin123)");
         } catch (Exception e) {
             logger.warn("Admin initialization skipped: {}", e.getMessage());
+        }
+
+        // ===== I7 数据迁移：启动时幂等执行所有 MigrationStep Bean =====
+        // 必须在主 schema + ensure* 补列之后跑，避免迁移对着不存在的表 ALTER 会炸。
+        // 失败仅记录不中断启动，由 schema_migration.failure_reason 告警人工介入。
+        try {
+            migrationExecutor.startup();
+        } catch (Exception e) {
+            logger.warn("Schema migration startup hook failed (non-fatal): {}", e.getMessage());
         }
     }
 
@@ -700,6 +715,82 @@ public class DatabaseInitializer {
         // ai_cs_session 表补齐
         ensureColumn("ai_cs_session", "product_id", "INTEGER");
         ensureColumn("ai_cs_session", "order_id", "INTEGER");
+    }
+
+    /**
+     * B9 批次日志框架：旧库启动时若 batch_job / batch_job_item 表缺失则按当前 dialect 建表兜底。
+     * 新库已通过 schema*.sql 建好，这里只针对升级场景。
+     */
+    private void ensureBatchTables() {
+        try (java.sql.Connection conn = dataSource.getConnection()) {
+            if (!tableExists(conn, "batch_job")) {
+                try (java.sql.Statement st = conn.createStatement()) {
+                    st.execute(buildBatchJobDdl());
+                    logger.info("Created missing table batch_job (B9 framework)");
+                }
+            }
+            if (!tableExists(conn, "batch_job_item")) {
+                try (java.sql.Statement st = conn.createStatement()) {
+                    st.execute(buildBatchJobItemDdl());
+                    logger.info("Created missing table batch_job_item (B9 framework)");
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("ensureBatchTables skipped: {}", e.getMessage());
+        }
+    }
+
+    /** 按 dialect 生成 batch_job 建表 SQL。 */
+    private String buildBatchJobDdl() {
+        String idType = databaseProvider != null && "postgres".equals(databaseProvider.dialect())
+                ? "BIGSERIAL" : "INTEGER";
+        String idPk = "postgres".equals(databaseProvider == null ? "sqlite" : databaseProvider.dialect())
+                      || "mysql".equals(databaseProvider == null ? "sqlite" : databaseProvider.dialect())
+                ? idType + " PRIMARY KEY AUTO_INCREMENT"
+                : idType + " PRIMARY KEY AUTOINCREMENT";
+        return "CREATE TABLE batch_job ("
+                + "id " + idPk + ", "
+                + "job_type VARCHAR(64) NOT NULL, "
+                + "job_code VARCHAR(128), "
+                + "trigger_source VARCHAR(16) DEFAULT 'SCHEDULER', "
+                + "status VARCHAR(16) DEFAULT 'RUNNING', "
+                + "total_count INTEGER DEFAULT 0, "
+                + "success_count INTEGER DEFAULT 0, "
+                + "failed_count INTEGER DEFAULT 0, "
+                + "skipped_count INTEGER DEFAULT 0, "
+                + "started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                + "ended_at TIMESTAMP, "
+                + "summary VARCHAR(512), "
+                + "failure_summary VARCHAR(2000), "
+                + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                + "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                + "deleted INTEGER DEFAULT 0"
+                + ")";
+    }
+
+    /** 按 dialect 生成 batch_job_item 建表 SQL。 */
+    private String buildBatchJobItemDdl() {
+        String idType = databaseProvider != null && "postgres".equals(databaseProvider.dialect())
+                ? "BIGSERIAL" : "INTEGER";
+        String idPk = "postgres".equals(databaseProvider == null ? "sqlite" : databaseProvider.dialect())
+                      || "mysql".equals(databaseProvider == null ? "sqlite" : databaseProvider.dialect())
+                ? idType + " PRIMARY KEY AUTO_INCREMENT"
+                : idType + " PRIMARY KEY AUTOINCREMENT";
+        return "CREATE TABLE batch_job_item ("
+                + "id " + idPk + ", "
+                + "batch_id BIGINT NOT NULL, "
+                + "item_key VARCHAR(128), "
+                + "item_label VARCHAR(256), "
+                + "status VARCHAR(16), "
+                + "duration_ms BIGINT, "
+                + "failure_reason VARCHAR(512), "
+                + "detail TEXT, "
+                + "started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                + "ended_at TIMESTAMP, "
+                + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                + "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                + "deleted INTEGER DEFAULT 0"
+                + ")";
     }
 
     private void ensureColumn(String table, String column, String ddl) {

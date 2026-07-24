@@ -1062,3 +1062,61 @@ CREATE TABLE IF NOT EXISTS proxy_audit_log (
     INDEX idx_proxy_audit_account (account_id, created_at),
     INDEX idx_proxy_audit_action (action, created_at)
 );
+
+-- ======================== 批次日志通用框架（B9） ========================
+-- 统一承载所有定时任务的「一次执行批次」与明细，避免每个任务重复造一份批次表结构。
+CREATE TABLE IF NOT EXISTS batch_job (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    job_type        VARCHAR(64) NOT NULL,
+    job_code        VARCHAR(128),
+    trigger_source  VARCHAR(16) DEFAULT 'SCHEDULER',
+    status          VARCHAR(16) DEFAULT 'RUNNING',
+    total_count     INTEGER DEFAULT 0,
+    success_count   INTEGER DEFAULT 0,
+    failed_count    INTEGER DEFAULT 0,
+    skipped_count   INTEGER DEFAULT 0,
+    started_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at        DATETIME,
+    summary         VARCHAR(512),
+    failure_summary VARCHAR(2000),
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted         INTEGER DEFAULT 0,
+    INDEX idx_batch_job_type (job_type, started_at),
+    INDEX idx_batch_job_status (status, deleted)
+);
+
+CREATE TABLE IF NOT EXISTS batch_job_item (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    batch_id        BIGINT NOT NULL,
+    item_key        VARCHAR(128),
+    item_label      VARCHAR(256),
+    status          VARCHAR(16),
+    duration_ms     BIGINT,
+    failure_reason  VARCHAR(512),
+    detail          TEXT,
+    started_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at        DATETIME,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted         INTEGER DEFAULT 0,
+    INDEX idx_batch_item_batch (batch_id),
+    INDEX idx_batch_item_status (status, deleted)
+);
+
+-- ======================== I7 schema 迁移版本表 ========================
+CREATE TABLE IF NOT EXISTS schema_migration (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    namespace       VARCHAR(64) NOT NULL,
+    version         VARCHAR(32) NOT NULL,
+    description     VARCHAR(256),
+    duration_ms     BIGINT,
+    status          VARCHAR(16),
+    failure_reason  VARCHAR(512),
+    executed_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted         INTEGER DEFAULT 0,
+    UNIQUE KEY uk_schema_migration_ns_ver (namespace, version),
+    INDEX idx_schema_migration_status (status, deleted)
+);

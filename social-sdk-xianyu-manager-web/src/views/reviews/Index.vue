@@ -249,7 +249,7 @@
           <el-divider content-position="left">{{ refundDescribe.title }}</el-divider>
           <div v-for="(line, li) in refundDescribe.descRichText" :key="li" class="describe-line">
             <span v-for="(seg, si) in line.data" :key="si">
-              <a v-if="seg.linkUrl" :href="seg.linkUrl" target="_blank" style="color: #409eff">{{ seg.content }}</a>
+              <a v-if="seg.linkUrl" :href="seg.linkUrl" target="_blank" style="color: #7c3aed">{{ seg.content }}</a>
               <span v-else>{{ seg.content }}</span>
             </span>
           </div>
@@ -604,7 +604,7 @@ function refundStatusType(status) {
 .credit-tag-icon { width: 16px; height: 16px; vertical-align: middle; margin-right: 4px; }
 .credit-cards { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
 .credit-card { min-width: 140px; text-align: center; }
-.credit-card-value { font-size: 24px; font-weight: 700; color: #409eff; }
+.credit-card-value { font-size: 24px; font-weight: 700; color: #7c3aed; }
 .credit-card-label { font-size: 12px; color: #909399; margin-top: 4px; }
 .credit-detail { margin-top: 16px; }
 .credit-detail-hint { font-size: 12px; color: #909399; margin-left: 4px; }

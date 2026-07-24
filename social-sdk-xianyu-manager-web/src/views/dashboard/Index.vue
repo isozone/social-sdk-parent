@@ -2,14 +2,16 @@
   <div class="dashboard">
     <!-- 顶部统计卡片 -->
     <el-row :gutter="16">
-      <el-col :span="3" v-for="card in statCards" :key="card.title">
+      <el-col :xs="12" :sm="12" :md="6" :lg="3" v-for="card in statCards" :key="card.title">
         <el-card shadow="hover" class="stat-card">
           <div class="stat-content">
-            <div>
-              <div class="stat-value">{{ card.value }}</div>
+            <div class="stat-text">
+              <div class="stat-value" :style="{ color: card.color }">{{ card.value }}</div>
               <div class="stat-label">{{ card.title }}</div>
             </div>
-            <el-icon :size="36" :color="card.color"><component :is="card.icon" /></el-icon>
+            <div class="stat-icon" :style="{ background: card.color }">
+              <el-icon :size="20" color="#fff"><component :is="card.icon" /></el-icon>
+            </div>
           </div>
         </el-card>
       </el-col>
@@ -134,7 +136,7 @@ const messageActivity = ref([])
 const accountStatus = ref([])
 
 const statCards = computed(() => [
-  { title: '总账号数', value: overview.value.totalAccounts || 0, icon: 'User', color: '#409EFF' },
+  { title: '总账号数', value: overview.value.totalAccounts || 0, icon: 'User', color: '#7c3aed' },
   { title: '在线账号', value: overview.value.onlineAccounts || 0, icon: 'CircleCheck', color: '#67C23A' },
   { title: '总商品数', value: overview.value.totalProducts || 0, icon: 'Goods', color: '#E6A23C' },
   { title: '在售商品', value: overview.value.onSaleProducts || 0, icon: 'Shop', color: '#F56C6C' },
@@ -203,7 +205,7 @@ const orderStatusOption = computed(() => {
         { name: '卖出', value: soldCount },
         { name: '买入', value: boughtCount },
       ],
-      color: ['#409EFF', '#E6A23C'],
+      color: ['#7c3aed', '#E6A23C'],
     }]
   }
 })
@@ -219,8 +221,8 @@ const orderTrendOption = computed(() => ({
     {
       name: '卖出', type: 'line', smooth: true,
       data: orderTrend.value.map(d => d.sold || 0),
-      lineStyle: { color: '#409EFF' },
-      itemStyle: { color: '#409EFF' },
+      lineStyle: { color: '#7c3aed' },
+      itemStyle: { color: '#7c3aed' },
       areaStyle: { color: 'rgba(64,158,255,0.15)' },
     },
     {
@@ -268,7 +270,7 @@ const accountOverviewOption = computed(() => {
     xAxis: { type: 'category', data: names, axisLabel: { rotate: names.length > 6 ? 30 : 0 } },
     yAxis: { type: 'value', minInterval: 1 },
     series: [
-      { name: '在售商品', type: 'bar', data: accounts.value.map(a => a.onSaleCount || 0), itemStyle: { color: '#409EFF' } },
+      { name: '在售商品', type: 'bar', data: accounts.value.map(a => a.onSaleCount || 0), itemStyle: { color: '#7c3aed' } },
       { name: '今日回复', type: 'bar', data: accounts.value.map(a => a.todayReplies || 0), itemStyle: { color: '#67C23A' } },
       { name: '浏览量', type: 'bar', data: accounts.value.map(a => a.viewCount || 0), itemStyle: { color: '#E6A23C' } },
       { name: '收藏数', type: 'bar', data: accounts.value.map(a => a.favoriteCount || 0), itemStyle: { color: '#F56C6C' } },
@@ -343,17 +345,34 @@ onMounted(() => { loadDashboard() })
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
+}
+
+.stat-text {
+  min-width: 0;
 }
 
 .stat-value {
-  font-size: 24px;
-  font-weight: bold;
-  color: #303133;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .stat-label {
   font-size: 12px;
   color: #909399;
-  margin-top: 4px;
+  margin-top: 6px;
+}
+
+.stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 8px 18px -6px rgba(0, 0, 0, 0.25);
 }
 </style>

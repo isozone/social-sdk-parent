@@ -287,7 +287,7 @@
         <!-- 统计信息 -->
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;">
           <div style="text-align: center; padding: 12px; background: #f5f7fa; border-radius: 8px;">
-            <div style="font-size: 22px; font-weight: bold; color: #409EFF;">{{ detailForm.followers || 0 }}</div>
+            <div style="font-size: 22px; font-weight: bold; color: #7c3aed;">{{ detailForm.followers || 0 }}</div>
             <div style="font-size: 12px; color: #909399; margin-top: 4px;">粉丝</div>
           </div>
           <div style="text-align: center; padding: 12px; background: #f5f7fa; border-radius: 8px;">

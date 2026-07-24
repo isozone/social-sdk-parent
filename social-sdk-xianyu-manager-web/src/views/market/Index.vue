@@ -98,10 +98,10 @@
       </el-card>
 
       <el-row :gutter="16" v-if="distribution">
-        <el-col :span="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.min | '-' }}</div><div class="stat-lbl">最低价</div></div></el-card></el-col>
-        <el-col :span="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.max | '-' }}</div><div class="stat-lbl">最高价</div></div></el-card></el-col>
-        <el-col :span="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.avg | '-' }}</div><div class="stat-lbl">平均价</div></div></el-card></el-col>
-        <el-col :span="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.median | '-' }}</div><div class="stat-lbl">中位数</div></div></el-card></el-col>
+        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.min | '-' }}</div><div class="stat-lbl">最低价</div></div></el-card></el-col>
+        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.max | '-' }}</div><div class="stat-lbl">最高价</div></div></el-card></el-col>
+        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.avg | '-' }}</div><div class="stat-lbl">平均价</div></div></el-card></el-col>
+        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.median | '-' }}</div><div class="stat-lbl">中位数</div></div></el-card></el-col>
       </el-row>
 
       <p v-if="distribution" style="color:#909399;margin-top:12px;">P25: {{ distribution.p25 | '-' }} / P75: {{ distribution.p75 | '-' }} / 样本数: {{ distribution.sampleCount }}</p>
@@ -172,7 +172,7 @@ const trendOption = computed(() => ({
   xAxis: { type: 'category', data: trendData.value.map(d => d.statDate) },
   yAxis: { type: 'value' },
   series: [
-    { name: '均价', type: 'line', smooth: true, data: trendData.value.map(d => d.avgPrice), itemStyle: { color: '#409EFF' } },
+    { name: '均价', type: 'line', smooth: true, data: trendData.value.map(d => d.avgPrice), itemStyle: { color: '#7c3aed' } },
     { name: '中位数', type: 'line', smooth: true, data: trendData.value.map(d => d.medianPrice), itemStyle: { color: '#67C23A' } },
     { name: '最低', type: 'line', smooth: true, data: trendData.value.map(d => d.minPrice), itemStyle: { color: '#E6A23C' } },
     { name: '最高', type: 'line', smooth: true, data: trendData.value.map(d => d.maxPrice), itemStyle: { color: '#F56C6C' } },

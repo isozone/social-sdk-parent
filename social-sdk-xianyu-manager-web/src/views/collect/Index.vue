@@ -530,7 +530,7 @@ onMounted(loadAccounts)
 }
 
 .input-tip a {
-  color: #409eff;
+  color: #7c3aed;
   text-decoration: none;
 }
 

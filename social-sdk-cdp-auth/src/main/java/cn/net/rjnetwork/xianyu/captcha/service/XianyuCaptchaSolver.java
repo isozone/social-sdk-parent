@@ -1630,13 +1630,19 @@ public class XianyuCaptchaSolver {
 
             // 每个目标域构造一个代表性 URL，用 url-based cookie 设置。
             // 代表性 URL 取该域根路径，Chrome 会自动推导 domain 为该 URL 的 host。
-            // 这里只取 goofish + taobao 两个核心域——IM 链路只依赖这两个域的 cookie，
-            // 旧实现把 tmall/aliyun/alicdn 也注入是冗余的，且 alicdn 是 CDN，注入反而可能干扰资源加载。
+            // 同时额外写 .goofish.com/.taobao.com 父域 cookie：IM 页会嵌入 passport.goofish.com
+            // 登录 iframe，只有 www.goofish.com host-only cookie 时 iframe 读不到登录态，会停在弹窗登录页。
             List<String> targetUrls = List.of(
                     "https://www.goofish.com/",
+                    "https://passport.goofish.com/",
                     "https://h5api.m.goofish.com/",
                     "https://www.taobao.com/",
-                    "https://login.taobao.com/"
+                    "https://login.taobao.com/",
+                    "https://login.m.taobao.com/"
+            );
+            List<String> parentDomains = List.of(
+                    ".goofish.com",
+                    ".taobao.com"
             );
 
             List<Map<String, Object>> cookieList = new ArrayList<>();
@@ -1657,13 +1663,23 @@ public class XianyuCaptchaSolver {
                     cookie.put("sameSite", "None");
                     cookieList.add(cookie);
                 }
+                for (String domain : parentDomains) {
+                    Map<String, Object> cookie = new LinkedHashMap<>();
+                    cookie.put("name", name);
+                    cookie.put("value", value);
+                    cookie.put("domain", domain);
+                    cookie.put("path", "/");
+                    cookie.put("secure", true);
+                    cookie.put("sameSite", "None");
+                    cookieList.add(cookie);
+                }
             }
 
             Map<String, Object> params = new LinkedHashMap<>();
             params.put("cookies", cookieList);
             sendCommand(socket, "Network.setCookies", params);
-            log.info("[CDP-AUTH] 注入 {} 个 cookie（{} 个唯一键，跨 {} 个 url）",
-                    cookieList.size(), merged.size(), targetUrls.size());
+            log.info("[CDP-AUTH] 注入 {} 个 cookie（{} 个唯一键，跨 {} 个 url + {} 个父域）",
+                    cookieList.size(), merged.size(), targetUrls.size(), parentDomains.size());
         } finally {
             if (socket != null) {
                 try { socket.close(); } catch (IOException ignored) {}
@@ -1755,20 +1771,32 @@ public class XianyuCaptchaSolver {
         try {
             socket = openWebSocket(cdpEndpoint);
             Map<String, Object> script = new LinkedHashMap<>();
-            script.put("expression", "location.href");
+            script.put("expression", """
+                    (() => {
+                      const href = String(location.href || '').toLowerCase();
+                      const loginIframe = Array.from(document.querySelectorAll('iframe'))
+                        .map(i => String(i.src || '').toLowerCase())
+                        .find(src => src.includes('passport') || src.includes('mini_login') || src.includes('login')) || '';
+                      const hasLoginModal = !!document.querySelector(
+                        '#xy-login-iframe, #alibaba-login-box, .login-modal-wrap--Tb8DyHnb, [class*=login-modal], [class*=loginCon]'
+                      );
+                      const isLogin = href.includes('login')
+                        || href.includes('passport')
+                        || href.includes('/login.htm')
+                        || href.includes('qrlogin')
+                        || hasLoginModal
+                        || !!loginIframe;
+                      return JSON.stringify({ href, hasLoginModal, loginIframe, isLogin });
+                    })()
+                    """);
             script.put("returnByValue", true);
             Map<String, Object> result = sendCommand(socket, "Runtime.evaluate", script);
             Object value = extractRuntimeValue(result);
             if (value == null) return false;
-            String href = String.valueOf(value).toLowerCase();
-            log.info("[CDP-AUTH] 当前页面 location.href={}", truncate(href, 200));
-            // 闲鱼/淘宝登录页 URL 特征
-            return href.contains("login")
-                    || href.contains("passport")
-                    || href.contains("login.taobao.com")
-                    || href.contains("login.m.taobao.com")
-                    || href.contains("/login.htm")
-                    || href.contains("qrlogin");
+            String pageState = String.valueOf(value);
+            String lower = pageState.toLowerCase(Locale.ROOT);
+            log.info("[CDP-AUTH] 当前页面登录态检测={}", truncate(pageState, 300));
+            return lower.contains("\"islogin\":true");
         } catch (Exception e) {
             log.warn("[CDP-AUTH] 检测登录页失败: {}", e.getMessage());
             return false;
