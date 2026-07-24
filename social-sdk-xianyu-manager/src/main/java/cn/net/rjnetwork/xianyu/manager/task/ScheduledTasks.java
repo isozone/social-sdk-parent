@@ -3,6 +3,7 @@ package cn.net.rjnetwork.xianyu.manager.task;
 import cn.net.rjnetwork.xianyu.manager.account.mapper.AccountMapper;
 import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
 import cn.net.rjnetwork.xianyu.manager.account.task.AccountHealthTask;
+import cn.net.rjnetwork.xianyu.manager.account.renew.task.CookiesRefreshTask;
 import cn.net.rjnetwork.xianyu.manager.message.service.ImMessageWatcherService;
 import cn.net.rjnetwork.xianyu.manager.monitor.service.MonitorService;
 import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
@@ -36,6 +37,7 @@ public class ScheduledTasks {
     private final MonitorTaskService monitorTaskService;
     private final MonitorTaskRunner monitorTaskRunner;
     private final CollectService collectService;
+    private final CookiesRefreshTask cookiesRefreshTask;
 
     public ScheduledTasks(AccountMapper accountMapper, ProductService productService,
                           MonitorService monitorService, AccountHealthTask healthTask,
@@ -44,7 +46,8 @@ public class ScheduledTasks {
                           OrderSyncService orderSyncService,
                           MonitorTaskService monitorTaskService,
                           MonitorTaskRunner monitorTaskRunner,
-                          CollectService collectService) {
+                          CollectService collectService,
+                          CookiesRefreshTask cookiesRefreshTask) {
         this.accountMapper = accountMapper;
         this.productService = productService;
         this.monitorService = monitorService;
@@ -55,6 +58,17 @@ public class ScheduledTasks {
         this.monitorTaskService = monitorTaskService;
         this.monitorTaskRunner = monitorTaskRunner;
         this.collectService = collectService;
+        this.cookiesRefreshTask = cookiesRefreshTask;
+    }
+
+    // ======================== Cookie 浏览器刷新定时链路（A1） ========================
+
+    /** 每 10 分钟扫描刷新计划到期 / Cookie 失效的账号，启动 Chrome 容器刷新 Cookie。
+     *  默认 onlyExpiredOnly=true：仅刷新健康检测失效的账号，避免无谓浏览器启动。
+     */
+    @Scheduled(cron = "0 0/10 * * * *")
+    public void runCookieRefresh() {
+        cookiesRefreshTask.runScheduled();
     }
 
     @Scheduled(cron = "0 0/30 * * * *")

@@ -321,11 +321,9 @@ public class XianyuLoginApiService {
             JsonNode ret = root.path("ret");
             if (ret.isArray() && ret.size() > 0) {
                 String r0 = ret.get(0).asText("");
-                if (r0.contains("FAIL_SYS_ILLEGAL_REQUEST")
-                        || r0.contains("FAIL_SYS_TOKEN_EXOIRED")
-                        || r0.contains("FAIL_BIZ_USER_NOT_LOGIN")
-                        || r0.contains("mtop.permission.login-error")
-                        || r0.contains("FAIL_SYS_USER_VALIDATE")) {
+                // 任意 FAIL_SYS_ / FAIL_BIZ_ 前缀都视为未登录，避免白名单遗漏
+                if (r0.startsWith("FAIL_SYS_") || r0.startsWith("FAIL_BIZ_")
+                        || r0.contains("mtop.permission.login-error")) {
                     result.loggedIn = false;
                     result.message = "Not logged in: " + r0;
                     return result;
@@ -340,7 +338,9 @@ public class XianyuLoginApiService {
             }
 
             JsonNode data = root.path("data");
-            if (data.isObject()) {
+            // 必须包含有效 userId 才视为已登录，避免空对象 {} 误判
+            String userId = data.path("userId").asText("");
+            if (data.isObject() && !userId.isEmpty()) {
                 result.loggedIn = true;
                 result.userId = data.path("userId").asText("");
                 String nick = data.path("nickName").asText("");

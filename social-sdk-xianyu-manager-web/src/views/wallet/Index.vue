@@ -58,6 +58,7 @@
         <el-table-column prop="status" label="状态" width="100" />
         <el-table-column prop="description" label="描述" />
         <el-table-column prop="transactionTime" label="时间" width="180" />
+        <template #empty><el-empty description="暂无交易记录" /></template>
       </el-table>
     </el-card>
   </div>

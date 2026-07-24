@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="page-root noflex">
     <el-card>
       <template #header>
         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -147,6 +147,7 @@
             </template>
           </el-table-column>
         </template>
+        <template #empty><el-empty description="暂无商品" /></template>
       </el-table>
 
       <el-pagination

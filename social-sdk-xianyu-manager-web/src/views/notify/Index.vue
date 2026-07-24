@@ -41,6 +41,7 @@
               <el-button size="small" type="danger" @click="removeChannel(row)">删除</el-button>
             </template>
           </el-table-column>
+          <template #empty><el-empty description="暂无通道" /></template>
         </el-table>
       </div>
 
@@ -68,6 +69,7 @@
               <el-button size="small" type="danger" @click="removeTemplate(row)">删除</el-button>
             </template>
           </el-table-column>
+          <template #empty><el-empty description="暂无模板" /></template>
         </el-table>
       </div>
 
@@ -110,6 +112,7 @@
               <el-button size="small" type="danger" @click="removeSub(row)">删除</el-button>
             </template>
           </el-table-column>
+          <template #empty><el-empty description="暂无订阅" /></template>
         </el-table>
       </div>
 
@@ -142,6 +145,7 @@
             </template>
           </el-table-column>
           <el-table-column prop="createdAt" label="时间" width="180" />
+          <template #empty><el-empty description="暂无日志" /></template>
         </el-table>
         <el-pagination
           style="margin-top: 12px; justify-content: flex-end;"

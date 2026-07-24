@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="page-root">
     <el-card>
       <template #header>
         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -40,6 +40,7 @@
             <el-button size="small" type="danger" @click="deleteAccount(row.id)">删除</el-button>
           </template>
         </el-table-column>
+        <template #empty><el-empty description="暂无账号" /></template>
       </el-table>
     </el-card>
 

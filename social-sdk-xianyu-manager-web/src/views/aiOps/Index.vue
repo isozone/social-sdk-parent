@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="page-root noflex">
     <!-- 批量上品卡片 -->
     <el-card style="margin-bottom: 20px;">
       <template #header>

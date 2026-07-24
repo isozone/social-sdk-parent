@@ -39,6 +39,7 @@
           <el-table-column label="评价时间" width="180">
             <template #default="{ row }">{{ reviewCreateTime(row) }}</template>
           </el-table-column>
+          <template #empty><el-empty description="暂无评价" /></template>
         </el-table>
 
         <el-divider content-position="left">发表评价</el-divider>
@@ -175,6 +176,7 @@
               <el-button size="small" @click="viewRefundDetail(refundOrderId(row))">详情</el-button>
             </template>
           </el-table-column>
+          <template #empty><el-empty description="暂无退款" /></template>
         </el-table>
 
         <el-divider content-position="left">申请退款</el-divider>

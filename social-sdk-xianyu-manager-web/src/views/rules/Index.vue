@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="page-root noflex">
     <el-card>
       <template #header>
         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -59,6 +59,7 @@
             <el-button size="small" type="danger" @click="deleteRule(row.id)">删除</el-button>
           </template>
         </el-table-column>
+        <template #empty><el-empty description="暂无规则" /></template>
       </el-table>
 
       <!-- ===== AI 接管配置 ===== -->

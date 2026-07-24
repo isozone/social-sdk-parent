@@ -1120,3 +1120,39 @@ CREATE TABLE IF NOT EXISTS schema_migration (
     UNIQUE KEY uk_schema_migration_ns_ver (namespace, version),
     INDEX idx_schema_migration_status (status, deleted)
 );
+
+-- ======================== A1 Cookie 浏览器刷新 ========================
+CREATE TABLE IF NOT EXISTS cookie_refresh_schedule (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    account_id          BIGINT NOT NULL,
+    enabled             INTEGER DEFAULT 1,
+    interval_minutes    INTEGER DEFAULT 720,
+    next_run_at         DATETIME,
+    last_run_at         DATETIME,
+    last_result         VARCHAR(16),
+    last_failure_reason VARCHAR(512),
+    only_on_expired     INTEGER DEFAULT 1,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    UNIQUE KEY uk_cookie_refresh_account (account_id),
+    INDEX idx_cookie_refresh_next_run (next_run_at, enabled, deleted)
+);
+
+CREATE TABLE IF NOT EXISTS scheduled_cookies_refresh_log (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    trigger_source      VARCHAR(16),
+    total_count         INTEGER DEFAULT 0,
+    success_count       INTEGER DEFAULT 0,
+    failed_count        INTEGER DEFAULT 0,
+    skipped_count       INTEGER DEFAULT 0,
+    status              VARCHAR(16),
+    started_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at            DATETIME,
+    failure_summary     VARCHAR(2000),
+    batch_job_id        BIGINT,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    INDEX idx_cookies_refresh_started (started_at, deleted)
+);
