@@ -1,26 +1,38 @@
 <template>
   <div class="page-root">
-    <el-tabs v-model="activeTab">
-      <el-tab-pane label="关键词管理" name="manage" />
-      <el-tab-pane label="关键词趋势" name="trend" />
-      <el-tab-pane label="价格分布" name="distribution" />
-      <el-tab-pane label="卖家画像" name="seller" />
-    </el-tabs>
-
     <!-- ====== 关键词管理 ====== -->
     <div v-show="activeTab === 'manage'">
-      <el-card style="margin-bottom: 16px;">
-        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-          <el-input v-model="newKeyword" placeholder="输入关键词，如：iPhone 15" style="width:220px;" @keyup.enter="addKeyword" />
+      <el-card shadow="never" style="margin-bottom: var(--space-4);">
+        <template #header>
+          <div class="card-head">
+            <div class="card-head-left">
+              <div class="card-chip chip-violet"><el-icon><Plus /></el-icon></div>
+              <div class="card-head-text">
+                <div class="card-title">添加追踪</div>
+                <div class="card-sub">输入关键词和抓取间隔</div>
+              </div>
+            </div>
+          </div>
+        </template>
+        <div class="page-toolbar">
+          <el-input v-model="newKeyword" placeholder="输入关键词，如：iPhone 15" @keyup.enter="addKeyword" />
           <el-input-number v-model="newInterval" :min="5" :max="1440" label="间隔(分钟)" style="width:130px;" />
-          <el-button type="primary" @click="addKeyword" :disabled="!newKeyword.trim()">添加追踪</el-button>
+          <el-button type="primary" @click="addKeyword" :disabled="!newKeyword.trim()"><el-icon><Plus /></el-icon> 添加追踪</el-button>
         </div>
       </el-card>
 
-      <el-card>
+      <el-card shadow="never">
         <template #header>
-          <span>已追踪关键词（{{ keywords.length }}）</span>
-          <el-button style="float:right;" size="small" @click="loadKeywords">刷新</el-button>
+          <div class="card-head">
+            <div class="card-head-left">
+              <div class="card-chip chip-cyan"><el-icon><Search /></el-icon></div>
+              <div class="card-head-text">
+                <div class="card-title">已追踪关键词</div>
+                <div class="card-sub">{{ keywords.length }} 个关键词</div>
+              </div>
+            </div>
+            <el-button size="small" @click="loadKeywords"><el-icon><Refresh /></el-icon> 刷新</el-button>
+          </div>
         </template>
         <el-table :data="keywords" stripe size="small" v-loading="loadingKeywords">
           <el-table-column prop="keyword" label="关键词" min-width="150" />
@@ -36,7 +48,7 @@
               {{ row.lastCrawlAt ? row.lastCrawlAt.replace('T', ' ').substring(0, 19) : '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="280">
+          <el-table-column label="操作" width="280" fixed="right">
             <template #default="{ row }">
               <el-button size="small" @click="crawlKeyword(row)" :loading="row._crawling">立即抓取</el-button>
               <el-button v-if="row.status === 'ACTIVE'" size="small" @click="pauseKeyword(row)">暂停</el-button>
@@ -44,16 +56,16 @@
               <el-button size="small" type="danger" @click="deleteKeyword(row)">删除</el-button>
             </template>
           </el-table-column>
+          <template #empty><el-empty description="暂无追踪关键词，请添加" /></template>
         </el-table>
-        <el-empty v-if="!loadingKeywords && keywords.length === 0" description="暂无追踪关键词，请添加" />
       </el-card>
     </div>
 
     <!-- ====== 关键词趋势 ====== -->
     <div v-show="activeTab === 'trend'">
-      <el-card style="margin-bottom: 16px;">
-        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-          <el-select v-model="keyword" placeholder="选择关键词" style="width:220px;" @change="loadTrend">
+      <el-card shadow="never" style="margin-bottom: var(--space-4);">
+        <div class="page-toolbar">
+          <el-select v-model="keyword" placeholder="选择关键词" style="width:260px;" @change="loadTrend">
             <el-option v-for="kw in keywordOptions" :key="kw" :label="kw" :value="kw" />
           </el-select>
           <el-button type="primary" @click="loadTrend" :disabled="!keyword">查询趋势</el-button>
@@ -61,35 +73,42 @@
         </div>
       </el-card>
 
-      <el-card>
+      <el-card shadow="never">
         <template #header>
-          <span>价格趋势 - {{ keyword }}</span>
-          <span v-if="latestStat" style="margin-left:16px;color:var(--text-3);font-size:13px;">
-            最新：均价 {{ latestStat.avgPrice ?? '-' }} | 中位数 {{ latestStat.medianPrice ?? '-' }} | 最低 {{ latestStat.minPrice ?? '-' }} | 最高 {{ latestStat.maxPrice ?? '-' }}
-          </span>
+          <div class="card-head">
+            <div class="card-head-left">
+              <div class="card-chip chip-violet"><el-icon><TrendCharts /></el-icon></div>
+              <div class="card-head-text">
+                <div class="card-title">价格趋势 - {{ keyword || '—' }}</div>
+                <div class="card-sub" v-if="latestStat">
+                  均价 {{ latestStat.avgPrice ?? '-' }} · 中位数 {{ latestStat.medianPrice ?? '-' }} · 最低 {{ latestStat.minPrice ?? '-' }} · 最高 {{ latestStat.maxPrice ?? '-' }}
+                </div>
+              </div>
+            </div>
+          </div>
         </template>
         <v-chart :option="trendOption" autoresize style="height:360px;" />
-      </el-card>
 
-      <el-card style="margin-top:16px;" v-if="trendData.length > 0">
-        <template #header>每日统计</template>
-        <el-table :data="trendData" stripe size="small">
-          <el-table-column prop="statDate" label="日期" width="120" />
-          <el-table-column prop="minPrice" label="最低" width="100" />
-          <el-table-column prop="maxPrice" label="最高" width="100" />
-          <el-table-column prop="avgPrice" label="均价" width="100" />
-          <el-table-column prop="medianPrice" label="中位数" width="100" />
-          <el-table-column prop="volume" label="成交量" width="100" />
-          <el-table-column prop="sampledCount" label="采样数" width="100" />
-        </el-table>
+        <el-card shadow="never" style="margin-top:var(--space-4);" v-if="trendData.length > 0">
+          <template #header>每日统计</template>
+          <el-table :data="trendData" stripe size="small">
+            <el-table-column prop="statDate" label="日期" width="120" />
+            <el-table-column prop="minPrice" label="最低" width="100" />
+            <el-table-column prop="maxPrice" label="最高" width="100" />
+            <el-table-column prop="avgPrice" label="均价" width="100" />
+            <el-table-column prop="medianPrice" label="中位数" width="100" />
+            <el-table-column prop="volume" label="成交量" width="100" />
+            <el-table-column prop="sampledCount" label="采样数" width="100" />
+          </el-table>
+        </el-card>
       </el-card>
     </div>
 
     <!-- ====== 价格分布 ====== -->
     <div v-show="activeTab === 'distribution'">
-      <el-card style="margin-bottom: 16px;">
-        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
-          <el-select v-model="distKeyword" placeholder="选择关键词" style="width:220px;">
+      <el-card shadow="never" style="margin-bottom: var(--space-4);">
+        <div class="page-toolbar">
+          <el-select v-model="distKeyword" placeholder="选择关键词" style="width:260px;">
             <el-option v-for="kw in keywordOptions" :key="kw" :label="kw" :value="kw" />
           </el-select>
           <el-input-number v-model="distDays" :min="1" :max="90" label="天数" style="width:120px;" />
@@ -98,36 +117,49 @@
       </el-card>
 
       <el-row :gutter="16" v-if="distribution">
-        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.min ?? '-' }}</div><div class="stat-lbl">最低价</div></div></el-card></el-col>
-        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.max ?? '-' }}</div><div class="stat-lbl">最高价</div></div></el-card></el-col>
-        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.avg ?? '-' }}</div><div class="stat-lbl">平均价</div></div></el-card></el-col>
-        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.median ?? '-' }}</div><div class="stat-lbl">中位数</div></div></el-card></el-col>
+        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card shadow="hover"><div class="stat-box"><div class="stat-num">{{ distribution.min ?? '-' }}</div><div class="stat-lbl">最低价</div></div></el-card></el-col>
+        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card shadow="hover"><div class="stat-box"><div class="stat-num">{{ distribution.max ?? '-' }}</div><div class="stat-lbl">最高价</div></div></el-card></el-col>
+        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card shadow="hover"><div class="stat-box"><div class="stat-num">{{ distribution.avg ?? '-' }}</div><div class="stat-lbl">平均价</div></div></el-card></el-col>
+        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card shadow="hover"><div class="stat-box"><div class="stat-num">{{ distribution.median ?? '-' }}</div><div class="stat-lbl">中位数</div></div></el-card></el-col>
       </el-row>
 
-      <p v-if="distribution" style="color:#909399;margin-top:12px;">P25: {{ distribution.p25 | '-' }} / P75: {{ distribution.p75 | '-' }} / 样本数: {{ distribution.sampleCount }}</p>
+      <p v-if="distribution" class="stat-meta">P25: {{ distribution.p25 ?? '-' }} / P75: {{ distribution.p75 ?? '-' }} / 样本数: {{ distribution.sampleCount }}</p>
     </div>
 
     <!-- ====== 卖家画像 ====== -->
     <div v-show="activeTab === 'seller'">
-      <el-card style="margin-bottom: 16px;">
-        <div style="display:flex;gap:12px;align-items:center;">
-          <el-input v-model="sellerQuery" placeholder="输入卖家昵称或UserId" style="width:280px;" />
+      <el-card shadow="never" style="margin-bottom: var(--space-4);">
+        <div class="page-toolbar">
+          <el-input v-model="sellerQuery" placeholder="输入卖家昵称或UserId" style="width:300px;" />
           <el-button type="primary" @click="doSearchSeller">搜索</el-button>
           <el-button @click="doFetchSeller">抓取画像</el-button>
         </div>
       </el-card>
 
-      <el-table :data="sellers" stripe size="small" v-loading="loadingSellers">
-        <el-table-column prop="nickname" label="昵称" width="140" />
-        <el-table-column prop="shopLevel" label="等级" width="100" />
-        <el-table-column prop="creditScore" label="信用分" width="100" />
-        <el-table-column prop="followers" label="粉丝" width="100" />
-        <el-table-column prop="soldCount" label="已售" width="100" />
-        <el-table-column prop="onSaleCount" label="在售" width="100" />
-        <el-table-column prop="ipLocation" label="IP归属" width="120" />
-        <el-table-column prop="introduction" label="简介" min-width="200" />
-        <template #empty><el-empty description="暂无卖家" /></template>
-      </el-table>
+      <el-card shadow="never">
+        <template #header>
+          <div class="card-head">
+            <div class="card-head-left">
+              <div class="card-chip chip-amber"><el-icon><User /></el-icon></div>
+              <div class="card-head-text">
+                <div class="card-title">卖家画像</div>
+                <div class="card-sub">昵称/ID 搜索与画像抓取</div>
+              </div>
+            </div>
+          </div>
+        </template>
+        <el-table :data="sellers" stripe size="small" v-loading="loadingSellers">
+          <el-table-column prop="nickname" label="昵称" width="140" />
+          <el-table-column prop="shopLevel" label="等级" width="100" />
+          <el-table-column prop="creditScore" label="信用分" width="100" />
+          <el-table-column prop="followers" label="粉丝" width="100" />
+          <el-table-column prop="soldCount" label="已售" width="100" />
+          <el-table-column prop="onSaleCount" label="在售" width="100" />
+          <el-table-column prop="ipLocation" label="IP归属" width="120" />
+          <el-table-column prop="introduction" label="简介" min-width="200" />
+          <template #empty><el-empty description="暂无卖家数据" /></template>
+        </el-table>
+      </el-card>
     </div>
   </div>
 </template>
@@ -140,6 +172,8 @@ import { LineChart } from 'echarts/charts'
 import { TooltipComponent, LegendComponent, GridComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
 import { ElMessage } from 'element-plus'
+import { Search, Plus, TrendCharts, Refresh, User } from '@element-plus/icons-vue'
+import { CHART } from '@/styles/color-palette'
 import {
   getMarketKeywords, addMarketKeyword, pauseMarketKeyword, resumeMarketKeyword,
   deleteMarketKeyword, crawlMarketKeyword,
@@ -173,10 +207,10 @@ const trendOption = computed(() => ({
   xAxis: { type: 'category', data: trendData.value.map(d => d.statDate) },
   yAxis: { type: 'value' },
   series: [
-    { name: '均价', type: 'line', smooth: true, data: trendData.value.map(d => d.avgPrice), itemStyle: { color: '#7c3aed' } },
-    { name: '中位数', type: 'line', smooth: true, data: trendData.value.map(d => d.medianPrice), itemStyle: { color: '#67C23A' } },
-    { name: '最低', type: 'line', smooth: true, data: trendData.value.map(d => d.minPrice), itemStyle: { color: '#E6A23C' } },
-    { name: '最高', type: 'line', smooth: true, data: trendData.value.map(d => d.maxPrice), itemStyle: { color: '#F56C6C' } },
+    { name: '均价', type: 'line', smooth: true, data: trendData.value.map(d => d.avgPrice), itemStyle: { color: CHART[0] } },
+    { name: '中位数', type: 'line', smooth: true, data: trendData.value.map(d => d.medianPrice), itemStyle: { color: CHART[1] } },
+    { name: '最低', type: 'line', smooth: true, data: trendData.value.map(d => d.minPrice), itemStyle: { color: CHART[2] } },
+    { name: '最高', type: 'line', smooth: true, data: trendData.value.map(d => d.maxPrice), itemStyle: { color: CHART[4] } },
   ]
 }))
 
@@ -282,7 +316,7 @@ async function doFetchSeller() {
   try {
     await fetchSeller(sellerQuery.value)
     ElMessage.success('抓取完成')
-    await doSearchSeller(false)
+    await doSearchSeller()
   } catch (e) {}
 }
 
@@ -290,7 +324,8 @@ onMounted(loadKeywords)
 </script>
 
 <style scoped>
-.stat-box { text-align: center; padding: 12px 0; }
-.stat-num { font-size: 24px; font-weight: bold; color: #303133; }
-.stat-lbl { font-size: 12px; color: #909399; margin-top: 4px; }
+.stat-box { text-align: center; padding: var(--space-3) 0; }
+.stat-num { font-size: 24px; font-weight: bold; color: var(--text-1); }
+.stat-lbl { font-size: 12px; color: var(--text-3); margin-top: var(--space-1); }
+.stat-meta { color: var(--text-3); margin-top: var(--space-3); font-size: 13px; text-align: center; }
 </style>

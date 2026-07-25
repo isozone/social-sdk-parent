@@ -1,10 +1,16 @@
 <template>
   <div class="page-root">
-    <el-card style="margin-bottom: 16px;">
+    <el-card shadow="never" style="margin-bottom: var(--space-4);">
       <template #header>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span>监控任务</span>
-          <el-button type="primary" size="small" @click="createVisible = true">新增任务</el-button>
+        <div class="card-head">
+          <div class="card-head-left">
+            <div class="card-chip chip-violet"><el-icon><Memo /></el-icon></div>
+            <div class="card-head-text">
+              <div class="card-title">监控任务</div>
+              <div class="card-sub">定时抓取闲鱼商品数据</div>
+            </div>
+          </div>
+          <el-button size="small" type="primary" @click="createVisible = true"><el-icon><Plus /></el-icon> 新增任务</el-button>
         </div>
       </template>
       <el-table :data="tasks" stripe v-loading="loading" size="small">
@@ -32,17 +38,17 @@
         <el-table-column prop="nextRunAt" label="下次运行" width="160" />
         <el-table-column label="熔断" width="80">
           <template #default="{ row }">
-            <span v-if="row.circuitOpen" style="color:#F56C6C;">开闸</span>
-            <span v-else style="color:#909399;">正常</span>
+            <span v-if="row.circuitOpen" class="circuit-danger">开闸</span>
+            <span v-else class="circuit-normal">正常</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="viewResults(row)">结果</el-button>
             <el-button size="small" @click="togglePause(row)">
               {{ row.status === 'ACTIVE' ? '暂停' : '恢复' }}
             </el-button>
-            <el-button size="small" @click="runNow(row)">立即</el-button>
+            <el-button size="small" type="success" @click="runNow(row)">立即</el-button>
           </template>
         </el-table-column>
         <template #empty><el-empty description="暂无任务" /></template>
@@ -97,6 +103,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Memo, Plus } from '@element-plus/icons-vue'
 import { getTaskList, createTask, pauseTask, resumeTask, runTask, getTaskResults } from '@/api/market'
 import api from '@/api/request'
 
@@ -164,7 +171,6 @@ async function viewResults(row) {
 onMounted(async () => {
   await loadData()
   try {
-    // 真实端点：GET /api/accounts（返回数组）、GET /api/ai/models（返回分页 Page）
     const [ar, mr] = await Promise.all([
       api.get('/accounts'),
       api.get('/ai/models', { params: { size: 200 } })
@@ -174,3 +180,8 @@ onMounted(async () => {
   } catch (e) {}
 })
 </script>
+
+<style scoped>
+.circuit-danger { color: var(--color-danger); font-weight: 600; }
+.circuit-normal { color: var(--text-3); }
+</style>

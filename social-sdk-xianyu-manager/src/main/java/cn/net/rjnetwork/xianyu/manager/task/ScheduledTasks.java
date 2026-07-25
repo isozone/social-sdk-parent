@@ -7,6 +7,11 @@ import cn.net.rjnetwork.xianyu.manager.account.renew.task.CookiesRefreshTask;
 import cn.net.rjnetwork.xianyu.manager.account.renew.task.LoginRenewTask;
 import cn.net.rjnetwork.xianyu.manager.account.renew.task.TokenRenewalTask;
 import cn.net.rjnetwork.xianyu.manager.message.service.ImMessageWatcherService;
+import cn.net.rjnetwork.xianyu.manager.virtual.task.ConfirmReceiptTask;
+import cn.net.rjnetwork.xianyu.manager.virtual.task.RedeliveryTask;
+import cn.net.rjnetwork.xianyu.manager.task.service.ScheduledTaskService;
+import cn.net.rjnetwork.xianyu.manager.order.rate.task.AutoRateTask;
+import cn.net.rjnetwork.xianyu.manager.order.rate.task.RedFlowerTask;
 import cn.net.rjnetwork.xianyu.manager.monitor.service.MonitorService;
 import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
 import cn.net.rjnetwork.xianyu.manager.product.service.ProductService;
@@ -42,6 +47,11 @@ public class ScheduledTasks {
     private final CookiesRefreshTask cookiesRefreshTask;
     private final LoginRenewTask loginRenewTask;
     private final TokenRenewalTask tokenRenewalTask;
+    private final RedeliveryTask redeliveryTask;
+    private final ConfirmReceiptTask confirmReceiptTask;
+    private final ScheduledTaskService scheduledTaskService;
+    private final AutoRateTask autoRateTask;
+    private final RedFlowerTask redFlowerTask;
 
     public ScheduledTasks(AccountMapper accountMapper, ProductService productService,
                           MonitorService monitorService, AccountHealthTask healthTask,
@@ -53,7 +63,12 @@ public class ScheduledTasks {
                           CollectService collectService,
                           CookiesRefreshTask cookiesRefreshTask,
                           LoginRenewTask loginRenewTask,
-                          TokenRenewalTask tokenRenewalTask) {
+                          TokenRenewalTask tokenRenewalTask,
+                          RedeliveryTask redeliveryTask,
+                          ConfirmReceiptTask confirmReceiptTask,
+                          ScheduledTaskService scheduledTaskService,
+                          AutoRateTask autoRateTask,
+                          RedFlowerTask redFlowerTask) {
         this.accountMapper = accountMapper;
         this.productService = productService;
         this.monitorService = monitorService;
@@ -67,6 +82,14 @@ public class ScheduledTasks {
         this.cookiesRefreshTask = cookiesRefreshTask;
         this.loginRenewTask = loginRenewTask;
         this.tokenRenewalTask = tokenRenewalTask;
+        this.redeliveryTask = redeliveryTask;
+        this.confirmReceiptTask = confirmReceiptTask;
+        this.scheduledTaskService = scheduledTaskService;
+        this.autoRateTask = autoRateTask;
+        this.redFlowerTask = redFlowerTask;
+        // B1：启动时把现有 cron 任务幂等注册到 scheduled_task 表，便于管理端启停/改 cron/查最近执行
+        try { scheduledTaskService.registerDefaults(); }
+        catch (Exception e) { log.warn("[B1] registerDefaults failed (non-fatal): {}", e.getMessage()); }
     }
 
     // ======================== Cookie 浏览器刷新定时链路（A1） ========================
@@ -97,6 +120,46 @@ public class ScheduledTasks {
     @Scheduled(cron = "0 0/20 * * * *")
     public void runTokenRenewal() {
         tokenRenewalTask.runScheduled();
+    }
+
+    // ======================== 自动补发货定时链路（A9） ========================
+
+    /** 每 5 分钟扫 FAILED/SKIPPED 但未超重试上限的 virtual_ship_task，按指数退避重跑 A8 主链路。
+     *  重试耗尽（retryCount >= maxRetry）则标 RETRY_EXHAUSTED 转人工介入。
+     */
+    @Scheduled(cron = "0 0/5 * * * *")
+    public void runRedelivery() {
+        redeliveryTask.runScheduled();
+    }
+
+    // ======================== 自动确认收货定时链路（A10） ========================
+
+    /** 每天 10:00 扫已发货 N 天（autoConfirmDays）但买家未确认的订单，按 confirmReceiptMessage 模板发话术催确认。
+     *  闲鱼侧 SDK 无专门「确认收货」MTOP API，走消息话术催确认（轻量可行）。
+     */
+    @Scheduled(cron = "0 0 10 * * *")
+    public void runConfirmReceipt() {
+        confirmReceiptTask.runScheduled();
+    }
+
+    // ======================== 自动评价定时链路（B2） ========================
+
+    /** 每天 11:00 扫已收货 N 天（delayDays）且卖家未评的订单，按 AutoRateConfig 调 reviewOrder 评好评。
+     *  话术模板支持 {itemTitle}/{buyerNick}/{accountName} 占位符替换。
+     */
+    @Scheduled(cron = "0 0 11 * * *")
+    public void runAutoRate() {
+        autoRateTask.runScheduled();
+    }
+
+    // ======================== 求小红花定时链路（B3） ========================
+
+    /** 每天 09:00 给已成交订单买家送红花提信誉，每日送花上限（dailyLimit）防风控盯上。
+     *  闲鱼侧送红花走 XianyuApiFacade.sendRedFlower（mtop.taobao.idlemessage.red.flower）。
+     */
+    @Scheduled(cron = "0 0 9 * * *")
+    public void runRedFlower() {
+        redFlowerTask.runScheduled();
     }
 
     @Scheduled(cron = "0 0/30 * * * *")

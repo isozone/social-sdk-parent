@@ -23,6 +23,9 @@ public class VirtualShipConfig extends BaseEntity {
     /** N天后自动确认收货 */
     private Integer autoConfirmDays;
 
+    /** A10 确认收货话术模板；null=走默认「买家您好，方便确认下收货吗？有助于我店铺评分提升，谢谢~」 */
+    private String confirmReceiptMessage;
+
     /** 发货后站内通知运营 */
     private Boolean notifyAfterShip;
 }

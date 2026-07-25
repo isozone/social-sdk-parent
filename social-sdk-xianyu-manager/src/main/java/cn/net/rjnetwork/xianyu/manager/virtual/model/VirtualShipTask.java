@@ -13,6 +13,9 @@ import cn.net.rjnetwork.xianyu.manager.common.BaseEntity;
 @TableName("virtual_ship_task")
 public class VirtualShipTask extends BaseEntity {
 
+    /** 账号 ID（A8 主链路用，关联 xianyu_account.id） */
+    private Long accountId;
+
     private Long orderId;
 
     private Long productId;
@@ -21,6 +24,9 @@ public class VirtualShipTask extends BaseEntity {
     private String status;
 
     private Integer retryCount;
+
+    /** A9 补发最大重试次数上限，默认 5；retryCount >= maxRetry 则不再重试，转人工介入 */
+    private Integer maxRetry;
 
     private String errorMessage;
 

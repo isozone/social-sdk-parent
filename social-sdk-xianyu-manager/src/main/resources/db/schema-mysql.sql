@@ -451,12 +451,8 @@ CREATE TABLE IF NOT EXISTS virtual_card_pool (
 );
 
 -- 自动发货任务（定时扫描执行）
-CREATE TABLE IF NOT EXISTS virtual_ship_task (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    order_id BIGINT NOT NULL UNIQUE,
-    product_id BIGINT NOT NULL,
-    status VARCHAR(16) DEFAULT 'PENDING', -- PENDING / PROCESSING / SHIPPED / FAILED / SKIPPED
-    retry_count INTEGER DEFAULT 0,
+retry_count INTEGER DEFAULT 0,
+    max_retry INTEGER DEFAULT 5,
     error_message TEXT,
     execute_at DATETIME,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -468,12 +464,8 @@ CREATE TABLE IF NOT EXISTS virtual_ship_task (
 );
 
 -- 自动发货全局配置（每账号一条）
-CREATE TABLE IF NOT EXISTS virtual_ship_config (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    account_id BIGINT NOT NULL UNIQUE,
-    enabled TINYINT(1) DEFAULT 1,
-    delay_seconds INTEGER DEFAULT 30,           -- 支付成功后延时发货(防风控)
-    auto_confirm_days INTEGER DEFAULT 7,        -- N天后自动确认收货
+auto_confirm_days INTEGER DEFAULT 7,
+    confirm_receipt_message TEXT,        -- N天后自动确认收货
     notify_after_ship TINYINT(1) DEFAULT 1,     -- 发货后站内通知运营
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -483,6 +475,21 @@ CREATE TABLE IF NOT EXISTS virtual_ship_config (
 
 CREATE INDEX idx_virtual_card_pool_product ON virtual_card_pool(product_id);
 CREATE INDEX idx_virtual_card_pool_status ON virtual_card_pool(status);
+CREATE TABLE IF NOT EXISTS virtual_ship_task (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    account_id BIGINT,
+    order_id BIGINT NOT NULL UNIQUE,
+    product_id BIGINT NOT NULL,
+    status VARCHAR(16) DEFAULT 'PENDING',
+    retry_count INTEGER DEFAULT 0,
+    max_retry INTEGER DEFAULT 5,
+    error_message TEXT,
+    execute_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    processed_at TIMESTAMP,
+    deleted INTEGER DEFAULT 0
+);
 CREATE INDEX idx_virtual_ship_task_status ON virtual_ship_task(status);
 CREATE INDEX idx_xianyu_order_require_virtual_ship ON xianyu_order(require_virtual_ship);
 
@@ -1322,4 +1329,94 @@ CREATE TABLE IF NOT EXISTS delivery_block_rule (
     deleted             INTEGER DEFAULT 0,
     INDEX idx_delivery_rule_account (account_id, enabled, priority, deleted),
     INDEX idx_delivery_rule_type (rule_type, enabled, deleted)
+);
+
+-- ======================== B1 统一任务调度中心 ========================
+CREATE TABLE IF NOT EXISTS scheduled_task (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    task_key            VARCHAR(64) NOT NULL,
+    task_name           VARCHAR(128),
+    category            VARCHAR(32),
+    cron                VARCHAR(64),
+    enabled             INTEGER DEFAULT 1,
+    last_run_at         DATETIME,
+    last_result         VARCHAR(16),
+    last_error          VARCHAR(512),
+    last_duration_ms    BIGINT,
+    last_batch_job_id   BIGINT,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    UNIQUE KEY uk_scheduled_task_key (task_key),
+    INDEX idx_scheduled_task_category (category, enabled, deleted)
+);
+
+-- ======================== B2 自动评价 ========================
+CREATE TABLE IF NOT EXISTS auto_rate_config (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    account_id          BIGINT,
+    enabled             INTEGER DEFAULT 1,
+    rate_level          VARCHAR(16) DEFAULT 'GOOD',
+    feedback_template   TEXT,
+    delay_days          INTEGER DEFAULT 1,
+    product_whitelist   TEXT,
+    buyer_blacklist     TEXT,
+    last_run_at         DATETIME,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    INDEX idx_auto_rate_account (account_id, enabled, deleted)
+);
+
+CREATE TABLE IF NOT EXISTS scheduled_rate_log (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    trigger_source      VARCHAR(16),
+    total_count         INTEGER DEFAULT 0,
+    success_count       INTEGER DEFAULT 0,
+    failed_count        INTEGER DEFAULT 0,
+    skipped_count       INTEGER DEFAULT 0,
+    status              VARCHAR(16),
+    started_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at            DATETIME,
+    failure_summary     VARCHAR(2000),
+    batch_job_id        BIGINT,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    INDEX idx_auto_rate_started (started_at, deleted)
+);
+
+-- ======================== B3 求小红花 ========================
+CREATE TABLE IF NOT EXISTS red_flower_config (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    account_id          BIGINT,
+    enabled             INTEGER DEFAULT 1,
+    target_type         VARCHAR(16) DEFAULT 'buyer',
+    daily_limit         INTEGER DEFAULT 20,
+    today_sent_count    INTEGER DEFAULT 0,
+    today_date          DATETIME,
+    buyer_whitelist     TEXT,
+    last_run_at         DATETIME,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    INDEX idx_red_flower_account (account_id, enabled, deleted)
+);
+
+CREATE TABLE IF NOT EXISTS scheduled_red_flower_log (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    trigger_source      VARCHAR(16),
+    total_count         INTEGER DEFAULT 0,
+    success_count       INTEGER DEFAULT 0,
+    failed_count        INTEGER DEFAULT 0,
+    skipped_count       INTEGER DEFAULT 0,
+    status              VARCHAR(16),
+    started_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at            DATETIME,
+    failure_summary     VARCHAR(2000),
+    batch_job_id        BIGINT,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    INDEX idx_red_flower_started (started_at, deleted)
 );

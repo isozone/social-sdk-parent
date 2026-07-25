@@ -1,10 +1,16 @@
 <template>
   <div class="page-root">
-    <el-card style="margin-bottom: 16px;">
+    <el-card shadow="never" style="margin-bottom: var(--space-4);">
       <template #header>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span>AI 客服</span>
-          <el-button size="small" @click="loadData">刷新</el-button>
+        <div class="card-head">
+          <div class="card-head-left">
+            <div class="card-chip chip-violet"><el-icon><ChatLineRound /></el-icon></div>
+            <div class="card-head-text">
+              <div class="card-title">AI 客服</div>
+              <div class="card-sub">会话管理、议价记录与知识条目维护</div>
+            </div>
+          </div>
+          <el-button size="small" @click="loadData"><el-icon><Refresh /></el-icon> 刷新</el-button>
         </div>
       </template>
       <el-tabs v-model="activeTab">
@@ -14,7 +20,7 @@
       </el-tabs>
 
       <!-- 会话管理 -->
-      <div v-show="activeTab === 'sessions'">
+      <div class="tab-content" v-show="activeTab === 'sessions'">
         <el-table :data="sessions" stripe size="small">
           <el-table-column prop="buyerNickname" label="买家昵称" width="140" />
           <el-table-column prop="buyerId" label="买家ID" width="140" />
@@ -30,7 +36,7 @@
       </div>
 
       <!-- 议价记录 -->
-      <div v-show="activeTab === 'bargains'">
+      <div class="tab-content" v-show="activeTab === 'bargains'">
         <el-table :data="sessionStates" stripe size="small">
           <el-table-column prop="sessionId" label="会话ID" width="100" />
           <el-table-column prop="bargainRound" label="议价轮次" sortable width="100" />
@@ -49,9 +55,9 @@
       </div>
 
       <!-- 知识库 -->
-      <div v-show="activeTab === 'knowledge'">
-        <div style="margin-bottom: 12px;">
-          <el-button type="primary" size="small" @click="showAddDialog">新增知识条目</el-button>
+      <div class="tab-content" v-show="activeTab === 'knowledge'">
+        <div class="page-toolbar">
+          <el-button type="primary" size="small" @click="showAddDialog"><el-icon><Plus /></el-icon> 新增知识条目</el-button>
         </div>
         <el-table :data="knowledgeList" stripe size="small">
           <el-table-column prop="question" label="问题" min-width="200" />
@@ -105,6 +111,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import api from '@/api/request'
+import { ChatLineRound, Refresh, Plus } from '@element-plus/icons-vue'
 
 const activeTab = ref('sessions')
 const sessions = ref([])
@@ -160,3 +167,7 @@ async function deleteKnowledge(row) {
 
 onMounted(loadData)
 </script>
+
+<style scoped>
+.tab-content { padding-top: var(--space-3); }
+</style>

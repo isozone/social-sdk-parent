@@ -3,7 +3,7 @@ server:
 
 spring:
   profiles:
-    active: sqlite
+    active: mysql
   application:
     name: xianyu-manager
   web:

@@ -3,8 +3,9 @@ package cn.net.rjnetwork.xianyu.manager.virtual.service;
 import cn.net.rjnetwork.xianyu.manager.account.mapper.AccountMapper;
 import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
 import cn.net.rjnetwork.xianyu.manager.batch.service.BatchJobService;
+import cn.net.rjnetwork.xianyu.manager.message.dto.MessageSendRequest;
 import cn.net.rjnetwork.xianyu.manager.message.service.MessageService;
-import cn.net.rjnetwork.xianyu.manager.order.mapper.XianyuOrderMapper;
+import cn.net.rjnetwork.xianyu.manager.order.mapper.OrderMapper;
 import cn.net.rjnetwork.xianyu.manager.order.model.XianyuOrder;
 import cn.net.rjnetwork.xianyu.manager.order.ship.service.DeliveryRuleEngine;
 import cn.net.rjnetwork.xianyu.manager.virtual.mapper.CardItemRelationMapper;
@@ -54,7 +55,7 @@ public class AutoShipService {
     private static final Logger log = LoggerFactory.getLogger(AutoShipService.class);
     private static final String JOB_TYPE = "auto_ship";
 
-    private final XianyuOrderMapper orderMapper;
+    private final OrderMapper orderMapper;
     private final ShipCardMapper shipCardMapper;
     private final CardItemRelationMapper relationMapper;
     private final DeliveryLogMapper deliveryLogMapper;
@@ -65,7 +66,7 @@ public class AutoShipService {
     private final BatchJobService batchJobService;
     private final ApplicationEventPublisher eventPublisher;
 
-    public AutoShipService(XianyuOrderMapper orderMapper,
+    public AutoShipService(OrderMapper orderMapper,
                            ShipCardMapper shipCardMapper,
                            CardItemRelationMapper relationMapper,
                            DeliveryLogMapper deliveryLogMapper,
@@ -115,8 +116,8 @@ public class AutoShipService {
             // 1. A7 规则评估
             DeliveryRuleEngine.DeliveryContext ctx = new DeliveryRuleEngine.DeliveryContext(
                     task.getAccountId(), parseLong(order.getBuyerId()), task.getProductId(),
-                    order.getPrice() == null ? null : order.getPrice().doubleValue(),
-                    order.getBuyerRegion());
+                    order.getAmount() == null ? null : order.getAmount().doubleValue(),
+                    null); // buyerRegion 暂未存于 XianyuOrder，规则REGION_BLOCK 暂以null跳过
             DeliveryRuleEngine.BlockDecision decision = ruleEngine.shouldBlock(ctx);
             audit.setRuleDecision(decision.block ? decision.action : "PASS");
             audit.setHitRuleName(decision.ruleName);
@@ -127,7 +128,7 @@ public class AutoShipService {
             }
             if ("DELAY".equals(decision.action)) {
                 task.setStatus("PENDING");
-                task.setNextRunAt(LocalDateTime.now().plusMinutes(30));
+                task.setExecuteAt(LocalDateTime.now().plusMinutes(30));
                 taskMapper.updateById(task);
                 audit.setStatus("DELAYED");
                 audit.setFailureReason(decision.reason);
@@ -158,21 +159,17 @@ public class AutoShipService {
             audit.setShipCardId(matched.getId());
             audit.setDeliverContent(buildDeliverContent(matched));
 
-            // 3. 延迟窗口（task.delaySeconds 非空时延后发送，防被风控盯上）
-            if (task.getDelaySeconds() != null && task.getDelaySeconds() > 0
-                    && (task.getNextRunAt() == null || task.getNextRunAt().isAfter(LocalDateTime.now()))) {
+            // 3. 延迟窗口（executeAt 未到则延后执行，防被风控盯上）
+            if (task.getExecuteAt() != null && task.getExecuteAt().isAfter(LocalDateTime.now())) {
                 task.setStatus("PENDING");
-                if (task.getNextRunAt() == null) {
-                    task.setNextRunAt(LocalDateTime.now().plusSeconds(task.getDelaySeconds()));
-                }
                 taskMapper.updateById(task);
                 audit.setStatus("DELAYED");
-                audit.setFailureReason("延迟 " + task.getDelaySeconds() + "s 后发");
+                audit.setFailureReason("延迟至 " + task.getExecuteAt() + " 后发");
                 deliveryLogMapper.insert(audit);
                 return;
             }
 
-            // 4. 发送：调 MessageService 把卡券内容发给买家
+            // 4. 发送：调 MessageService.sendMessage 把卡券内容发给买家
             XianyuAccount account = accountMapper.selectById(task.getAccountId());
             if (account == null) {
                 finalizeFail(task, audit, "FAILED", "账号不存在");
@@ -180,7 +177,11 @@ public class AutoShipService {
             }
             String deliverText = buildDeliverContent(matched);
             try {
-                messageService.sendText(account, order.getSessionId(), deliverText);
+                MessageSendRequest req = new MessageSendRequest();
+                req.setAccountId(account.getId());
+                req.setSessionId(null); // sessionId 暂不存于 VirtualShipTask，由 MessageService 按 buyerId 拿会话
+                req.setContent(deliverText);
+                messageService.sendMessage(req);
             } catch (Exception e) {
                 finalizeFail(task, audit, "FAILED", "发送失败：" + e.getMessage());
                 return;
@@ -197,7 +198,7 @@ public class AutoShipService {
             deliveryLogMapper.insert(audit);
 
             task.setStatus("SUCCESS");
-            task.setShippedAt(LocalDateTime.now());
+            task.setProcessedAt(LocalDateTime.now());
             taskMapper.updateById(task);
             log.info("[A8] order {} shipped via card {}", task.getOrderId(), matched.getId());
         } catch (Exception e) {
@@ -230,7 +231,7 @@ public class AutoShipService {
         audit.setDurationMs(0L);
         deliveryLogMapper.insert(audit);
         task.setStatus("FAILED");
-        task.setLastError(reason);
+        task.setErrorMessage(reason);
         taskMapper.updateById(task);
     }
 
@@ -240,7 +241,7 @@ public class AutoShipService {
         audit.setDurationMs(0L);
         deliveryLogMapper.insert(audit);
         task.setStatus("SKIPPED");
-        task.setLastError(reason);
+        task.setErrorMessage(reason);
         taskMapper.updateById(task);
     }
 
@@ -248,7 +249,7 @@ public class AutoShipService {
         try {
             eventPublisher.publishEvent(new cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent(
                     type, task.getAccountId(),
-                    Optional.ofNullable(order).map(o -> o.getBuyerNick()).orElse(""),
+                    Optional.ofNullable(order).map(o -> o.getCounterpartyName()).orElse(""),
                     java.util.Map.of("orderId", String.valueOf(task.getOrderId()),
                             "productId", String.valueOf(task.getProductId()),
                             "reason", reason == null ? "" : reason)));
@@ -259,8 +260,8 @@ public class AutoShipService {
     public Long runBatch(String triggerSource) {
         List<VirtualShipTask> pendings = taskMapper.selectList(new LambdaQueryWrapper<VirtualShipTask>()
                 .eq(VirtualShipTask::getStatus, "PENDING")
-                .and(w -> w.isNull(VirtualShipTask::getNextRunAt)
-                        .or().le(VirtualShipTask::getNextRunAt, LocalDateTime.now())));
+                .and(w -> w.isNull(VirtualShipTask::getExecuteAt)
+                        .or().le(VirtualShipTask::getExecuteAt, LocalDateTime.now())));
         var job = batchJobService.startBatch(JOB_TYPE, triggerSource, triggerSource, pendings.size());
         int success = 0, failed = 0, skipped = 0;
         for (VirtualShipTask t : pendings) {
@@ -276,12 +277,12 @@ public class AutoShipService {
                     skipped++;
                     batchJobService.recordItem(job.getId(), String.valueOf(t.getOrderId()),
                             "order#" + t.getOrderId(), "SKIPPED", System.currentTimeMillis() - t0,
-                            t.getLastError(), null);
+                            t.getErrorMessage(), null);
                 } else {
                     failed++;
                     batchJobService.recordItem(job.getId(), String.valueOf(t.getOrderId()),
                             "order#" + t.getOrderId(), "FAILED", System.currentTimeMillis() - t0,
-                            t.getLastError(), null);
+                            t.getErrorMessage(), null);
                 }
             } catch (Exception e) {
                 failed++;
@@ -303,36 +304,45 @@ public class AutoShipService {
         task.setAccountId(accountId);
         task.setOrderId(orderId);
         task.setProductId(productId);
-        task.setSessionId(sessionId);
         task.setStatus("PENDING");
-        task.setCreatedAt(LocalDateTime.now());
+        task.setRetryCount(0);
+        task.setMaxRetry(5);
         taskMapper.insert(task);
         log.info("[A8] pay success event → enqueue ship task orderId={} productId={}", orderId, productId);
         // 立即跑一次（链路内含延迟/规则，不会无脑发）
         processShipTask(task);
     }
 
-    /** 兜底用：扫订单表里 TRADE_PAID 但还没建 task 的，补建入队。由 scanAndShip 调。 */
+    /** 兜底用：扫订单表里 PAID 但还没建 task 的，补建入队。由 scanAndShip 调。 */
     public int enqueuePaidOrders() {
         List<XianyuOrder> paid = orderMapper.selectList(new LambdaQueryWrapper<XianyuOrder>()
-                .eq(XianyuOrder::getStatus, "TRADE_PAID"));
+                .eq(XianyuOrder::getStatus, "PAID"));
         int enqueued = 0;
         for (XianyuOrder o : paid) {
             // 已有同订单 PENDING/SUCCESS task 则跳过
             Long exists = taskMapper.selectCount(new LambdaQueryWrapper<VirtualShipTask>()
-                    .eq(VirtualShipTask::getOrderId, o.getId())
+                    .eq(VirtualShipTask::getOrderId, parseLongOrderId(o.getOrderId()))
                     .in(VirtualShipTask::getStatus, "PENDING", "PROCESSING", "SUCCESS"));
             if (exists != null && exists > 0) continue;
             VirtualShipTask task = new VirtualShipTask();
             task.setAccountId(o.getAccountId());
-            task.setOrderId(o.getId());
-            task.setProductId(o.getProductId() == null ? null : o.getProductId().longValue());
-            task.setSessionId(o.getSessionId());
+            task.setOrderId(parseLongOrderId(o.getOrderId()));
+            task.setProductId(o.getProductId());
             task.setStatus("PENDING");
-            task.setCreatedAt(LocalDateTime.now());
+            task.setRetryCount(0);
+            task.setMaxRetry(5);
             taskMapper.insert(task);
             enqueued++;
         }
         return enqueued;
+    }
+
+    /** XianyuOrder.orderId 是 String 类型（闲鱼侧长 ID），转 Long 存 VirtualShipTask.orderId。 */
+    private Long parseLongOrderId(String s) {
+        if (s == null || s.isBlank()) return null;
+        try { return Long.parseLong(s); } catch (NumberFormatException e) {
+            // 非纯数字的闲鱼 orderId 用 hashCode 兜底（碰撞概率低，仅用于 task 关联）
+            return (long) s.hashCode();
+        }
     }
 }
