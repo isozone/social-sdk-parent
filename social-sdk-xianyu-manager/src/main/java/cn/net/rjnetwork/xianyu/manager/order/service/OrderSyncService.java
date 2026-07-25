@@ -7,11 +7,15 @@ import cn.net.rjnetwork.xianyu.manager.account.mapper.AccountMapper;
 import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
 import cn.net.rjnetwork.xianyu.manager.order.mapper.OrderMapper;
 import cn.net.rjnetwork.xianyu.manager.order.model.XianyuOrder;
+import cn.net.rjnetwork.xianyu.manager.order.status.OrderStateMachineService;
+import cn.net.rjnetwork.xianyu.manager.order.status.OrderStatusMachine;
 import cn.net.rjnetwork.xianyu.manager.product.mapper.ProductMapper;
 import cn.net.rjnetwork.xianyu.manager.product.model.XianyuProduct;
 import cn.net.rjnetwork.xianyu.manager.virtual.service.VirtualShipService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +34,8 @@ import java.util.Map;
 @Service
 public class OrderSyncService {
 
+    private static final Logger log = LoggerFactory.getLogger(OrderSyncService.class);
+
     private static final DateTimeFormatter[] DATE_FORMATS = {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"),
@@ -44,6 +50,8 @@ public class OrderSyncService {
     private final ProductMapper productMapper;
     private final VirtualShipService virtualShipService;
     private final ApplicationEventPublisher eventPublisher;
+    /** 订单状态机服务（BOT-O1）—— 可选注入避免循环依赖。 */
+    private OrderStateMachineService orderStateMachineService;
 
     public OrderSyncService(AccountMapper accountMapper, OrderMapper orderMapper,
                             ProductMapper productMapper,
@@ -54,6 +62,12 @@ public class OrderSyncService {
         this.productMapper = productMapper;
         this.virtualShipService = virtualShipService;
         this.eventPublisher = eventPublisher;
+    }
+
+    /** Spring 注入 OrderStateMachineService（可选，避免启动期循环依赖）。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setOrderStateMachineService(OrderStateMachineService orderStateMachineService) {
+        this.orderStateMachineService = orderStateMachineService;
     }
 
     /**
@@ -407,6 +421,10 @@ public class OrderSyncService {
                 resolveProductRef(existing, accountId);
                 existing.setUpdatedAt(LocalDateTime.now());
                 orderMapper.updateById(existing);
+                // BOT-O1 订单状态机迁移：闲鱼原始 status 映射到 order_status 状态机
+                if (statusChanged) {
+                    transitionOrderStatus(existing.getOrderId(), mapToOrderStatus(order.getStatus()));
+                }
                 tryCreateVirtualShipTask(existing);
 
                 if (statusChanged || titleChanged) {
@@ -421,6 +439,8 @@ public class OrderSyncService {
                 resolveProductRef(order, accountId);
                 order.setCreatedAt(LocalDateTime.now());
                 order.setUpdatedAt(LocalDateTime.now());
+                // BOT-O1 新订单初始化状态机：按闲鱼原始 status 映射
+                order.setOrderStatus(mapToOrderStatus(order.getStatus()));
                 orderMapper.insert(order);
                 tryCreateVirtualShipTask(order);
                 eventPublisher.publishEvent(new NotifyEvent("NEW_ORDER", accountId, accountName,
@@ -428,6 +448,41 @@ public class OrderSyncService {
                                 "itemTitle", str(order.getItemTitle()), "amount", str(order.getAmount()),
                                 "counterparty", str(order.getCounterpartyName()), "status", str(order.getStatus()))));
             }
+        }
+    }
+
+    /** BOT-O1 把闲鱼原始 status/tradeStatusEnum 映射到订单状态机枚举。
+     *  闲鱼真实取值（参考 isReadyForVirtualShip L545-550 + mapStatusFromEnum）：
+     *  status        — PAID/BUYER_TO_CONFIRM/SELLER_CONSIGN/TRADE_FINISHED/REFUNDING/TRADE_CLOSED 等（大写）
+     *  tradeStatusEnum — buyer_to_confirm/paid/trade_paid/trade_finish/refund/refund_finish/trade_closed 等（小写） */
+    private String mapToOrderStatus(String rawStatus) {
+        if (rawStatus == null || rawStatus.isBlank()) return OrderStatusMachine.CREATED;
+        String s = rawStatus.toUpperCase();
+        // 待付款（下单未付）
+        if (s.contains("WAIT") || s.contains("PENDING") || s.contains("CREATED") || s.contains("BUYER_PAY")) return OrderStatusMachine.CREATED;
+        // 已付款（含 buyer_to_confirm/paid/trade_paid/buyer_to_confirm）
+        if (s.contains("PAID") || s.contains("BUYER_TO_CONFIRM") || s.contains("TRADE_PAID")) return OrderStatusMachine.PAID;
+        // 已发货（含 seller_consign/consign/shipped）
+        if (s.contains("CONSIGN") || s.contains("SHIPPED") || s.contains("SELLER_CONSIGN")) return OrderStatusMachine.SHIPPED;
+        // 已完成（含 trade_finish/finished，但排除 refund_finish）
+        if ((s.contains("FINISH") || s.contains("TRADE_FINISHED")) && !s.contains("REFUND")) return OrderStatusMachine.COMPLETED;
+        // 退款中（含 refund/refunding，但排除 refund_finish/refund_finished）
+        if (s.contains("REFUND") && !(s.contains("FINISH"))) return OrderStatusMachine.REFUNDING;
+        // 已退款（含 refund_finish/refund_finished）
+        if (s.contains("REFUND") && s.contains("FINISH")) return OrderStatusMachine.REFUNDED;
+        // 已关闭/取消
+        if (s.contains("CLOSE") || s.contains("CANCEL") || s.contains("TRADE_CLOSED")) return OrderStatusMachine.CLOSED;
+        // 默认按已付款（最常见同步态，与 isReadyForVirtualShip 一致）
+        return OrderStatusMachine.PAID;
+    }
+
+    /** BOT-O1 调状态机服务迁移（容错：服务未注入或迁移非法不阻断主链路）。 */
+    private void transitionOrderStatus(String orderId, String to) {
+        if (orderStateMachineService == null) return;
+        try {
+            orderStateMachineService.transition(orderId, to);
+        } catch (Exception e) {
+            log.warn("[BOT-O1] 订单 {} 状态机迁移到 {} 失败（非致命）: {}", orderId, to, e.getMessage());
         }
     }
 

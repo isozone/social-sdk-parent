@@ -36,9 +36,9 @@ import java.util.Optional;
  * </ol>
  */
 @Service
-public class PolishService {
+public class ScheduledPolishService {
 
-    private static final Logger log = LoggerFactory.getLogger(PolishService.class);
+    private static final Logger log = LoggerFactory.getLogger(ScheduledPolishService.class);
     private static final String JOB_TYPE = "polish";
 
     private final ProductMapper productMapper;
@@ -47,7 +47,7 @@ public class PolishService {
     private final CircuitBreakerService circuitBreaker;
     private final BatchJobService batchJobService;
 
-    public PolishService(ProductMapper productMapper,
+    public ScheduledPolishService(ProductMapper productMapper,
                         AccountMapper accountMapper,
                         ScheduledPolishLogMapper logMapper,
                         CircuitBreakerService circuitBreaker,

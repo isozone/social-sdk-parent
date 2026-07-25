@@ -211,6 +211,30 @@ const routes = [
         name: 'LoginRenewLogs',
         component: () => import('@/views/logs/loginRenew/Index.vue'),
         meta: { title: '登录续期日志' }
+      },
+      {
+        path: 'delivery-rules',
+        name: 'DeliveryRules',
+        component: () => import('@/views/deliveryRules/Index.vue'),
+        meta: { title: '发货匹配规则' }
+      },
+      {
+        path: 'comment-templates',
+        name: 'CommentTemplates',
+        component: () => import('@/views/commentTemplates/Index.vue'),
+        meta: { title: '评价模板' }
+      },
+      {
+        path: 'item-reply',
+        name: 'ItemReply',
+        component: () => import('@/views/itemReply/Index.vue'),
+        meta: { title: '商品专属回复' }
+      },
+      {
+        path: 'close-notice',
+        name: 'CloseNotice',
+        component: () => import('@/views/closeNotice/Index.vue'),
+        meta: { title: '关闭平台通知' }
       }
     ]
   }

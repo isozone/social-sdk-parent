@@ -63,8 +63,10 @@
 
     <!-- 底部 CTA -->
     <section class="bottom-cta">
-      <h2>开始托管你的闲鱼生意</h2>
-      <button class="cta-primary" @click="goLogin">登录控制台</button>
+      <div class="bottom-cta-inner">
+        <h2>开始托管你的闲鱼生意</h2>
+        <button class="cta-primary" @click="goLogin">登录控制台</button>
+      </div>
     </section>
 
     <!-- 页脚 -->
@@ -153,8 +155,8 @@ const stats = [
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 .nav-inner {
-  max-width: 1200px; margin: 0 auto;
-  padding: 0 24px; height: 64px;
+  width: 100%; box-sizing: border-box;
+  padding: 0 32px; height: 64px;
   display: flex; align-items: center; justify-content: space-between;
 }
 .brand {
@@ -194,7 +196,7 @@ const stats = [
 }
 
 /* ===== Feature Grid ===== */
-.features { max-width: 1200px; margin: 0 auto; padding: 80px 24px; }
+.features { padding: 80px 32px; }
 .feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 24px; }
 .feature-card {
   padding: 32px 24px; background: #fafafa;
@@ -229,9 +231,8 @@ const stats = [
 .feature-card p  { font-size: 14px; line-height: 1.6; color: #666; margin: 0; }
 
 /* ===== Scenes ===== */
-.scenes { background: #f9fafb; padding: 80px 24px; }
+.scenes { background: #f9fafb; padding: 80px 32px; }
 .scene-grid {
-  max-width: 1200px; margin: 0 auto;
   display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 24px;
 }
 .scene-card {
@@ -255,9 +256,8 @@ const stats = [
 .scene-card p { font-size: 14px; line-height: 1.6; color: #666; margin: 0; }
 
 /* ===== Stats ===== */
-.stats { background: #1a1a2e; padding: 72px 24px; }
+.stats { background: #1a1a2e; padding: 72px 32px; }
 .stats-inner {
-  max-width: 1000px; margin: 0 auto;
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px;
   text-align: center;
 }
@@ -266,15 +266,18 @@ const stats = [
 
 /* ===== Bottom CTA ===== */
 .bottom-cta {
-  text-align: center; padding: 100px 24px;
+  padding: 56px 32px;
   background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
 }
-.bottom-cta h2 { font-size: 32px; font-weight: 700; color: #fff; margin: 0 0 28px; }
+.bottom-cta-inner {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 24px; flex-wrap: wrap;
+}
+.bottom-cta h2 { font-size: 28px; font-weight: 700; color: #fff; margin: 0; }
 
 /* ===== Footer ===== */
-.footer { background: #111; padding: 24px; border-top: 1px solid #222; }
+.footer { background: #111; padding: 24px 32px; border-top: 1px solid #222; }
 .footer-inner {
-  max-width: 1200px; margin: 0 auto;
   display: flex; justify-content: space-between; align-items: center;
   font-size: 13px; color: #888;
 }
@@ -289,5 +292,6 @@ const stats = [
   .section-title { font-size: 24px; }
   .stats-inner { grid-template-columns: repeat(2, 1fr); }
   .footer-inner { flex-direction: column; gap: 10px; }
+  .bottom-cta-inner { flex-direction: column; text-align: center; }
 }
 </style>

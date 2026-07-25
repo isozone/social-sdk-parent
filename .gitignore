@@ -100,3 +100,5 @@ data/
 *.tmp
 *.swp
 chrome-profiles
+
+social-sdk-xianyu-manager/src/main/resources/application-local.yml

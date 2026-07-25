@@ -3,7 +3,7 @@ package cn.net.rjnetwork.xianyu.manager.product.polish.controller;
 import cn.net.rjnetwork.xianyu.manager.common.ApiResponse;
 import cn.net.rjnetwork.xianyu.manager.product.polish.mapper.ScheduledPolishLogMapper;
 import cn.net.rjnetwork.xianyu.manager.product.polish.model.ScheduledPolishLog;
-import cn.net.rjnetwork.xianyu.manager.product.polish.service.PolishService;
+import cn.net.rjnetwork.xianyu.manager.product.polish.service.ScheduledPolishService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.web.bind.annotation.*;
@@ -17,10 +17,10 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/polish")
 public class PolishController {
 
-    private final PolishService polishService;
+    private final ScheduledPolishService polishService;
     private final ScheduledPolishLogMapper logMapper;
 
-    public PolishController(PolishService polishService, ScheduledPolishLogMapper logMapper) {
+    public PolishController(ScheduledPolishService polishService, ScheduledPolishLogMapper logMapper) {
         this.polishService = polishService;
         this.logMapper = logMapper;
     }

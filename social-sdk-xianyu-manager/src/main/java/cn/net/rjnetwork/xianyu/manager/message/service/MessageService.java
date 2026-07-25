@@ -10,6 +10,7 @@ import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
 import cn.net.rjnetwork.xianyu.manager.account.service.AccountService;
 import cn.net.rjnetwork.xianyu.manager.audit.model.AuditLog;
 import cn.net.rjnetwork.xianyu.manager.audit.service.AuditService;
+import cn.net.rjnetwork.xianyu.manager.circuit.RiskControlProtector;
 import cn.net.rjnetwork.xianyu.manager.message.dto.MessageSendRequest;
 import cn.net.rjnetwork.xianyu.manager.message.mapper.MessageMapper;
 import cn.net.rjnetwork.xianyu.manager.message.model.XianyuMessage;
@@ -56,6 +57,8 @@ public class MessageService {
     private AccountService accountService;
     /** 审计服务 — 记录滑块验证失败事件到 audit_log 表。 */
     private final AuditService auditService;
+    /** 风控暂停保护（BOT-A6）—— 识别风控码后暂停账号 + 写 risk_log。可选注入避免循环依赖。 */
+    private RiskControlProtector riskControlProtector;
 
     public MessageService(MessageMapper messageMapper, RuleService ruleService,
                           ApplicationEventPublisher eventPublisher, AccountMapper accountMapper,
@@ -72,6 +75,12 @@ public class MessageService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     public void setAccountService(AccountService accountService) {
         this.accountService = accountService;
+    }
+
+    /** Spring 注入 RiskControlProtector（可选，避免启动期循环依赖）。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setRiskControlProtector(RiskControlProtector riskControlProtector) {
+        this.riskControlProtector = riskControlProtector;
     }
 
     /** 返回会话摘要：sessionId、对方昵称、头像、最后消息时间、未读数（从缓存的 session 列表补） */
@@ -438,6 +447,15 @@ public class MessageService {
                 errorMessage.contains("FAIL_SYS_TOKEN_EXOIRED") ||
                 errorMessage.contains("FAIL_SYS_TOKEN_EMPTY") ||
                 errorMessage.contains("FAIL_SYS_ILLEGAL_REQUEST"))) {
+                // BOT-A6 风控暂停保护：识别风控码后暂停账号 + 写 risk_log，防死循环刷官方接口
+                if (riskControlProtector != null) {
+                    try {
+                        riskControlProtector.handleRiskControl(acc.getId(), "MESSAGE_SYNC",
+                                extractRiskCode(errorMessage), errorMessage);
+                    } catch (Exception rce) {
+                        log.warn("[MESSAGE] BOT-A6 风控暂停保护调用失败（非致命）: {}", rce.getMessage());
+                    }
+                }
                 if (!allowCaptcha) {
                     log.info("[MESSAGE] risk control detected during scheduled pull, skip captcha solving for account {}", acc.getId());
                     return false;
@@ -747,7 +765,7 @@ public class MessageService {
      */
     private static String extractErrorSummary(String raw) {
         if (raw == null || raw.isBlank()) return "未知风控";
-        // 尝试找 JSON 片断 ret[0]
+        // 尝试找 JSON 片段 ret[0]
         java.util.regex.Matcher m = java.util.regex.Pattern.compile(
                 "\"ret\"\\s*:\\s*\\[\\s*\"([^\"]+)\"\\]").matcher(raw);
         if (m.find()) {
@@ -758,6 +776,19 @@ public class MessageService {
         }
         // 兜底：不是 JSON 就截断
         return raw.length() > 200 ? raw.substring(0, 200) + "..." : raw;
+    }
+
+    /** 从原始错误信息里提取风控码（供 BOT-A6 写 risk_control_log.risk_code）。 */
+    private static String extractRiskCode(String raw) {
+        if (raw == null || raw.isBlank()) return "UNKNOWN";
+        if (raw.contains("FAIL_SYS_USER_VALIDATE")) return "FAIL_SYS_USER_VALIDATE";
+        if (raw.contains("RGV587")) return "RGV587_ERROR";
+        if (raw.contains("punish")) return "punish";
+        if (raw.contains("FAIL_SYS_TOKEN_EXOIRED") || raw.contains("FAIL_SYS_TOKEN_EMPTY"))
+            return "FAIL_SYS_TOKEN";
+        if (raw.contains("FAIL_SYS_ILLEGAL_REQUEST")) return "FAIL_SYS_ILLEGAL_REQUEST";
+        if (raw.contains("captcha")) return "CAPTCHA";
+        return "UNKNOWN";
     }
 
     private static String truncate(String s, int max) {

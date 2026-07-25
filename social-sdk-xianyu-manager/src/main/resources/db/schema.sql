@@ -1489,3 +1489,21 @@ CREATE TABLE IF NOT EXISTS comment_templates (
     deleted             INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_comment_templates_account ON comment_templates(account_id, category, enabled, deleted);
+
+-- BOT-D1 商品专属回复（商品级专属回复；≠ A10 通用关键词回复）
+CREATE TABLE IF NOT EXISTS item_reply (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id          INTEGER NOT NULL,
+    item_id             VARCHAR(64) NOT NULL,
+    item_title          VARCHAR(256),
+    trigger_scene       VARCHAR(32) DEFAULT 'FIRST_INQUIRY',
+    reply_content       VARCHAR(2000) NOT NULL,
+    enabled             INTEGER DEFAULT 1,
+    priority            INTEGER DEFAULT 100,
+    use_count           INTEGER DEFAULT 0,
+    remark              VARCHAR(500),
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_item_reply_match ON item_reply(account_id, item_id, trigger_scene, enabled, deleted);

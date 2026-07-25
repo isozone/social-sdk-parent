@@ -3,7 +3,7 @@ server:
 
 spring:
   profiles:
-    active: mysql
+    active: local
   application:
     name: xianyu-manager
   web:
