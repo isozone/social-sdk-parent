@@ -11,7 +11,7 @@ import java.util.Arrays;
  * <p>连接池可并发（maxActive=20），SET 注入 standard_conforming_strings + 时区。</p>
  */
 @Component
-@ConditionalOnProperty(prefix = "spring.profiles", name = "active", havingValue = "postgres")
+@ConditionalOnProperty(prefix = "bitefu.wall", name = "db-type", havingValue = "postgres")
 public class PostgresProvider implements DatabaseProvider {
 
     private static final String[] INIT = {

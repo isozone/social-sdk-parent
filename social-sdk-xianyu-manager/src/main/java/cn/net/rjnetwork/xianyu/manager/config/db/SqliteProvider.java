@@ -12,7 +12,7 @@ import java.util.Arrays;
  * <p>激活条件：{@code spring.profiles.active=sqlite} 或缺失（兜底默认）。</p>
  */
 @Component
-@ConditionalOnProperty(prefix = "spring.profiles", name = "active", havingValue = "sqlite", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "bitefu.wall", name = "db-type", havingValue = "sqlite", matchIfMissing = true)
 public class SqliteProvider implements DatabaseProvider {
 
     private static final String[] PRAGMA = {

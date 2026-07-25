@@ -11,7 +11,7 @@ import java.util.Arrays;
  * <p>连接池可并发（maxActive=20），SET 注入 utf8mb4 + 严格 SQL 模式 + 时区。</p>
  */
 @Component
-@ConditionalOnProperty(prefix = "spring.profiles", name = "active", havingValue = "mysql")
+@ConditionalOnProperty(prefix = "bitefu.wall", name = "db-type", havingValue = "mysql")
 public class MysqlProvider implements DatabaseProvider {
 
     private static final String[] INIT = {
