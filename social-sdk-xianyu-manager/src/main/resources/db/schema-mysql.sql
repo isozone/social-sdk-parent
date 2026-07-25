@@ -452,26 +452,19 @@ CREATE TABLE IF NOT EXISTS virtual_card_pool (
     FOREIGN KEY (product_id) REFERENCES xianyu_product(id)
 );
 
--- 自动发货任务（定时扫描执行）
-retry_count INTEGER DEFAULT 0,
-    max_retry INTEGER DEFAULT 5,
-    error_message TEXT,
-    execute_at DATETIME,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    processed_at TIMESTAMP,
-    deleted INTEGER DEFAULT 0,
-    FOREIGN KEY (order_id) REFERENCES xianyu_order(id),
-    FOREIGN KEY (product_id) REFERENCES xianyu_product(id)
-);
-
 -- 自动发货全局配置（每账号一条）
-auto_confirm_days INTEGER DEFAULT 7,
-    confirm_receipt_message TEXT,        -- N天后自动确认收货
-    notify_after_ship TINYINT(1) DEFAULT 1,     -- 发货后站内通知运营
+CREATE TABLE IF NOT EXISTS virtual_ship_config (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    account_id BIGINT NOT NULL,
+    enabled TINYINT(1) DEFAULT 0,
+    delay_seconds INT DEFAULT 0,
+    auto_confirm_days INT DEFAULT 7,
+    confirm_receipt_message TEXT,
+    notify_after_ship TINYINT(1) DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    deleted INTEGER DEFAULT 0,
+    deleted INT DEFAULT 0,
+    UNIQUE KEY uk_account (account_id),
     FOREIGN KEY (account_id) REFERENCES xianyu_account(id)
 );
 

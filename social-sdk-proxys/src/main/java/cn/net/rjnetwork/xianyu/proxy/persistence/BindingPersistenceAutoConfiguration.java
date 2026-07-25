@@ -16,7 +16,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 import org.springframework.context.event.EventListener;
 
 import javax.sql.DataSource;
@@ -53,7 +52,7 @@ public class BindingPersistenceAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(BindingRepository.class)
-    @Profile({"sqlite", "default"})
+    @ConditionalOnProperty(prefix = "bitefu.wall", name = "db-type", havingValue = "sqlite", matchIfMissing = true)
     public BindingRepository sqliteBindingRepository(DataSource dataSource) {
         log.info("[PROXY-AUTOCONFIG] 创建 SqliteBindingRepository (profile=sqlite/default)");
         return new SqliteBindingRepository(dataSource);
@@ -64,7 +63,7 @@ public class BindingPersistenceAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(BindingRepository.class)
-    @Profile("mysql")
+    @ConditionalOnProperty(prefix = "bitefu.wall", name = "db-type", havingValue = "mysql")
     public BindingRepository mysqlBindingRepository(DataSource dataSource) {
         log.info("[PROXY-AUTOCONFIG] 创建 MySqlBindingRepository (profile=mysql)");
         return new MySqlBindingRepository(dataSource);
@@ -75,7 +74,7 @@ public class BindingPersistenceAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(BindingRepository.class)
-    @Profile("postgres")
+    @ConditionalOnProperty(prefix = "bitefu.wall", name = "db-type", havingValue = "postgres")
     public BindingRepository postgresBindingRepository(DataSource dataSource) {
         log.info("[PROXY-AUTOCONFIG] 创建 PostgresBindingRepository (profile=postgres)");
         return new PostgresBindingRepository(dataSource);

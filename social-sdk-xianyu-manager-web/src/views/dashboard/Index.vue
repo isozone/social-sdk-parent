@@ -138,7 +138,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { use } from 'echarts/core'
+import { use, graphic } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { PieChart, LineChart, BarChart } from 'echarts/charts'
 import { TooltipComponent, LegendComponent, GridComponent, TitleComponent } from 'echarts/components'
@@ -265,7 +265,7 @@ const lineCharts = computed(() => [
         {
           name: '买入', type: 'line', smooth: true, lineStyle: { width: 2 },
           data: orderTrend.value.map(d => d.bought || 0),
-          itemStyle: { color: CHART[5] }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          itemStyle: { color: CHART[5] }, areaStyle: { color: new graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: 'rgba(239,68,68,0.20)' }, { offset: 1, color: 'rgba(239,68,68,0.02)' }
           ])},
         },
@@ -285,14 +285,14 @@ const lineCharts = computed(() => [
         {
           name: '收到', type: 'line', smooth: true, lineStyle: { width: 2 },
           data: messageActivity.value.map(d => d.incoming || 0),
-          itemStyle: { color: CHART[3] }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          itemStyle: { color: CHART[3] }, areaStyle: { color: new graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: 'rgba(16,185,129,0.25)' }, { offset: 1, color: 'rgba(16,185,129,0.02)' }
           ])},
         },
         {
           name: '回复', type: 'line', smooth: true, lineStyle: { width: 2 },
           data: messageActivity.value.map(d => d.outgoing || 0),
-          itemStyle: { color: CHART[2] }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          itemStyle: { color: CHART[2] }, areaStyle: { color: new graphic.LinearGradient(0, 0, 0, 1, [
             { offset: 0, color: 'rgba(245,158,11,0.20)' }, { offset: 1, color: 'rgba(245,158,11,0.02)' }
           ])},
         },

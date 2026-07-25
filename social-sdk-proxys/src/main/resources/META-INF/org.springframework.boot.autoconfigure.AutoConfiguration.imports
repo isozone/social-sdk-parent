@@ -1,1 +1,2 @@
 cn.net.rjnetwork.xianyu.proxy.core.ProxyAutoConfiguration
+cn.net.rjnetwork.xianyu.proxy.persistence.BindingPersistenceAutoConfiguration

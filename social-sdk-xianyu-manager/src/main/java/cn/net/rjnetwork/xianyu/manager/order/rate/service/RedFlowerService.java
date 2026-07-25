@@ -51,22 +51,19 @@ public class RedFlowerService {
     private final ScheduledRedFlowerLogMapper logMapper;
     private final CircuitBreakerService circuitBreaker;
     private final BatchJobService batchJobService;
-    private final XianyuApiFacade apiFacade;
 
     public RedFlowerService(OrderMapper orderMapper,
                            AccountMapper accountMapper,
                            RedFlowerConfigMapper configMapper,
                            ScheduledRedFlowerLogMapper logMapper,
                            CircuitBreakerService circuitBreaker,
-                           BatchJobService batchJobService,
-                           XianyuApiFacade apiFacade) {
+                           BatchJobService batchJobService) {
         this.orderMapper = orderMapper;
         this.accountMapper = accountMapper;
         this.configMapper = configMapper;
         this.logMapper = logMapper;
         this.circuitBreaker = circuitBreaker;
         this.batchJobService = batchJobService;
-        this.apiFacade = apiFacade;
     }
 
     /** 执行一次求红花批次。由 RedFlowerTask 定时调用，也可管理端手动触发。 */

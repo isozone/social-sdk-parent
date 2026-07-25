@@ -9,6 +9,12 @@
 #     -e POSTGRES_PASSWORD=yourpass \
 #     -e POSTGRES_DB=xianyu_manager \
 #     -p 5432:5432 postgres:16
+# 方言开关：触发 PostgresProvider 的 @ConditionalOnProperty(prefix="bitefu.wall", name="db-type", havingValue="postgres")。
+# 不设的话 SqliteProvider 兜底激活，把 SQLite 的 PRAGMA 注入到 PG 连接里报语法错。
+bitefu:
+  wall:
+    db-type: postgres
+
 spring:
   datasource:
     driver-class-name: org.postgresql.Driver

@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
  * ruleType 取 BUYER_BLACK/BUYER_LOW_CREDIT/PRODUCT_BLOCK/PRICE_RANGE/REGION_BLOCK/TIME_WINDOW。</p>
  */
 @RestController
-@RequestMapping("/api/delivery-rules")
+@RequestMapping("/api/delivery-block-rules")
 public class DeliveryBlockRuleController {
 
     private final DeliveryBlockRuleMapper ruleMapper;

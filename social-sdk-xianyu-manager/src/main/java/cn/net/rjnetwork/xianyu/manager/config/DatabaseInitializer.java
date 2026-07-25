@@ -397,7 +397,16 @@ public class DatabaseInitializer {
     private void ensureVirtualColumns() {
         ensureColumn("virtual_card_pool", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
         ensureColumn("virtual_card_pool", "used_order_id", "INTEGER");
+        // virtual_ship_task 早期 schema 缺 account_id 等列，旧库 ALTER 补齐（幂等）
+        ensureColumn("virtual_ship_task", "account_id", "BIGINT");
+        ensureColumn("virtual_ship_task", "order_id", "BIGINT");
+        ensureColumn("virtual_ship_task", "product_id", "BIGINT");
+        ensureColumn("virtual_ship_task", "status", "VARCHAR(16) DEFAULT 'PENDING'");
+        ensureColumn("virtual_ship_task", "retry_count", "INTEGER DEFAULT 0");
+        ensureColumn("virtual_ship_task", "max_retry", "INTEGER DEFAULT 5");
+        ensureColumn("virtual_ship_task", "error_message", "TEXT");
         ensureColumn("virtual_ship_task", "execute_at", "DATETIME");
+        ensureColumn("virtual_ship_task", "processed_at", "DATETIME");
     }
 
     private void ensureOrderColumns() {
@@ -415,6 +424,16 @@ public class DatabaseInitializer {
         ensureColumn("xianyu_order", "virtual_shipped_at", "DATETIME");
         ensureColumn("xianyu_order", "auto_receipt_at", "DATETIME");
         ensureColumn("xianyu_order", "deliver_content", "TEXT");
+        // BOT-O1 订单状态机后加的列，旧库可能缺失（ensureColumn 幂等，已有则跳过）
+        ensureColumn("xianyu_order", "order_id", "VARCHAR(64)");
+        ensureColumn("xianyu_order", "status", "VARCHAR(32) DEFAULT 'PENDING'");
+        ensureColumn("xianyu_order", "amount", "REAL");
+        ensureColumn("xianyu_order", "item_title", "VARCHAR(256)");
+        ensureColumn("xianyu_order", "counterparty_name", "VARCHAR(128)");
+        ensureColumn("xianyu_order", "order_time", "DATETIME");
+        ensureColumn("xianyu_order", "tracking_no", "VARCHAR(64)");
+        ensureColumn("xianyu_order", "order_status", "VARCHAR(32) DEFAULT 'CREATED'");
+        ensureColumn("xianyu_order", "pre_refund_status", "VARCHAR(32)");
     }
 
     private void ensureMessageColumns() {
