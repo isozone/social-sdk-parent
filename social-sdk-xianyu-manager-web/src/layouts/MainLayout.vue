@@ -191,9 +191,6 @@
                 <el-dropdown-item command="profile">
                   <el-icon><User /></el-icon> 个人中心
                 </el-dropdown-item>
-                <el-dropdown-item command="changePassword">
-                  <el-icon><Lock /></el-icon> 修改密码
-                </el-dropdown-item>
                 <el-dropdown-item divided command="logout">
                   <el-icon><SwitchButton /></el-icon> 退出登录
                 </el-dropdown-item>
@@ -526,7 +523,7 @@ const currentTitle = computed(() => titleMap[route.path] || '管理后台')
 function openDataBoard() { window.open('/data-board', '_blank') }
 
 function handleCommand(cmd) {
-  if (cmd === 'profile' || cmd === 'changePassword') router.push('/app/profile')
+  if (cmd === 'profile') router.push('/app/profile')
   else if (cmd === 'logout') {
     ElMessageBox.confirm('确认退出登录？', '提示', { type: 'warning' }).then(() => {
       authStore.logout(); router.push('/login')

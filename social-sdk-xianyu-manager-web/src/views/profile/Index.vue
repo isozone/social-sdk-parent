@@ -111,17 +111,6 @@
             label-position="top"
             class="profile-form"
           >
-            <el-form-item label="原密码" prop="oldPassword">
-              <el-input
-                v-model="pwdForm.oldPassword"
-                type="password"
-                show-password
-                placeholder="请输入当前密码"
-                autocomplete="off"
-              >
-                <template #prefix><el-icon><Lock /></el-icon></template>
-              </el-input>
-            </el-form-item>
             <el-form-item label="新密码" prop="newPassword">
               <el-input
                 v-model="pwdForm.newPassword"
@@ -190,7 +179,6 @@ const profileForm = reactive({
 })
 
 const pwdForm = reactive({
-  oldPassword: '',
   newPassword: '',
   confirmPassword: ''
 })
@@ -229,7 +217,6 @@ const validateConfirm = (rule, value, callback) => {
 }
 
 const pwdRules = {
-  oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
   newPassword: [
     { required: true, message: '请输入新密码', trigger: 'blur' },
     { min: 6, max: 64, message: '新密码长度需为 6-64 位', trigger: 'blur' }
@@ -305,12 +292,10 @@ async function handleChangePassword() {
   savingPwd.value = true
   try {
     const res = await changePassword({
-      oldPassword: pwdForm.oldPassword,
       newPassword: pwdForm.newPassword
     })
     if (res.success) {
       ElMessage.success('密码已更新，请使用新密码重新登录')
-      pwdForm.oldPassword = ''
       pwdForm.newPassword = ''
       pwdForm.confirmPassword = ''
       pwdFormRef.value.clearValidate()
@@ -325,7 +310,6 @@ async function handleChangePassword() {
 }
 
 function handleResetPwd() {
-  pwdForm.oldPassword = ''
   pwdForm.newPassword = ''
   pwdForm.confirmPassword = ''
   pwdFormRef.value?.clearValidate()

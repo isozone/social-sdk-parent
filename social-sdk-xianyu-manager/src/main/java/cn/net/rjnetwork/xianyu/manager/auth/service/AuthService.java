@@ -90,18 +90,12 @@ public class AuthService {
 
     /**
      * 修改当前管理员的登录密码。
-     * 需要先校验原密码正确，再使用 PasswordEncoder 重新编码新密码。
+     * 直接使用 PasswordEncoder 重新编码新密码（不要求原密码，适合忘记原密码场景）。
      */
     @Transactional
     public void changePassword(String username, ChangePasswordRequest request) {
         AdminUser user = findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("用户不存在"));
-        if (!passwordEncoder.matches(request.getOldPassword(), user.getPasswordHash())) {
-            throw new IllegalArgumentException("原密码不正确");
-        }
-        if (request.getNewPassword().equals(request.getOldPassword())) {
-            throw new IllegalArgumentException("新密码不能与原密码相同");
-        }
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         adminUserMapper.updateById(user);
     }

@@ -163,6 +163,7 @@ public class DatabaseInitializer {
             ensureMonitorColumns();
             ensureBuyerProfileColumns();
             ensureCircuitBreakerColumns();
+            ensureAdminUserColumns();
             ensureAiCsSessionStateColumns();
             ensureAutoReplyLogTable();
             // ===== B9 批次日志框架：batch_job / batch_job_item 旧库补建 =====
@@ -407,6 +408,13 @@ public class DatabaseInitializer {
         ensureColumn("virtual_ship_task", "error_message", "TEXT");
         ensureColumn("virtual_ship_task", "execute_at", "DATETIME");
         ensureColumn("virtual_ship_task", "processed_at", "DATETIME");
+        // virtual_ship_config 早期 schema 缺列，旧库 ALTER 补齐（幂等）
+        ensureColumn("virtual_ship_config", "account_id", "BIGINT");
+        ensureColumn("virtual_ship_config", "enabled", "INTEGER DEFAULT 0");
+        ensureColumn("virtual_ship_config", "delay_seconds", "INTEGER DEFAULT 0");
+        ensureColumn("virtual_ship_config", "auto_confirm_days", "INTEGER DEFAULT 7");
+        ensureColumn("virtual_ship_config", "confirm_receipt_message", "TEXT");
+        ensureColumn("virtual_ship_config", "notify_after_ship", "INTEGER DEFAULT 1");
     }
 
     private void ensureOrderColumns() {
@@ -728,6 +736,14 @@ public class DatabaseInitializer {
         ensureColumn("circuit_breaker", "cooldown_seconds", "INTEGER DEFAULT 300");
         ensureColumn("circuit_breaker", "threshold_count", "INTEGER DEFAULT 5");
         ensureColumn("circuit_breaker", "last_failure_message", "TEXT");
+    }
+
+    private void ensureAdminUserColumns() {
+        // admin_user 早期 schema 可能缺列，旧库 ALTER 补齐（幂等）
+        ensureColumn("admin_user", "display_name", "VARCHAR(128)");
+        ensureColumn("admin_user", "email", "VARCHAR(128)");
+        ensureColumn("admin_user", "phone", "VARCHAR(32)");
+        ensureColumn("admin_user", "role_level", "INTEGER DEFAULT 1");
     }
 
     private void ensureAiCsSessionStateColumns() {
