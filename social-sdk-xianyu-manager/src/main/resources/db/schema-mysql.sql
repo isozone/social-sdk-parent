@@ -134,6 +134,8 @@ CREATE TABLE IF NOT EXISTS xianyu_order (
     amount REAL,
     status VARCHAR(32) DEFAULT 'PENDING',
     trade_status_enum VARCHAR(32), -- 闲鱼原始状态枚举 (tradeStatusEnum)
+    order_status VARCHAR(32) DEFAULT 'CREATED', -- BOT-O1 订单状态机：CREATED/PAID/SHIPPED/DELIVERED/COMPLETED/REFUNDING/REFUNDED/CLOSED
+    pre_refund_status VARCHAR(32), -- BOT-O1 退款前状态快照，退款取消/驳回后回滚用
     is_seller INTEGER DEFAULT 0, -- 是否为卖家订单
     tracking_no VARCHAR(64),
     order_time TIMESTAMP, -- 订单创建时间(来自闲鱼 API)
@@ -1419,4 +1421,143 @@ CREATE TABLE IF NOT EXISTS scheduled_red_flower_log (
     updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted             INTEGER DEFAULT 0,
     INDEX idx_red_flower_started (started_at, deleted)
+);
+
+-- ======================== B4 定时擦亮 ========================
+CREATE TABLE IF NOT EXISTS scheduled_polish_log (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    trigger_source      VARCHAR(16),
+    account_id          BIGINT,
+    total_count         INTEGER DEFAULT 0,
+    success_count       INTEGER DEFAULT 0,
+    failed_count        INTEGER DEFAULT 0,
+    skipped_count       INTEGER DEFAULT 0,
+    status              VARCHAR(16),
+    started_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at            DATETIME,
+    failure_summary     VARCHAR(2000),
+    batch_job_id        BIGINT,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    INDEX idx_polish_started (started_at, deleted),
+    INDEX idx_polish_account (account_id, started_at)
+);
+
+CREATE TABLE IF NOT EXISTS scheduled_close_notice_log (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    trigger_source      VARCHAR(16),
+    account_id          BIGINT,
+    total_count         INTEGER DEFAULT 0,
+    success_count       INTEGER DEFAULT 0,
+    failed_count        INTEGER DEFAULT 0,
+    skipped_count       INTEGER DEFAULT 0,
+    status              VARCHAR(16),
+    started_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at            DATETIME,
+    failure_summary     VARCHAR(2000),
+    batch_job_id        BIGINT,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    INDEX idx_close_notice_started (started_at, deleted),
+    INDEX idx_close_notice_account (account_id, started_at)
+);
+
+-- BOT-O3 发货匹配规则（关键词→卡券，决定发哪张卡/发几次；≠ A7 拦截阻断）
+CREATE TABLE IF NOT EXISTS delivery_rules (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    account_id          BIGINT,
+    item_id             VARCHAR(64),
+    keyword             VARCHAR(500) NOT NULL,
+    match_mode          VARCHAR(16) DEFAULT 'CONTAINS',
+    card_id             BIGINT NOT NULL,
+    delivery_count      INTEGER DEFAULT 1,
+    priority            INTEGER DEFAULT 100,
+    enabled             INTEGER DEFAULT 1,
+    last_hit_at         DATETIME,
+    hit_count           INTEGER DEFAULT 0,
+    remark              VARCHAR(500),
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    INDEX idx_delivery_rules_account (account_id, enabled, deleted),
+    INDEX idx_delivery_rules_item (item_id, enabled, deleted)
+);
+
+-- BOT-O4 发货日志（每次尝试发货必有一条；可按订单反查）
+CREATE TABLE IF NOT EXISTS delivery_log (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    account_id          BIGINT,
+    order_id            BIGINT,
+    product_id          BIGINT,
+    buyer_id            VARCHAR(64),
+    ship_card_id        BIGINT,
+    rule_decision       VARCHAR(32),
+    hit_rule_name       VARCHAR(128),
+    deliver_content     TEXT,
+    status              VARCHAR(16),
+    failure_reason      VARCHAR(2000),
+    batch_job_id        BIGINT,
+    shipped_at          DATETIME,
+    duration_ms         BIGINT,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    INDEX idx_delivery_log_order (order_id, deleted),
+    INDEX idx_delivery_log_account (account_id, shipped_at, deleted)
+);
+
+-- BOT-O5 发货终态（多数量订单按 unit 跟踪 sent/finalized；支持部分成功）
+CREATE TABLE IF NOT EXISTS delivery_finalization (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    order_id            BIGINT NOT NULL,
+    unit_index          INTEGER NOT NULL,
+    total_units         INTEGER DEFAULT 1,
+    card_id             BIGINT,
+    reservation_id      VARCHAR(64),
+    status              VARCHAR(16) DEFAULT 'PENDING',
+    delivery_log_id     BIGINT,
+    finalized_at        DATETIME,
+    reason              VARCHAR(500),
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    UNIQUE KEY uk_delivery_finalization (order_id, unit_index, deleted),
+    INDEX idx_delivery_finalization_status (status, deleted)
+);
+
+-- BOT-O6 卡密预留（发货前预留→成功确认消耗→失败释放；唯一约束防双花）
+CREATE TABLE IF NOT EXISTS data_card_reservations (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    card_id             BIGINT NOT NULL,
+    data_card_id        BIGINT NOT NULL,
+    reserved_for        BIGINT NOT NULL,
+    buyer_id            VARCHAR(64),
+    status              VARCHAR(16) DEFAULT 'RESERVED',
+    reserved_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+    confirmed_at        DATETIME,
+    reason              VARCHAR(500),
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    UNIQUE KEY uk_data_card_reservation (data_card_id, status, deleted),
+    INDEX idx_data_card_reservation_order (reserved_for, status, deleted)
+);
+
+-- BOT-B1 评价模板（多条+激活+账号级开关；≠ A11 AutoRateConfig 单条配置）
+CREATE TABLE IF NOT EXISTS comment_templates (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    account_id          BIGINT,
+    category            VARCHAR(16) DEFAULT 'POSITIVE',
+    content             VARCHAR(2000) NOT NULL,
+    name                VARCHAR(128),
+    enabled             INTEGER DEFAULT 1,
+    priority            INTEGER DEFAULT 100,
+    use_count           INTEGER DEFAULT 0,
+    remark              VARCHAR(500),
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    INDEX idx_comment_templates_account (account_id, category, enabled, deleted)
 );

@@ -50,7 +50,10 @@
                   <span class="last-msg">
                     <template v-if="s.contentType === 'IMAGE'">[图片]</template>
                     <template v-else-if="s.contentType === 'VIDEO'">[视频]</template>
+                    <template v-else-if="s.contentType === 'AUDIO'">[语音]</template>
+                    <template v-else-if="s.contentType === 'FILE'">[文件]</template>
                     <template v-else-if="s.contentType === 'CARD' || s.contentType === 'JSON'">[卡片]</template>
+                    <template v-else-if="s.contentType === 'SYSTEM'">[系统消息]</template>
                     <template v-else>{{ s.lastContent || '无消息' }}</template>
                   </span>
                 </div>
@@ -102,7 +105,7 @@
                         size="small"
                         :color="parseJsonCard(msg.content).buttonBgColor || '#7c3aed'"
                         class="card-btn"
-                        @click="parseJsonCard(msg.content).targetUrl && window.open(parseJsonCard(msg.content).targetUrl, '_blank')"
+                        @click="openMedia(parseJsonCard(msg.content).targetUrl)"
                       >{{ parseJsonCard(msg.content).buttonText }}</el-button>
                       <div v-if="parseJsonCard(msg.content).subTitle" class="card-desc">{{ parseJsonCard(msg.content).subTitle }}</div>
                       <!-- 当提取不出任何有意义字段时，降级展示原始 JSON -->
@@ -559,8 +562,8 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   padding: 10px 20px;
-  background: var(--surface-0);
-  border-bottom: 1px solid var(--line-2);
+  background: #fff;
+  border-bottom: 1px solid var(--border);
 }
 .countdown-tag {
   display: flex;
@@ -598,15 +601,15 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--surface-1);
-  border-right: 1px solid var(--line-2);
+  background: var(--bg-soft);
+  border-right: 1px solid var(--border);
 }
 .session-list-header {
   padding: 14px 18px;
   font-weight: 600;
   font-size: 15px;
   color: var(--text-1);
-  border-bottom: 1px solid var(--line-2);
+  border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -614,7 +617,7 @@ onUnmounted(() => {
 .session-search {
   padding: 10px 16px;
   background: transparent;
-  border-bottom: 1px solid var(--line-2);
+  border-bottom: 1px solid var(--border);
 }
 .session-list-body {
   flex: 1;
@@ -632,13 +635,13 @@ onUnmounted(() => {
   gap: 12px;
   padding: 12px 18px;
   cursor: pointer;
-  border-bottom: 1px solid var(--line-3);
+  border-bottom: 1px solid var(--border);
   transition: background 0.15s ease;
 }
-.session-item:hover { background: var(--hover-1); }
-.session-item.active { background: var(--brand-light-8); }
-.unread .name { color: var(--danger); font-weight: 600; }
-.unread .last-msg { color: var(--danger); }
+.session-item:hover { background: var(--bg-soft); }
+.session-item.active { background: var(--el-color-primary-light-9); }
+.unread .name { color: var(--color-danger); font-weight: 600; }
+.unread .last-msg { color: var(--color-danger); }
 .session-info {
   flex: 1;
   min-width: 0;
@@ -694,8 +697,8 @@ onUnmounted(() => {
 }
 .chat-header {
   padding: 14px 20px;
-  background: var(--surface-0);
-  border-bottom: 1px solid var(--line-2);
+  background: #fff;
+  border-bottom: 1px solid var(--border);
 }
 .chat-header.empty {
   display: flex;

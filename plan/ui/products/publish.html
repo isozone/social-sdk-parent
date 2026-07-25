@@ -2,183 +2,228 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>发布商品 - AI 鱼多宝</title>
 <style>
-@import url('_design-system.css');
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+body{font-family:-apple-system,'PingFang SC','Inter',system-ui,sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+.phone-frame{width:393px;height:852px;border-radius:54px;background:#f5f5f7;position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.18)}
+.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}
+.status-bar{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:13px;font-weight:600;color:#111827}
+.page-content{position:absolute;top:58px;left:0;right:0;bottom:110px;overflow-y:auto;overflow-x:hidden}
+.page-content::-webkit-scrollbar{display:none}
+.safe-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}
 
-.form-header{background:var(--gradient-brand);padding:48px 16px 28px;border-radius:0 0 28px 28px;display:flex;align-items:center;gap:12px}
-.form-back{color:#fff;font-size:22px;cursor:pointer}
-.form-title{color:#fff;font-size:17px;font-weight:700}
+/* Nav */
+.nav-bar{position:absolute;top:58px;left:0;right:0;height:44px;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid #f3f4f6;z-index:50}
+.back-btn{display:flex;align-items:center;gap:4px;font-size:15px;color:#4f46e5;cursor:pointer;background:none;border:none;font-family:inherit;font-weight:600}
+.nav-title{font-size:17px;font-weight:700;color:#111827}
 
-.form-body{padding:0 16px 20px}
+/* Form Sections */
+.form-section{background:#fff;border-radius:16px;border:1px solid #e5e7eb;box-shadow:0 1px 4px rgba(0,0,0,.03);padding:16px;margin:12px 16px}
+.section-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.section-icon{width:32px;height:32px;border-radius:10px;background:rgba(79,70,229,.08);display:flex;align-items:center;justify-content:center;font-size:16px}
+.section-name{font-size:15px;font-weight:700;color:#111827}
+.section-sub{font-size:11px;color:#9ca3af;margin-left:auto;font-weight:500}
 
-.section-card{background:var(--bg-card);border-radius:var(--radius-md);border:1px solid var(--border-light);box-shadow:var(--shadow-sm);overflow:hidden}
+/* Account Selector */
+.acc-tabs{display:flex;gap:8px}
+.acc-tab{flex:1;padding:10px;text-align:center;border-radius:16px;font-size:13px;font-weight:500;color:#6b7280;background:#f5f5f7;border:1.5px solid transparent;cursor:pointer;transition:all .2s}
+.acc-tab.active{border-color:#4f46e5;background:rgba(79,70,229,.06);color:#4f46e5;font-weight:600}
+.acc-tab:active{transform:scale(.97)}
 
-.section-head{display:flex;align-items:center;gap:8px;margin-bottom:14px}
-.section-icon{width:28px;height:28px;border-radius:8px;background:rgba(79,70,229,.08);display:flex;align-items:center;justify-content:center;font-size:14px}
-.section-name{font-size:15px;font-weight:700;color:var(--text-primary)}
-.section-sub{font-size:12px;color:var(--text-tertiary);font-weight:400}
-
-/* Upload grid */
-.upload-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.upload-item{aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;position:relative}
-.upload-item--gray{background:linear-gradient(135deg,#f3f4f6,#e5e7eb)}
-.upload-item--blue{background:linear-gradient(135deg,#e0e7ff,#c7d2fe)}
-.upload-item--green{background:linear-gradient(135deg,#e0f2fe,#e8f5e9)}
-.upload-placeholder{display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:32px;border-radius:inherit}
-.upload-add{border:2px dashed var(--border);border-radius:var(--radius-sm);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--text-tertiary);font-size:11px;background:var(--bg-page);transition:all .2s}
-.upload-add:active{border-color:var(--brand);color:var(--brand)}
-.upload-add .plus{font-size:28px;line-height:1}
+/* Image Upload */
+.upload-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.upload-slot{aspect-ratio:1;border-radius:16px;overflow:hidden;position:relative}
+.upload-placeholder{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed #e5e7eb;border-radius:16px;cursor:pointer;transition:all .2s;color:#9ca3af;background:#f8f8f9}
+.upload-placeholder:hover{border-color:#4f46e5;color:#4f46e5;background:rgba(79,70,229,.03)}
+.upload-placeholder:active{transform:scale(.96)}
+.placeholder-icon{font-size:28px;line-height:1}
+.placeholder-text{font-size:10px;margin-top:4px;font-weight:500}
+.img-preview{width:100%;height:100%;object-fit:cover;background:linear-gradient(135deg,#e0e7ff,#c7d2fe);display:flex;align-items:center;justify-content:center;font-size:32px}
+.delete-btn{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none}
 
 /* Fields */
 .field{margin-bottom:14px}
 .field:last-child{margin-bottom:0}
-.field-label{font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:7px;display:block}
-.field-input{width:100%;height:44px;background:var(--bg-page);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0 14px;font-size:14px;color:var(--text-primary);outline:none;transition:all .25s}
-.field-input:focus{border-color:var(--brand);background:#fff;box-shadow:0 0 0 3px rgba(79,70,229,.08)}
+.field-label{font-size:13px;font-weight:600;color:#6b7280;margin-bottom:7px;display:block}
+.field-input{width:100%;height:46px;background:#f8f8f9;border:1.5px solid #e5e7eb;border-radius:16px;padding:0 14px;font-size:14px;color:#111827;outline:none;transition:all .25s}
+.field-input:focus{border-color:#4f46e5;background:#fff;box-shadow:0 0 0 3px rgba(79,70,229,.1)}
+.field-input::placeholder{color:#9ca3af}
 textarea.field-input{height:120px;padding-top:12px;resize:none;line-height:1.6}
-.char-count{font-size:11px;color:var(--text-tertiary);text-align:right;margin-top:4px}
+.char-count{font-size:11px;color:#9ca3af;text-align:right;margin-top:4px}
 
-/* Category picker */
-.category-picker{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--bg-page);border-radius:var(--radius-sm);border:1px solid var(--border)}
-.category-main{font-size:14px;color:var(--text-primary);font-weight:500}
-.category-sub{font-size:12px;color:var(--text-tertiary);margin-top:2px}
+/* Category Picker */
+.category-picker{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:#f8f8f9;border:1.5px solid #e5e7eb;border-radius:16px;cursor:pointer;transition:all .2s}
+.category-picker:active{border-color:#4f46e5}
+.cat-main{font-size:14px;color:#111827;font-weight:500}
+.cat-sub{font-size:11px;color:#9ca3af;margin-top:2px}
+.cat-arrow{color:#9ca3af;font-size:18px}
 
-/* Price row */
-.price-row{display:flex;gap:10px}
-.price-input-wrap{flex:1;position:relative}
-.price-prefix{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px;font-weight:700;color:var(--danger);pointer-events:none}
-.price-input{padding-left:32px}
-.stock-input{width:100px}
+/* Price & Stock */
+.price-stock-row{display:flex;gap:10px}
+.price-wrap{flex:1;position:relative}
+.price-prefix{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px;font-weight:700;color:#ef4444;pointer-events:none}
+.price-wrap .field-input{padding-left:32px}
+.stock-input{width:110px!important}
 
-/* Account selector */
-.account-select{display:flex;gap:8px}
-.acc-opt{flex:1;padding:10px;background:var(--bg-page);border-radius:var(--radius-sm);text-align:center;font-size:12px;font-weight:500;color:var(--text-secondary);border:2px solid transparent;cursor:pointer;transition:all .2s}
-.acc-opt:active{transform:scale(.97)}
-.acc-opt.active{border-color:var(--brand);background:rgba(79,70,229,.06);color:var(--brand);font-weight:700}
-
-/* Condition tabs */
-.condition-tabs{display:flex;gap:8px}
-.condition-tab{flex:1;padding:8px;text-align:center;border-radius:var(--radius-xs);font-size:12px;font-weight:500;color:var(--text-secondary);background:var(--bg-page);border:1px solid var(--border);cursor:pointer;transition:all .2s}
+/* Condition Tabs */
+.condition-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.condition-tab{flex:1;padding:10px;text-align:center;border-radius:16px;font-size:12px;font-weight:500;color:#6b7280;background:#f5f5f7;border:1.5px solid transparent;cursor:pointer;transition:all .2s;min-width:calc(50% - 3px)}
+.condition-tab.active{border-color:#4f46e5;background:rgba(79,70,229,.06);color:#4f46e5;font-weight:600}
 .condition-tab:active{transform:scale(.97)}
-.condition-tab.active{border-color:var(--brand);background:rgba(79,70,229,.06);color:var(--brand);font-weight:700}
 
-/* Submit bar */
-.submit-bar{position:absolute;bottom:0;left:0;right:0;background:rgba(255,255,255,.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border-light);padding:10px 16px;padding-bottom:max(10px,env(safe-area-inset-bottom));z-index:80}
+/* Submit Bar */
+.submit-bar{position:absolute;bottom:0;left:0;right:0;background:rgba(255,255,255,.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid #e5e7eb;padding:12px 16px;z-index:80}
 .submit-row{display:flex;gap:10px}
-.submit-btn{flex:1;height:50px;border-radius:var(--radius-sm);font-size:16px;font-weight:700;border:none;cursor:pointer;transition:all .2s}
+.submit-btn{flex:1;height:50px;border-radius:16px;font-size:16px;font-weight:700;border:none;cursor:pointer;transition:all .3s cubic-bezier(.16,1,.3,1)}
 .submit-btn:active{transform:scale(.97)}
-.submit-btn--brand{background:var(--gradient-brand);color:#fff;box-shadow:0 8px 32px rgba(79,70,229,.35)}
-.submit-btn--ghost{background:var(--bg-page);color:var(--text-secondary);font-size:14px}
-.save-tip{text-align:center;font-size:11px;color:var(--text-tertiary);margin-top:8px}
+.submit-brand{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;box-shadow:0 8px 32px rgba(79,70,229,.35)}
+.submit-ghost{background:#f5f5f7;color:#6b7280;font-size:14px;font-weight:500;border:1px solid #e5e7eb}
+.save-tip{text-align:center;font-size:11px;color:#9ca3af;margin-top:8px}
+
+/* AI Suggestion */
+.ai-suggestion{display:flex;align-items:center;gap:10px;padding:12px 14px;background:linear-gradient(135deg,rgba(79,70,229,.06),rgba(124,58,237,.06));border-radius:16px;border:1px solid rgba(79,70,229,.1);margin-top:12px}
+.ai-icon{font-size:20px}
+.ai-text{font-size:12px;color:#6b7280;flex:1}
+.ai-btn{padding:6px 12px;border-radius:10px;background:#4f46e5;color:#fff;font-size:11px;font-weight:600;border:none;cursor:pointer;transition:all .2s}
+.ai-btn:active{transform:scale(.95)}
 </style>
 </head>
 <body>
 <div class="phone-frame safe-bottom">
   <div class="island"></div>
-  <div class="status-bar"><span>9:41</span><span>●●●●●</span></div>
+  <div class="status-bar"><span>9:41</span><span style="display:flex;gap:6px;align-items:center">
+    <svg width="16" height="12" viewBox="0 0 16 12"><path d="M1 10.5a1 1 0 01-.5-1.86A8 8 0 018 2a8 8 0 018.5 6.64 1 1 0 01-1 1.86A6 6 0 008 4a6 6 0 00-7 6.5z" fill="#10b981"/><path d="M4 7.5a1 1 0 01-.5-1.86A4 4 0 018 2a4 4 0 014.5 3.64 1 1 0 01-1 1.86A2 2 0 008 4a2 2 0 00-4.5 3.5z" fill="#10b981"/></svg>
+    <svg width="16" height="12" viewBox="0 0 16 12"><rect x="1" y="4" width="3" height="8" rx=".5" fill-opacity=".3"/><rect x="5.5" y="2.5" width="3" height="9.5" rx=".5" fill-opacity=".5"/><rect x="10" y="0" width="3" height="12" rx=".5"/></svg>
+    <svg width="28" height="12" viewBox="0 0 28 12"><rect x=".5" y=".5" width="23" height="11" rx="3" stroke="#000" fill="none"/><rect x="2" y="2" width="16" height="8" rx="1.5" fill="#10b981"/></svg>
+  </span></div>
 
-  <div class="page-content" style="bottom:0">
-    <!-- Form Header -->
-    <div class="form-header">
-      <span class="form-back">‹ 返回</span>
-      <span class="form-title">发布商品</span>
+  <!-- Nav -->
+  <div class="nav-bar">
+    <button class="back-btn" onclick="location.href='list.html'">← 返回</button>
+    <span class="nav-title">发布商品</span>
+    <span></span>
+  </div>
+
+  <div class="page-content">
+    <!-- Account Section -->
+    <div class="form-section">
+      <div class="section-head">
+        <div class="section-icon">👤</div>
+        <div class="section-name">发布账号</div>
+      </div>
+      <div class="acc-tabs">
+        <div class="acc-tab active">主力号</div>
+        <div class="acc-tab">副业号</div>
+        <div class="acc-tab">本地</div>
+      </div>
     </div>
 
-    <div class="form-body">
-      <!-- Account Section -->
-      <div class="section-card">
-        <div class="section-head">
-          <div class="section-icon">👤</div>
-          <div class="section-name">发布账号</div>
+    <!-- Image Upload -->
+    <div class="form-section">
+      <div class="section-head">
+        <div class="section-icon">📷</div>
+        <div class="section-name">商品图片</div>
+        <div class="section-sub">最多9张</div>
+      </div>
+      <div class="upload-grid">
+        <div class="upload-slot">
+          <div class="img-preview">👟</div>
+          <button class="delete-btn">×</button>
         </div>
-        <div class="account-select">
-          <div class="acc-opt active">主力号</div>
-          <div class="acc-opt">副业号</div>
-          <div class="acc-opt">本地商品</div>
+        <div class="upload-slot">
+          <div class="img-preview">📦</div>
+          <button class="delete-btn">×</button>
+        </div>
+        <div class="upload-slot">
+          <div class="img-preview">🏷️</div>
+          <button class="delete-btn">×</button>
+        </div>
+        <label class="upload-placeholder">
+          <span class="placeholder-icon">＋</span>
+          <span class="placeholder-text">添加图片</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Product Info -->
+    <div class="form-section">
+      <div class="section-head">
+        <div class="section-icon">📝</div>
+        <div class="section-name">商品信息</div>
+      </div>
+      <div class="field">
+        <label class="field-label">商品标题</label>
+        <input class="field-input" placeholder="请输入商品标题（≤30字）">
+        <div class="char-count">0 / 30</div>
+      </div>
+      <div class="field">
+        <label class="field-label">商品描述</label>
+        <textarea class="field-input" placeholder="详细描述商品成色、使用情况、来源等..."></textarea>
+        <div class="char-count">0 / 500</div>
+      </div>
+      <div class="field">
+        <label class="field-label">分类</label>
+        <div class="category-picker">
+          <div>
+            <div class="cat-main">运动鞋 > 板鞋</div>
+            <div class="cat-sub">点击切换分类</div>
+          </div>
+          <span class="cat-arrow">›</span>
         </div>
       </div>
-
-      <!-- Images -->
-      <div class="section-card">
-        <div class="section-head">
-          <div class="section-icon">📷</div>
-          <div class="section-name">商品图片 <span class="section-sub">（最多9张）</span></div>
-        </div>
-        <div class="upload-grid">
-          <div class="upload-item">
-            <div class="upload-placeholder upload-item--gray">👟</div>
+      <div class="field">
+        <label class="field-label">价格 & 库存</label>
+        <div class="price-stock-row">
+          <div class="price-wrap">
+            <span class="price-prefix">¥</span>
+            <input class="field-input" placeholder="0.00">
           </div>
-          <div class="upload-item">
-            <div class="upload-placeholder upload-item--blue">👟</div>
-          </div>
-          <div class="upload-item">
-            <div class="upload-placeholder upload-item--green">📦</div>
-          </div>
-          <div class="upload-add"><span class="plus">+</span><span>添加图片</span></div>
+          <input class="field-input stock-input" placeholder="库存">
         </div>
       </div>
+    </div>
 
-      <!-- Info -->
-      <div class="section-card">
-        <div class="section-head">
-          <div class="section-icon">📝</div>
-          <div class="section-name">商品信息</div>
-        </div>
-        <div class="field">
-          <label class="field-label">商品标题</label>
-          <input class="field-input" placeholder="请输入商品标题（≤30字）">
-          <div class="char-count">0 / 30</div>
-        </div>
-        <div class="field">
-          <label class="field-label">商品描述</label>
-          <textarea class="field-input" placeholder="详细描述商品成色、使用情况、来源等..."></textarea>
-          <div class="char-count">0 / 500</div>
-        </div>
-        <div class="field">
-          <label class="field-label">分类</label>
-          <div class="category-picker"><div><div class="category-main">运动鞋 > 板鞋</div><div class="category-sub">点击切换分类</div></div><span style="color:var(--text-tertiary)">›</span></div>
-        </div>
-        <div class="field">
-          <label class="field-label">价格 & 库存</label>
-          <div class="price-row">
-            <div class="price-input-wrap"><span class="price-prefix">¥</span><input class="field-input price-input" placeholder="0.00"></div>
-            <input class="field-input stock-input" placeholder="库存">
-          </div>
+    <!-- Publishing Settings -->
+    <div class="form-section">
+      <div class="section-head">
+        <div class="section-icon">⚙️</div>
+        <div class="section-name">发布设置</div>
+      </div>
+      <div class="field">
+        <label class="field-label">发货方式</label>
+        <div class="category-picker">
+          <div class="cat-main">邮寄 · 运费自理</div>
+          <span class="cat-arrow">›</span>
         </div>
       </div>
+      <div class="field">
+        <label class="field-label">宝贝成新</label>
+        <div class="condition-tabs">
+          <div class="condition-tab active">全新</div>
+          <div class="condition-tab">近乎全新</div>
+          <div class="condition-tab">轻微使用</div>
+          <div class="condition-tab">明显使用</div>
+        </div>
+      </div>
+    </div>
 
-      <!-- Publish Settings -->
-      <div class="section-card">
-        <div class="section-head">
-          <div class="section-icon">⚙️</div>
-          <div class="section-name">发布设置</div>
-        </div>
-        <div class="field">
-          <label class="field-label">发货方式</label>
-          <select class="field-input"><option>邮寄 · 运费自理</option><option>包邮</option><option>同城自提</option></select>
-        </div>
-        <div class="field">
-          <label class="field-label">宝贝成新</label>
-          <div class="condition-tabs">
-            <span class="condition-tab active">全新</span>
-            <span class="condition-tab">近乎全新</span>
-            <span class="condition-tab">轻微使用</span>
-            <span class="condition-tab">明显使用</span>
-          </div>
-        </div>
+    <!-- AI Suggestion -->
+    <div class="form-section">
+      <div class="ai-suggestion">
+        <div class="ai-icon">🤖</div>
+        <div class="ai-text">AI 建议：添加更多细节描述可提高曝光率 30%</div>
+        <button class="ai-btn">一键优化</button>
       </div>
     </div>
   </div>
 
-  <!-- Bottom Submit Bar -->
+  <!-- Submit Bar -->
   <div class="submit-bar">
     <div class="submit-row">
-      <button class="submit-btn submit-btn--ghost">存草稿</button>
-      <button class="submit-btn submit-btn--brand">发布</button>
+      <button class="submit-btn submit-ghost">存草稿</button>
+      <button class="submit-btn submit-brand">发布</button>
     </div>
     <div class="save-tip">发布后将在闲鱼展示，可立即开始自动回复</div>
   </div>

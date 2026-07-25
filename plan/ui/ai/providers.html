@@ -5,61 +5,60 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>AI 厂商管理 - AI 鱼多宝</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
+@import url('../_design-system.css');
 body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
-:root{--brand:#4f46e5;--violet:#7c3aed;--cyan:#22d3ee;--bg-page:#f5f5f7;--text-primary:#111827;--text-secondary:#6b7280;--text-tertiary:#9ca3af;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--border:#e5e7eb}
-.phone{width:393px;height:852px;border-radius:54px;background:var(--bg-page);position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.18)}
-.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}
-.status-bar{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:14px;font-weight:600;color:var(--text-primary)}
-.page-content{position:absolute;top:58px;left:0;right:0;bottom:84px;overflow-y:auto}
-.page-content::-webkit-scrollbar{display:none}
-.header{background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:18px 16px 20px;border-radius:0 0 22px 22px;display:flex;align-items:center;gap:10px}
-.back{font-size:20px;color:#fff}.h-title{color:#fff;font-size:17px;font-weight:700;flex:1}.add-btn{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer}
+.provider-header{background:var(--gradient-brand);padding:18px 16px 20px;border-radius:0 0 28px 28px;display:flex;align-items:center;gap:10px}
+.provider-header .nav-back{color:#fff}
+.add-btn{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s}
+.add-btn:active{transform:scale(.95)}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 16px;margin-top:-18px;position:relative;z-index:2}
 .provider-list{padding:0 16px 20px;display:flex;flex-direction:column;gap:12px}
-.provider-card{background:#fff;border-radius:20px;padding:16px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.03)}
+.provider-card{background:var(--bg-card);border-radius:var(--radius-md);border:1px solid var(--border);box-shadow:var(--shadow-sm);padding:16px;transition:transform .2s cubic-bezier(.16,1,.3,1)}
+.provider-card:active{transform:scale(.98)}
 .provider-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
-.provider-logo{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff}
+.provider-logo{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex-shrink:0}
 .pl-openai{background:linear-gradient(135deg,#10b981,#22c55e)}.pl-anthropic{background:linear-gradient(135deg,#d97706,#f59e0b)}.pl-baidu{background:linear-gradient(135deg,#3b82f6,#60a5fa)}
 .provider-name{font-size:16px;font-weight:700;color:var(--text-primary)}.provider-status{font-size:11px;color:var(--text-tertiary);margin-top:2px}
-.provider-switch{margin-left:auto}
-.switch-track{width:44px;height:24px;border-radius:12px;position:relative;transition:background .3s}
+.switch-track{width:44px;height:24px;border-radius:12px;position:relative;transition:background .3s;cursor:pointer}
 .switch-track.on{background:var(--brand)}.switch-track.off{background:var(--text-tertiary)}
 .switch-knob{position:absolute;width:20px;height:20px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .3s cubic-bezier(.16,1,.3,1);box-shadow:0 1px 3px rgba(0,0,0,.2)}
 .switch-track.on .switch-knob{left:22px}
 .models-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
 .model-item{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--bg-page);border-radius:12px;font-size:13px;font-weight:500;color:var(--text-primary)}
 .model-status{font-size:10px;font-weight:700}
-.ms-active{color:var(--success)}.ms-inactive{color:var(--text-tertiary)}
-.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 16px;margin-bottom:14px}
-.stat-card-mini{background:#fff;border-radius:14px;padding:12px 8px;text-align:center;border:1px solid var(--border)}
-.s-num{font-size:18px;font-weight:800;color:var(--brand)}.s-label{font-size:10px;color:var(--text-tertiary);margin-top:2px}
-.tab-bar{position:absolute;bottom:0;left:0;right:0;height:84px;background:rgba(255,255,255,.94);backdrop-filter:blur(20px);border-top:1px solid var(--border-light);display:flex;z-index:80;padding-bottom:8px}
-.tab-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}.tab-item:active{transform:scale(.92)}.tab-icon{font-size:20px}.tab-label{font-size:10px;color:var(--text-tertiary);font-weight:400}
-.tab-item.active .tab-icon{color:var(--brand)}.tab-item.active .tab-label{color:var(--brand);font-weight:600}
-.safe-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}
+.ms-active{color:var(--success)}.ms-default{color:var(--brand)}.ms-inactive{color:var(--text-tertiary)}
+.ms-dot{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;vertical-align:middle}
 </style>
 </head>
 <body>
-<div class="phone safe-bottom">
+<div class="phone-frame safe-bottom">
   <div class="island"></div>
   <div class="status-bar"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
   <div class="page-content">
-    <div class="header"><span class="back">‹</span><span class="h-title">AI 厂商 / 模型</span><button class="add-btn">+ 添加</button></div>
+    <div class="provider-header">
+      <button class="nav-back"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M8 1L2 9L8 17" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> 返回</button>
+      <span class="nav-title" style="color:#fff;flex:1">AI 厂商 / 模型</span>
+      <button class="add-btn">+ 添加</button>
+    </div>
     <div class="stats-row">
-      <div class="stat-card-mini"><div class="s-num">3</div><div class="s-label">厂商</div></div>
-      <div class="stat-card-mini"><div class="s-num">8</div><div class="s-label">模型</div></div>
-      <div class="stat-card-mini"><div class="s-num">1.2k</div><div class="s-label">本月调用</div></div>
+      <div class="stat-card"><div class="stat-value">3</div><div class="stat-label">厂商</div></div>
+      <div class="stat-card"><div class="stat-value">8</div><div class="stat-label">模型</div></div>
+      <div class="stat-card"><div class="stat-value">1.2k</div><div class="stat-label">本月调用</div></div>
+    </div>
+    <div class="section-header" style="padding-left:0;padding-right:0">
+      <div class="section-title">已配置厂商</div>
+      <span class="chip chip-green">3 启用中</span>
     </div>
     <div class="provider-list">
       <div class="provider-card">
         <div class="provider-head">
           <div class="provider-logo pl-openai">O</div>
           <div style="flex:1"><div class="provider-name">OpenAI</div><div class="provider-status">api.openai.com · gpt-4o, gpt-4o-mini</div></div>
-          <div class="provider-switch"><div class="switch-track on"><div class="switch-knob"></div></div></div>
+          <div class="switch-track on" style="margin-left:auto"><div class="switch-knob"></div></div>
         </div>
         <div class="models-grid">
-          <div class="model-item">gpt-4o <span class="model-status ms-active">● 启用</span></div>
-          <div class="model-item">gpt-4o-mini <span class="model-status ms-active">● 默认</span></div>
+          <div class="model-item">gpt-4o <span class="model-status ms-active"><span class="ms-dot" style="background:var(--success)"></span>启用</span></div>
+          <div class="model-item">gpt-4o-mini <span class="model-status ms-default"><span class="ms-dot" style="background:var(--brand)"></span>默认</span></div>
           <div class="model-item">o1-preview <span class="model-status ms-inactive">○</span></div>
         </div>
       </div>
@@ -67,22 +66,22 @@ body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:fle
         <div class="provider-head">
           <div class="provider-logo pl-anthropic">A</div>
           <div style="flex:1"><div class="provider-name">Anthropic</div><div class="provider-status">api.anthropic.com · claude-sonnet</div></div>
-          <div class="provider-switch"><div class="switch-track on"><div class="switch-knob"></div></div></div>
+          <div class="switch-track on" style="margin-left:auto"><div class="switch-knob"></div></div>
         </div>
         <div class="models-grid">
-          <div class="model-item">claude-sonnet-4 <span class="model-status ms-active">● 启用</span></div>
-          <div class="model-item">claude-haiku <span class="model-status ms-active">● 省钱模式</span></div>
+          <div class="model-item">claude-sonnet-4 <span class="model-status ms-active"><span class="ms-dot" style="background:var(--success)"></span>启用</span></div>
+          <div class="model-item">claude-haiku <span class="model-status ms-default"><span class="ms-dot" style="background:var(--brand)"></span>省钱模式</span></div>
         </div>
       </div>
-      <div class="provider-card">
+      <div class="provider-card" style="opacity:.7">
         <div class="provider-head">
           <div class="provider-logo pl-baidu">B</div>
           <div style="flex:1"><div class="provider-name">百度文心</div><div class="provider-status">wenxin.baidu.com · ernie-4</div></div>
-          <div class="provider-switch"><div class="switch-track off"><div class="switch-knob"></div></div></div>
+          <div class="switch-track off" style="margin-left:auto"><div class="switch-knob"></div></div>
         </div>
         <div class="models-grid">
           <div class="model-item">ernie-4.0 <span class="model-status ms-inactive">○ 停用</span></div>
-          <div class="model-item">ernie-lite <span class="model-status ms-inactive">○</span></div>
+          <div class="model-item">ernie-lite <span class="model-status ms-inactive">○ 停用</span></div>
         </div>
       </div>
     </div>

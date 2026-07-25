@@ -3,6 +3,7 @@ package cn.net.rjnetwork.xianyu.manager.message.service;
 import cn.net.rjnetwork.xianyu.api.XianyuImAccsClient;
 import cn.net.rjnetwork.xianyu.api.XianyuMtopApiClient;
 import cn.net.rjnetwork.xianyu.api.XianyuMessageApiService;
+import cn.net.rjnetwork.xianyu.api.XianyuProfileApiService;
 import cn.net.rjnetwork.xianyu.captcha.service.XianyuCaptchaSolver;
 import cn.net.rjnetwork.xianyu.manager.account.mapper.AccountMapper;
 import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
@@ -48,6 +49,8 @@ public class MessageService {
     private final Map<Long, ReentrantLock> accountSyncLocks = new ConcurrentHashMap<>();
     private final Map<Long, XianyuMessageApiService> accountMessageApis = new ConcurrentHashMap<>();
     private final Map<Long, String> accountCookieFingerprints = new ConcurrentHashMap<>();
+    /** 账号 selfUserId 内存缓存：避免每次 normalizeDirections 都 selectById + 远程拉 userId */
+    private final Map<Long, String> selfUserIdCache = new ConcurrentHashMap<>();
 
     /** 账号服务 — 用于风控触发时按账号启动独占 Chrome 容器（per-account CDP 端点）。 */
     private AccountService accountService;
@@ -1177,17 +1180,58 @@ public class MessageService {
      * 提取当前账号 selfUserId，用于判消息方向：senderId == selfId 则 OUTGOING，否则 INCOMING。
      */
     private String extractSelfUserId(Long accountId) {
+        // 先查内存缓存，避免每次 normalizeDirections 都 selectById + 远程拉 userId
+        String cached = selfUserIdCache.get(accountId);
+        if (cached != null && !cached.isBlank()) return cached;
         try {
             XianyuAccount acc = accountMapper.selectById(accountId);
             if (acc == null) return "";
+            // 优先用账号已同步的 userId 字段
             if (acc.getUserId() != null && !acc.getUserId().isBlank()) {
-                return stripGoofishSuffix(acc.getUserId());
+                String uid = stripGoofishSuffix(acc.getUserId());
+                selfUserIdCache.put(accountId, uid);
+                return uid;
             }
+            // 其次从 cookie 解析 unb/userId
             String cookie = acc.getCookieHeader();
             String unb = cookieValue(cookie, "unb");
-            if (!unb.isBlank()) return stripGoofishSuffix(unb);
+            if (!unb.isBlank()) {
+                String uid = stripGoofishSuffix(unb);
+                selfUserIdCache.put(accountId, uid);
+                return uid;
+            }
             String userId = cookieValue(cookie, "userId");
-            if (!userId.isBlank()) return stripGoofishSuffix(userId);
+            if (!userId.isBlank()) {
+                String uid = stripGoofishSuffix(userId);
+                selfUserIdCache.put(accountId, uid);
+                return uid;
+            }
+            // 兜底：主动调闲鱼 mtop.taobao.idlemessage.pc.loginuser.get 拉真实 userId 并回写 acc.userId
+            // 这是根治「自己的消息不显示在右侧」的关键 —— 不依赖 cookie 解析，直接问闲鱼我是谁
+            if (cookie != null && !cookie.isBlank()) {
+                try {
+                    XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(cookie);
+                    XianyuProfileApiService profileApi = new XianyuProfileApiService(mtopClient);
+                    JsonNode loginInfo = profileApi.getLoginUserInfo();
+                    if (loginInfo != null) {
+                        JsonNode data = loginInfo.path("data");
+                        String uid = data.path("userId").asText("");
+                        if (!uid.isEmpty()) {
+                            uid = stripGoofishSuffix(uid);
+                            // 回写账号 userId 字段，后续调用直接命中缓存
+                            acc.setUserId(uid);
+                            try { accountMapper.updateById(acc); } catch (Exception ue) {
+                                log.warn("[MESSAGE] account {} 回写 userId 失败（非致命）: {}", accountId, ue.getMessage());
+                            }
+                            selfUserIdCache.put(accountId, uid);
+                            log.info("[MESSAGE] account {} 通过 getLoginUserInfo 兜底拉到 userId={}", accountId, uid);
+                            return uid;
+                        }
+                    }
+                } catch (Exception fe) {
+                    log.warn("[MESSAGE] account {} getLoginUserInfo 兜底失败: {}", accountId, fe.getMessage());
+                }
+            }
         } catch (Exception e) {
             log.warn("[MESSAGE] extractSelfUserId failed for account {}: {}", accountId, e.getMessage());
         }
@@ -1209,6 +1253,10 @@ public class MessageService {
     private List<XianyuMessage> normalizeDirections(Long accountId, List<XianyuMessage> rows) {
         if (rows == null || rows.isEmpty()) return rows;
         String selfUserId = extractSelfUserId(accountId);
+        if (selfUserId == null || selfUserId.isBlank()) {
+            log.warn("[MESSAGE] account {} selfUserId 为空，所有消息将判 INCOMING（自己的消息不显示在右侧）。"
+                    + "请检查账号 user_id 字段是否已同步、cookie 是否含 unb/userId。", accountId);
+        }
         for (XianyuMessage row : rows) {
             if (row == null) continue;
             row.setDirection(isSelfSender(selfUserId, row.getSenderId()) ? "OUTGOING" : "INCOMING");

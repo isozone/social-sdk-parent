@@ -662,7 +662,9 @@ function copyWechat() {
   color: rgba(226, 232, 240, 0.4);
   font-size: 12px;
   margin-top: 18px;
+  line-height: 1.8;
 }
+
 .legal-link {
   color: #5ce0f0;
   text-decoration: none;

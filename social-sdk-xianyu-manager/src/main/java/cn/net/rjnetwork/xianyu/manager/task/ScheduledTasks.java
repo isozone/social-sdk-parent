@@ -12,6 +12,8 @@ import cn.net.rjnetwork.xianyu.manager.virtual.task.RedeliveryTask;
 import cn.net.rjnetwork.xianyu.manager.task.service.ScheduledTaskService;
 import cn.net.rjnetwork.xianyu.manager.order.rate.task.AutoRateTask;
 import cn.net.rjnetwork.xianyu.manager.order.rate.task.RedFlowerTask;
+import cn.net.rjnetwork.xianyu.manager.product.polish.task.PolishTask;
+import cn.net.rjnetwork.xianyu.manager.message.closenotice.task.CloseNoticeTask;
 import cn.net.rjnetwork.xianyu.manager.monitor.service.MonitorService;
 import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
 import cn.net.rjnetwork.xianyu.manager.product.service.ProductService;
@@ -52,6 +54,8 @@ public class ScheduledTasks {
     private final ScheduledTaskService scheduledTaskService;
     private final AutoRateTask autoRateTask;
     private final RedFlowerTask redFlowerTask;
+    private final PolishTask polishTask;
+    private final CloseNoticeTask closeNoticeTask;
 
     public ScheduledTasks(AccountMapper accountMapper, ProductService productService,
                           MonitorService monitorService, AccountHealthTask healthTask,
@@ -68,7 +72,9 @@ public class ScheduledTasks {
                           ConfirmReceiptTask confirmReceiptTask,
                           ScheduledTaskService scheduledTaskService,
                           AutoRateTask autoRateTask,
-                          RedFlowerTask redFlowerTask) {
+                          RedFlowerTask redFlowerTask,
+                          PolishTask polishTask,
+                          CloseNoticeTask closeNoticeTask) {
         this.accountMapper = accountMapper;
         this.productService = productService;
         this.monitorService = monitorService;
@@ -87,6 +93,8 @@ public class ScheduledTasks {
         this.scheduledTaskService = scheduledTaskService;
         this.autoRateTask = autoRateTask;
         this.redFlowerTask = redFlowerTask;
+        this.polishTask = polishTask;
+        this.closeNoticeTask = closeNoticeTask;
         // B1：启动时把现有 cron 任务幂等注册到 scheduled_task 表，便于管理端启停/改 cron/查最近执行
         try { scheduledTaskService.registerDefaults(); }
         catch (Exception e) { log.warn("[B1] registerDefaults failed (non-fatal): {}", e.getMessage()); }
@@ -160,6 +168,24 @@ public class ScheduledTasks {
     @Scheduled(cron = "0 0 9 * * *")
     public void runRedFlower() {
         redFlowerTask.runScheduled();
+    }
+
+    // ======================== 定时擦亮定时链路（B4） ========================
+
+    /** 每 2 小时扫账号在售商品调 editItem 触发擦亮，提升商品在闲鱼搜索排序。
+     *  闲鱼侧 SDK 无专门 polish API，走商品编辑链路触发排序刷新（与参考项目一致）。
+     */
+    @Scheduled(cron = "0 0 0/2 * * *")
+    public void runPolish() {
+        polishTask.runScheduled();
+    }
+
+    // ======================== 定时关闭平台通知定时链路（B5） ========================
+
+    /** 每小时扫账号未关闭的平台通知，调 closeNotice 逐个关闭。 */
+    @Scheduled(cron = "0 0 0/1 * * *")
+    public void runCloseNotice() {
+        closeNoticeTask.runScheduled();
     }
 
     @Scheduled(cron = "0 0/30 * * * *")

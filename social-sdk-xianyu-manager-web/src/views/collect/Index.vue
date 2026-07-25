@@ -1,6 +1,6 @@
 <template>
   <div class="page-root">
-    <el-card shadow="never" style="margin: 0;">
+    <el-card shadow="never">
       <!-- 卡片头 -->
       <div class="card-head">
         <div class="card-head-left">
@@ -10,16 +10,12 @@
             <div class="card-sub">同步、管理与维护闲鱼商品 / 用户 / 店铺收藏列表</div>
           </div>
         </div>
-        <div class="card-head-right">
-          <el-button
-            type="primary"
-            size="small"
-            :loading="syncing"
-            :disabled="!selectedAccountId"
-            @click="handleSync"
-          >
-            <el-icon><Refresh /></el-icon>
-            {{ syncing ? '同步中...' : '同步闲鱼收藏' }}
+        <div class="toolbar-right">
+          <el-button type="primary" size="small" :loading="syncing" :disabled="!selectedAccountId" @click="handleSync">
+            <el-icon><Refresh /></el-icon> 同步闲鱼收藏
+          </el-button>
+          <el-button type="success" size="small" @click="handleOpenAddDialog">
+            <el-icon><Plus /></el-icon> 添加收藏
           </el-button>
         </div>
       </div>
@@ -41,29 +37,26 @@
                 <el-option label="店铺" value="SHOP" />
               </el-select>
             </el-form-item>
-            <el-form-item>
-              <el-button type="primary" @click="handleOpenAddDialog">添加收藏</el-button>
-            </el-form-item>
           </el-form>
         </div>
       </div>
 
-      <el-table :data="collects" stripe v-loading="loading">
+      <el-table :data="collects" stripe v-loading="loading" height="420">
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column prop="targetType" label="类型" width="80">
           <template #default="{ row }">
             <el-tag size="small" :type="typeColor(row.targetType)">{{ typeLabel(row.targetType) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="targetId" label="目标ID" width="180" />
-        <el-table-column prop="targetName" label="名称" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="targetId" label="目标ID" width="180" show-overflow-tooltip />
+        <el-table-column prop="targetName" label="名称" min-width="220" show-overflow-tooltip />
         <el-table-column prop="collectedAt" label="收藏时间" width="180">
           <template #default="{ row }">{{ formatTime(row.collectedAt) }}</template>
         </el-table-column>
         <el-table-column label="操作" width="140" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" link type="primary" @click="openItem(row.targetId)">查看</el-button>
-            <el-button size="small" link type="danger" @click="handleRemove(row)">移除</el-button>
+            <el-button size="small" text type="primary" @click="openItem(row.targetId)">查看</el-button>
+            <el-button size="small" text type="danger" @click="handleRemove(row)">移除</el-button>
           </template>
         </el-table-column>
         <template #empty><el-empty description="暂无收藏" /></template>
@@ -71,7 +64,7 @@
     </el-card>
 
     <!-- 添加收藏弹窗 -->
-    <el-dialog v-model="showAddDialog" title="添加收藏" width="640px">
+    <el-dialog v-model="showAddDialog" title="添加收藏" width="660px" destroy-on-close>
       <el-form :model="addForm" label-width="80px">
         <el-form-item label="类别">
           <el-radio-group v-model="addForm.targetType" @change="onTypeChange">
@@ -90,12 +83,7 @@
       <el-divider>快速输入</el-divider>
       <el-form :model="addForm" label-width="80px">
         <el-form-item label="链接/ID">
-          <el-input
-            v-model="quickInput"
-            :placeholder="quickInputPlaceholder"
-            clearable
-            @clear="onQuickInputClear"
-          >
+          <el-input v-model="quickInput" :placeholder="quickInputPlaceholder" clearable @clear="onQuickInputClear">
             <template #append>
               <el-button :loading="parsing" @click="onQuickInputConfirm">识别</el-button>
             </template>
@@ -124,12 +112,7 @@
         <el-divider>或 关键词搜索</el-divider>
         <el-form :model="addForm" label-width="80px">
           <el-form-item label="关键词">
-            <el-input
-              v-model="searchKeyword"
-              placeholder="搜索商品名称..."
-              clearable
-              @keyup.enter="handleSearch"
-            >
+            <el-input v-model="searchKeyword" placeholder="搜索商品名称..." clearable @keyup.enter="handleSearch">
               <template #append>
                 <el-button :loading="searching" @click="handleSearch">
                   <el-icon><Search /></el-icon>搜索
@@ -140,14 +123,8 @@
         </el-form>
 
         <div v-if="searchResults.length > 0" class="search-results">
-          <div style="font-size:13px; color: var(--text-3); margin-bottom:8px;">搜索结果：点击选中</div>
-          <el-table
-            :data="searchResults"
-            max-height="280"
-            @row-click="onSelectItem"
-            size="small"
-            stripe
-          >
+          <div style="font-size: 13px; color: var(--text-3); margin-bottom: 8px;">搜索结果：点击选中</div>
+          <el-table :data="searchResults" max-height="280" @row-click="onSelectItem" size="small" stripe>
             <el-table-column label="商品" min-width="300">
               <template #default="{ row }">
                 <div class="item-cell">
@@ -158,7 +135,7 @@
             </el-table-column>
             <el-table-column label="价格" width="100">
               <template #default="{ row }">
-                <span style="color: var(--danger); font-weight:600;">¥{{ row.price }}</span>
+                <span style="color: var(--color-danger); font-weight: 600;">¥{{ row.price }}</span>
               </template>
             </el-table-column>
           </el-table>
@@ -180,7 +157,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, Search, Star } from '@element-plus/icons-vue'
+import { Refresh, Search, Star, Plus } from '@element-plus/icons-vue'
 import api from '@/api/request'
 import { listCollects, addCollect, removeCollect, syncCollects, searchCollectItems, lookupCollectTarget } from '@/api/collect'
 
@@ -194,17 +171,14 @@ const syncing = ref(false)
 const loading = ref(false)
 const addForm = ref({ targetType: 'ITEM', targetId: '', targetName: '', accountId: null })
 
-// 快速输入（链接/ID）
 const quickInput = ref('')
 const parsing = ref(false)
-
-// 搜索相关
 const searchKeyword = ref('')
 const searchResults = ref([])
 const searching = ref(false)
 const searched = ref(false)
 
-const filterState = {}
+const filterState = reactive({})
 
 const quickInputPlaceholder = computed(() => {
   if (addForm.value.targetType === 'ITEM') return '粘贴商品链接，如 https://www.goofish.com/item?id=xxx'
@@ -216,14 +190,14 @@ async function loadAccounts() {
   try {
     const res = await api.get('/accounts')
     if (res.success) {
-      accounts.value = res.data
+      accounts.value = res.data || []
       if (accounts.value.length > 0 && !selectedAccountId.value) {
         selectedAccountId.value = accounts.value[0].id
         addForm.value.accountId = accounts.value[0].id
         await loadCollects()
       }
     }
-  } catch (e) {}
+  } catch (e) { /* ignore */ }
 }
 
 async function loadCollects() {
@@ -234,12 +208,12 @@ async function loadCollects() {
     if (selectedType.value) params.targetType = selectedType.value
     const res = await listCollects(params)
     if (res.success) {
-      collects.value = res.data
+      collects.value = res.data || []
     } else {
       ElMessage.error(res.message || '加载收藏列表失败')
     }
-  } catch (e) {}
-  loading.value = false
+  } catch (e) { /* ignore */ }
+  finally { loading.value = false }
 }
 
 function handleOpenAddDialog() {
@@ -273,14 +247,13 @@ function onQuickInputClear() {
   quickInput.value = ''
 }
 
-function parseXianyuUrl(input, targetType) {
+function parseXianyuUrl(input) {
   if (!input) return null
   input = input.trim()
   if (/^\d+$/.test(input)) return input
   try {
     const url = new URL(input)
-    const params = url.searchParams
-    let id = params.get('id')
+    let id = url.searchParams.get('id')
     if (id) return id
     const pathMatch = url.pathname.match(/\/(item|user|shop)\/(\d+)/)
     if (pathMatch) return pathMatch[2]
@@ -292,19 +265,10 @@ function parseXianyuUrl(input, targetType) {
 }
 
 async function onQuickInputConfirm() {
-  if (!quickInput.value.trim()) {
-    ElMessage.warning('请输入链接或目标ID')
-    return
-  }
-  if (!addForm.value.accountId) {
-    ElMessage.warning('请先选择账号')
-    return
-  }
-  const targetId = parseXianyuUrl(quickInput.value, addForm.value.targetType)
-  if (!targetId) {
-    ElMessage.warning('无法识别目标ID，请检查输入')
-    return
-  }
+  if (!quickInput.value.trim()) { ElMessage.warning('请输入链接或目标ID'); return }
+  if (!addForm.value.accountId) { ElMessage.warning('请先选择账号'); return }
+  const targetId = parseXianyuUrl(quickInput.value)
+  if (!targetId) { ElMessage.warning('无法识别目标ID，请检查输入'); return }
   parsing.value = true
   try {
     const res = await lookupCollectTarget(addForm.value.accountId, addForm.value.targetType, targetId)
@@ -322,35 +286,25 @@ async function onQuickInputConfirm() {
     addForm.value.targetName = ''
     ElMessage.warning('自动查询名称失败，可手填名称后继续')
   }
-  parsing.value = false
+  finally { parsing.value = false }
 }
 
 async function handleSearch() {
-  if (!searchKeyword.value.trim()) {
-    ElMessage.warning('请输入搜索关键词')
-    return
-  }
-  if (!addForm.value.accountId) {
-    ElMessage.warning('请先选择账号')
-    return
-  }
+  if (!searchKeyword.value.trim()) { ElMessage.warning('请输入搜索关键词'); return }
+  if (!addForm.value.accountId) { ElMessage.warning('请先选择账号'); return }
   searching.value = true
   searched.value = true
   try {
     const res = await searchCollectItems(addForm.value.accountId, searchKeyword.value.trim())
     if (res.success) {
       searchResults.value = res.data || []
-      if (searchResults.value.length === 0) {
-        ElMessage.info('无搜索结果，可尝试更换关键词')
-      }
+      if (!searchResults.value.length) ElMessage.info('无搜索结果，可尝试更换关键词')
     } else {
       ElMessage.error(res.message || '搜索失败')
       searchResults.value = []
     }
-  } catch (e) {
-    searchResults.value = []
-  }
-  searching.value = false
+  } catch (e) { searchResults.value = [] }
+  finally { searching.value = false }
 }
 
 function onSelectItem(row) {
@@ -360,36 +314,8 @@ function onSelectItem(row) {
 }
 
 async function handleAdd() {
-  if (!addForm.value.targetId) {
-    ElMessage.warning('请填写或搜索选择目标ID')
-    return
-  }
-  if (!addForm.value.accountId) {
-    ElMessage.warning('请选择账号')
-    return
-  }
-
-  if (addForm.value.targetType !== 'ITEM') {
-    try {
-      adding.value = true
-      const res = await addCollect({
-        accountId: addForm.value.accountId,
-        targetType: addForm.value.targetType,
-        targetId: addForm.value.targetId,
-        targetName: addForm.value.targetName
-      })
-      if (res.success) {
-        ElMessage.success('已添加')
-        handleCloseAddDialog()
-        await loadCollects()
-      } else {
-        ElMessage.error(res.message || '添加失败')
-      }
-    } catch (e) {}
-    adding.value = false
-    return
-  }
-
+  if (!addForm.value.targetId) { ElMessage.warning('请填写或搜索选择目标ID'); return }
+  if (!addForm.value.accountId) { ElMessage.warning('请选择账号'); return }
   adding.value = true
   try {
     const res = await addCollect({
@@ -399,21 +325,19 @@ async function handleAdd() {
       targetName: addForm.value.targetName
     })
     if (res.success) {
-      ElMessage.success('已添加并同步到闲鱼')
+      ElMessage.success(addForm.value.targetType === 'ITEM' ? '已添加并同步到闲鱼' : '已添加')
       handleCloseAddDialog()
       await loadCollects()
     } else {
       ElMessage.error(res.message || '添加失败')
     }
-  } catch (e) {}
-  adding.value = false
+  } catch (e) { ElMessage.error('添加失败') }
+  finally { adding.value = false }
 }
 
 async function handleRemove(row) {
   try {
-    await ElMessageBox.confirm(`确定要移除收藏「${row.targetName || row.targetId}」？`, '确认移除', {
-      type: 'warning'
-    })
+    await ElMessageBox.confirm(`确定要移除收藏「${row.targetName || row.targetId}」？`, '确认移除', { type: 'warning' })
   } catch { return }
   try {
     const res = await removeCollect(row.id)
@@ -423,7 +347,7 @@ async function handleRemove(row) {
     } else {
       ElMessage.error(res.message || '移除失败')
     }
-  } catch (e) {}
+  } catch (e) { ElMessage.error('移除失败') }
 }
 
 async function handleSync() {
@@ -439,98 +363,49 @@ async function handleSync() {
     } else {
       ElMessage.error(res.message || '同步失败')
     }
-  } catch (e) {}
-  syncing.value = false
+  } catch (e) { ElMessage.error('同步失败') }
+  finally { syncing.value = false }
 }
 
-function openItem(itemId) {
-  window.open(`https://www.goofish.com/item?id=${itemId}`, '_blank')
-}
+function openItem(itemId) { window.open(`https://www.goofish.com/item?id=${itemId}`, '_blank') }
 
-function typeLabel(t) {
-  return { ITEM: '商品', USER: '用户', SHOP: '店铺' }[t] || t
-}
-
-function typeColor(t) {
-  return { ITEM: 'success', USER: 'warning', SHOP: 'danger' }[t] || 'info'
-}
+function typeLabel(t) { return { ITEM: '商品', USER: '用户', SHOP: '店铺' }[t] || t }
+function typeColor(t) { return { ITEM: 'success', USER: 'warning', SHOP: 'danger' }[t] || 'info' }
 
 function formatTime(t) {
   if (!t) return ''
-  try {
-    return new Date(t).toLocaleString('zh-CN')
-  } catch { return t }
+  try { return new Date(t).toLocaleString('zh-CN') } catch { return t }
 }
 
 onMounted(loadAccounts)
 </script>
 
 <style scoped>
-.filter-bar :deep(.el-form-item) {
-  margin-bottom: 0;
-}
-
-.page-root {
-  padding: 0;
-}
+.filter-bar :deep(.el-form-item) { margin-bottom: 0; }
+.page-root { padding: 0; }
 
 .search-results {
-  border: 1px solid var(--line-2);
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
   overflow: hidden;
   margin-bottom: 12px;
 }
+.search-results :deep(.el-table__row) { cursor: pointer; }
+.search-results :deep(.el-table__row:hover) { background-color: #f8f7ff !important; }
 
-.search-results :deep(.el-table__row) {
-  cursor: pointer;
-}
+.item-cell { display: flex; align-items: center; gap: 10px; }
+.item-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 
-.search-results :deep(.el-table__row:hover) {
-  background-color: var(--hover-1) !important;
-}
-
-.item-cell {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.item-title {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-}
-
-.no-result {
-  text-align: center;
-  color: var(--text-3);
-  padding: 24px 0;
-  font-size: 13px;
-}
+.no-result { text-align: center; color: var(--text-3); padding: 24px 0; font-size: 13px; }
 
 .selected-preview {
   margin-top: 12px;
   padding: 12px;
-  background-color: var(--brand-light-9);
-  border-radius: 8px;
-  border: 1px solid var(--line-2);
+  background-color: var(--el-color-primary-light-9);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
 }
 
-.input-tip {
-  font-size: 12px;
-  color: var(--text-3);
-  margin-top: 4px;
-  line-height: 1.5;
-}
-
-.input-tip a {
-  color: var(--brand-2);
-  text-decoration: none;
-}
-
-.input-tip a:hover {
-  text-decoration: underline;
-}
+.input-tip { font-size: 12px; color: var(--text-3); margin-top: 4px; line-height: 1.5; }
+.input-tip a { color: var(--brand-2); text-decoration: none; &:hover { text-decoration: underline; } }
 </style>

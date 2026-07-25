@@ -3,90 +3,144 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>规则列表 - AI 鱼多宝</title>
+<title>自动回复规则 - AI 鱼多宝</title>
 <style>
 @import url('../_design-system.css');
-body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
-/* Custom additions */
-.rule-list{padding:0 16px 20px;display:flex;flex-direction:column;gap:12px}
-.rule-card{background:#fff;border-radius:18px;padding:16px;border:1px solid var(--border);box-shadow:var(--shadow-sm);transition:all .2s}
-.rule-card:active{transform:scale(.98)}
-.rule-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-.rule-name{font-size:15px;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:8px}
-.rule-body{display:flex;flex-direction:column;gap:8px}
-.rule-pattern{display:flex;align-items:center;gap:8px}
-.rule-label{font-size:12px;font-weight:600;color:var(--text-secondary);white-space:nowrap}
-.rule-tag{flex:1;padding:6px 12px;background:var(--bg-page);border-radius:10px;font-size:12px;color:var(--text-primary);font-weight:500;word-break:break-all}
-.rule-reply{font-size:12px;color:var(--text-tertiary);line-height:1.5;display:flex;align-items:start;gap:6px}
-.rule-reply::before{content:'回复：';font-weight:600;color:var(--text-secondary)}
-.rule-footer{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid var(--border-light)}
-.r-stat{font-size:11px;color:var(--text-tertiary)}
-.r-stat b{color:var(--text-primary);font-weight:700}
-.rule-actions{display:flex;gap:6px}
-.r-action{padding:5px 12px;border-radius:8px;font-size:11px;font-weight:600;border:none;cursor:pointer}
-.r-test{background:rgba(79,70,229,.08);color:var(--brand)}
-.r-edit{background:var(--bg-page);color:var(--text-secondary)}
-/* nav override for brand header */
-.nav-bar{height:auto;padding:20px 16px 22px;border-radius:0 0 28px 28px;background:var(--gradient-brand);border-bottom:none;backdrop-filter:none}
+body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px}
+.nav-brand{position:absolute;top:58px;left:0;right:0;height:auto;padding:20px 16px 20px;border-radius:0 0 24px 24px;background:var(--gradient-brand);z-index:50;display:flex;align-items:center;gap:12px}
 .nav-back-text{color:#fff;font-size:22px;cursor:pointer}
 .nav-title-style{color:#fff;font-size:17px;font-weight:700;flex:1;text-align:center}
-.nav-spacer{width:24px}
-.btn-create{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;transition:all .2s}
-.btn-create:active{background:rgba(255,255,255,.3)}
-.toggle{position:relative;width:44px;height:24px;border-radius:12px;transition:background .3s}
-.toggle.on{background:var(--success)}
+.btn-create{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer}
+.filter-tabs{display:flex;gap:6px;padding:14px 16px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.filter-tabs::-webkit-scrollbar{display:none}
+.ftab{flex:0 0 auto;padding:7px 14px;border-radius:var(--radius-full);font-size:12px;font-weight:500;background:var(--bg-card);border:1px solid var(--border);color:var(--text-secondary)}
+.ftab.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 16px 4px}
+.stat-mini{background:var(--bg-card);border-radius:12px;padding:10px 6px;text-align:center;border:1px solid var(--border)}
+.stat-mini .stat-value{font-size:16px;font-weight:800;color:var(--text-primary)}
+.stat-mini .stat-unit{font-size:10px;color:var(--text-tertiary)}
+.rule-cards{padding:0 16px 20px;display:flex;flex-direction:column;gap:12px}
+.rcard{background:var(--bg-card);border-radius:var(--radius-md);padding:16px;border:1px solid var(--border);box-shadow:var(--shadow-sm)}
+.rcard-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.rcard-name{font-size:15px;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:8px}
+.toggle{position:relative;width:44px;height:24px;border-radius:12px;background:var(--success);transition:background .3s}
 .toggle.off{background:var(--border)}
 .toggle::after{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:left .3s cubic-bezier(.16,1,.3,1)}
-.toggle.on::after{left:22px}
-.scroll-tabs{padding-top:0}
+.toggle.off::after{left:22px}
+.rpattern{display:flex;align-items:center;gap:8px}
+.rlbl{font-size:12px;font-weight:600;color:var(--text-secondary);white-space:nowrap}
+.rtag{flex:1;padding:6px 12px;background:var(--bg-page);border-radius:10px;font-size:12px;color:var(--text-primary);font-weight:500;word-break:break-all}
+.rreply{font-size:12px;color:var(--text-tertiary);line-height:1.5;margin-top:8px}
+.rfooter{display:flex;align-items:center;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid var(--border-light)}
+.rs{font-size:11px;color:var(--text-tertiary)}
+.rs b{color:var(--text-primary);font-weight:700}
+.ractions{display:flex;gap:6px}
+.ract{padding:5px 12px;border-radius:8px;font-size:11px;font-weight:600;border:none;cursor:pointer}
+.rtest{background:rgba(79,70,229,.08);color:var(--brand)}
+.redit{background:var(--bg-page);color:var(--text-secondary)}
+.reply-type-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:8px;font-size:10px;font-weight:600}
+.ct-keyword{background:rgba(79,70,229,.08);color:var(--brand)}
+.ct-ai{background:rgba(34,211,238,.1);color:#0891b2}
+.ct-auto{background:rgba(16,185,129,.1);color:var(--success)}
+.fab-rules{position:absolute;bottom:100px;right:24px;width:56px;height:56px;border-radius:50%;background:var(--gradient-brand);color:#fff;font-size:24px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(79,70,229,.35);z-index:50;cursor:pointer;transition:all .25s cubic-bezier(.16,1,.3,1)}
+.fab-rules:active{transform:scale(.92)}
+.content-wrap{position:absolute;top:128px;left:0;right:0;bottom:0;overflow-y:auto}
+.content-wrap::-webkit-scrollbar{display:none}
 </style>
 </head>
 <body>
 <div class="phone-frame safe-bottom">
   <div class="island"></div>
   <div class="status-bar"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
-  <div class="page-content">
-    <div class="nav-bar">
-      <div style="display:flex;align-items:center;gap:8px">
-        <span class="nav-back-text">‹</span>
-        <span class="nav-title-style">关键词规则</span>
-        <div class="nav-spacer"></div>
-      </div>
-      <button class="btn-create">+ 新建规则</button>
+
+  <div class="nav-brand">
+    <span class="nav-back-text">‹</span>
+    <span class="nav-title-style">自动回复规则</span>
+    <button class="btn-create">+ 新建</button>
+  </div>
+
+  <div class="content-wrap">
+    <div class="filter-tabs">
+      <div class="ftab active">全部 (12)</div>
+      <div class="ftab">生效中</div>
+      <div class="ftab">已暂停</div>
+      <div class="ftab">关键词</div>
+      <div class="ftab">AI</div>
+      <div class="ftab">自动</div>
     </div>
-    <div class="scroll-tabs">
-      <div class="scroll-tab active">全部 (12)</div>
-      <div class="scroll-tab">生效中</div>
-      <div class="scroll-tab">已暂停</div>
-      <div class="scroll-tab">AI 规则</div>
+
+    <div class="stats-row">
+      <div class="stat-mini"><div class="stat-value">12</div><div class="stat-unit">总规则</div></div>
+      <div class="stat-mini"><div class="stat-value">9</div><div class="stat-unit">生效中</div></div>
+      <div class="stat-mini"><div class="stat-value">85%</div><div class="stat-unit">平均匹配</div></div>
+      <div class="stat-mini"><div class="stat-value">2.4k</div><div class="stat-unit">今日命中</div></div>
     </div>
-    <div class="rule-list">
-      <div class="rule-card">
-        <div class="rule-header"><div class="rule-name">🎯 价格议价</div><div class="toggle on"></div></div>
-        <div class="rule-body">
-          <div class="rule-pattern"><span class="rule-label">匹配：</span><span class="rule-tag">"能便宜吗" "最低多少" "多少钱"</span></div>
-          <div class="rule-reply">亲，这个价格已经很优惠了哦～如果您诚心想要，给您个小折扣可以吗？</div>
-          <div class="rule-footer"><div style="display:flex;gap:12px"><span class="r-stat">今日命中 <b>32</b></span><span class="r-stat">累计 <b>1.2k</b></span><span class="r-stat">匹配率 <b>95%</b></span></div><div class="rule-actions"><button class="r-action r-test">测试</button><button class="r-action r-edit">编辑</button></div></div>
+
+    <div class="rule-cards">
+      <div class="rcard">
+        <div class="rcard-head">
+          <span class="rcard-name">🎯 价格议价</span>
+          <div class="toggle" title="启用中"></div>
+        </div>
+        <div class="rpattern"><span class="rlbl">匹配：</span><span class="rtag">"能便宜吗" "最低多少" "多少钱"</span></div>
+        <div class="rreply">亲，这个价格已经很优惠了哦～如果您诚心想要，给您个小折扣可以吗？</div>
+        <div class="rfooter">
+          <div style="display:flex;gap:12px">
+            <span class="rs">今日 <b>32</b></span>
+            <span class="rs">累计 <b>1.2k</b></span>
+            <span class="rs">匹配率 <b>95%</b></span>
+          </div>
+          <div class="ractions">
+            <button class="ract rtest">测试</button>
+            <button class="ract redit">编辑</button>
+          </div>
         </div>
       </div>
-      <div class="rule-card">
-        <div class="rule-header"><div class="rule-name">📦 发货咨询</div><div class="toggle on"></div></div>
-        <div class="rule-body">
-          <div class="rule-pattern"><span class="rule-label">匹配：</span><span class="rule-tag">"什么时候发货" "多久到" "快递发哪"</span></div>
-          <div class="rule-reply">下单后24小时内发货哦，默认中通快递，发货后会通知您单号～</div>
-          <div class="rule-footer"><div style="display:flex;gap:12px"><span class="r-stat">今日命中 <b>18</b></span><span class="r-stat">累计 <b>856</b></span><span class="r-stat">匹配率 <b>88%</b></span></div><div class="rule-actions"><button class="r-action r-test">测试</button><button class="r-action r-edit">编辑</button></div></div>
+
+      <div class="rcard">
+        <div class="rcard-head">
+          <span class="rcard-name">📦 发货咨询</span>
+          <div class="toggle" title="启用中"></div>
+        </div>
+        <div class="rpattern"><span class="rlbl">匹配：</span><span class="rtag">"什么时候发货" "多久到" "快递发哪"</span></div>
+        <div class="rreply">下单后24小时内发货哦，默认中通快递，发货后会通知您单号～</div>
+        <div class="rfooter">
+          <div style="display:flex;gap:12px">
+            <span class="rs">今日 <b>18</b></span>
+            <span class="rs">累计 <b>856</b></span>
+            <span class="rs">匹配率 <b>88%</b></span>
+          </div>
+          <div class="ractions">
+            <button class="ract rtest">测试</button>
+            <button class="ract redit">编辑</button>
+          </div>
         </div>
       </div>
-      <div class="rule-card">
-        <div class="rule-header"><div class="rule-name">✅ 确认收货</div><div class="toggle off"></div></div>
-        <div class="rule-body">
-          <div class="rule-pattern"><span class="rule-label">匹配：</span><span class="rule-tag">"已收到" "没问题" "挺好的"</span></div>
-          <div class="rule-reply">感谢亲的认可！满意的话麻烦给个好评哦，有什么其他需要随时联系我～</div>
-          <div class="rule-footer"><div style="display:flex;gap:12px"><span class="r-stat">今日命中 <b>0</b></span><span class="r-stat">累计 <b>234</b></span><span class="r-stat">匹配率 <b>76%</b></span></div><div class="rule-actions"><button class="r-action r-test">测试</button><button class="r-action r-edit">编辑</button></div></div>
+
+      <div class="rcard">
+        <div class="rcard-head">
+          <span class="rcard-name">✅ 确认收货</span>
+          <div class="toggle off" title="已暂停"></div>
+        </div>
+        <div class="rpattern"><span class="rlbl">匹配：</span><span class="rtag">"已收到" "没问题" "挺好的"</span></div>
+        <div class="rreply">感谢亲的认可！满意的话麻烦给个好评哦，有什么其他需要随时联系我～</div>
+        <div class="rfooter">
+          <div style="display:flex;gap:12px">
+            <span class="rs">今日 <b>0</b></span>
+            <span class="rs">累计 <b>234</b></span>
+            <span class="rs">匹配率 <b>76%</b></span>
+          </div>
+          <div class="ractions">
+            <button class="ract rtest">测试</button>
+            <button class="ract redit">编辑</button>
+          </div>
         </div>
       </div>
     </div>
   </div>
+
+  <div class="fab-rules">+</div>
+
   <div class="tab-bar safe-bottom">
     <div class="tab-item"><span class="tab-icon">📊</span><span class="tab-label">首页</span></div>
     <div class="tab-item"><span class="tab-icon">💬</span><span class="tab-label">消息</span></div>

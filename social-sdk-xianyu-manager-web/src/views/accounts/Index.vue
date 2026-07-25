@@ -333,7 +333,8 @@ async function loadAccounts() {
   try {
     const res = await api.get('/accounts')
     if (res.success) accounts.value = res.data
-  } catch (e) { /* ignore */ }
+    else ElMessage.error(res.message || '加载账号列表失败')
+  } catch (e) { /* 拦截器已提示 */ }
   finally { loading.value = false }
 }
 
@@ -356,8 +357,10 @@ async function handleStatusUpdate() {
       ElMessage.success('状态已更新')
       showStatusDialog.value = false
       await loadAccounts()
+    } else {
+      ElMessage.error(res.message || '状态更新失败')
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) { /* 拦截器已提示 */ }
 }
 
 async function deleteAccount(id) {
@@ -367,8 +370,10 @@ async function deleteAccount(id) {
     if (res.success) {
       ElMessage.success('已删除')
       await loadAccounts()
+    } else {
+      ElMessage.error(res.message || '删除账号失败')
     }
-  } catch (e) { /* ignore */ }
+  } catch (e) { /* 拦截器已提示 */ }
 }
 
 // ==================== 编辑账号 ====================

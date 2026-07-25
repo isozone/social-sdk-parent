@@ -33,6 +33,10 @@ public class XianyuOrder extends BaseEntity {
     private String status; // PENDING, PAID, SHIPPED, COMPLETED, REFUNDING, REFUNDED, CLOSED
     /** 闲鱼原始状态枚举 (tradeStatusEnum)，用于调试和回查 */
     private String tradeStatusEnum;
+    /** 订单状态机当前状态（BOT-O1）：CREATED/PAID/SHIPPED/DELIVERED/COMPLETED/REFUNDING/REFUNDED/CLOSED */
+    private String orderStatus;
+    /** 退款前状态快照（BOT-O1）：进入 REFUNDING/REFUNDED 时保留 pre_refund_status，便于退款取消/驳回后回滚 */
+    private String preRefundStatus;
     /** 是否为卖家订单（bought 返回有 seller 标记，sold API 无此字段） */
     private Boolean isSeller;
     private String trackingNo;

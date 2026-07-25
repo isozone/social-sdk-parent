@@ -2,127 +2,122 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>商品详情 - AI 鱼多宝</title>
 <style>
-@import url('_design-system.css');
+:root { --brand: #4f46e5; --violet: #7c3aed; --gradient-brand: linear-gradient(135deg, #4f46e5, #7c3aed); --bg-page: #f5f5f7; --bg-card: #ffffff; --text-primary: #111827; --text-secondary: #6b7280; --text-tertiary: #9ca3af; --danger: #ef4444; --success: #10b981; --warning: #f59e0b; --border: #e5e7eb; --shadow-sm: 0 1px 3px rgba(0,0,0,.04); --shadow-md: 0 4px 12px rgba(0,0,0,.06); --radius-sm: 12px; --radius-md: 16px; --radius-lg: 24px; }
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
-
+body{font-family:-apple-system,'PingFang SC',system-ui,sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px}
+.phone-frame{width:393px;height:852px;border-radius:54px;background:var(--bg-page);position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.18)}
+.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}
+.status-bar{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:14px;font-weight:600;color:var(--text-primary)}
+.nav-bar{position:absolute;top:58px;left:0;right:0;height:44px;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid var(--border);z-index:50}
+.back-btn{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:var(--bg-page);cursor:pointer;transition:all .2s}
+.back-btn:active{transform:scale(.92)}
+.page-content{position:absolute;top:102px;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:hidden}
+.page-content::-webkit-scrollbar{display:none}
 /* Carousel */
-.carousel{position:relative;background:var(--gradient-brand);padding-top:100%;overflow:hidden}
-.carousel-slide{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:80px;color:#fff}
-.carousel-dots{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
+.carousel{height:240px;background:linear-gradient(135deg,#e0e7ff,#c7d2fe);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.carousel-emoji{font-size:80px;filter:drop-shadow(0 8px 24px rgba(0,0,0,.15))}
+.carousel-dots{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
 .dot{width:8px;height:8px;border-radius:4px;background:rgba(255,255,255,.35)}
 .dot.active{width:20px;background:#fff;border-radius:4px}
-
 /* Info Card */
-.info-card{background:var(--bg-card);border-radius:24px 24px 0 0;margin-top:-20px;position:relative;z-index:1;padding:20px}
-
-.product-title-text{font-size:18px;font-weight:700;color:var(--text-primary);line-height:1.5;margin-bottom:12px}
-
-.price-row{display:flex;align-items:baseline;gap:8px;margin-bottom:16px}
+.info-card{background:var(--bg-card);border-radius:0 0 var(--radius-lg) var(--radius-lg);margin-top:-20px;position:relative;z-index:1;padding:20px 16px}
+.tags{display:flex;gap:8px;margin-bottom:12px}
+.chip{padding:4px 10px;border-radius:var(--radius-sm);font-size:11px;font-weight:600}
+.chip-green{background:rgba(16,185,129,.1);color:var(--success)}.chip-violet{background:rgba(124,58,237,.1);color:var(--violet)}
+.item-title{font-size:18px;font-weight:700;color:var(--text-primary);line-height:1.4;margin-bottom:10px}
+.price-row{display:flex;align-items:baseline;gap:8px;margin-bottom:14px}
 .price-main{font-size:28px;font-weight:800;color:var(--danger)}
-.price-symbol{font-size:16px}
 .price-original{font-size:13px;color:var(--text-tertiary);text-decoration:line-through}
 .discount-tag{font-size:11px;font-weight:600;color:var(--success);background:rgba(16,185,129,.1);padding:3px 8px;border-radius:6px}
-
-.meta-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
-.meta-item{background:var(--bg-page);border-radius:var(--radius-sm);padding:12px;text-align:center}
-.meta-val{font-size:16px;font-weight:700;color:var(--text-primary)}
-.meta-label{font-size:11px;color:var(--text-tertiary);margin-top:3px}
-
-.desc-card{padding:16px;background:var(--bg-card);border-radius:var(--radius-md);margin-top:12px;border:1px solid var(--border)}
-.desc-title{font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:10px}
-.desc-text{font-size:13px;color:var(--text-secondary);line-height:1.8}
-
-/* Stats Row */
-.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:16px;margin:0;background:var(--bg-card);border-radius:var(--radius-md);border:1px solid var(--border-light);box-shadow:var(--shadow-sm);margin-top:14px}
-.stat-cell{text-align:center}
-.stat-icon{font-size:20px;margin-bottom:4px}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
+.stat-cell{text-align:center;padding:10px;background:var(--bg-page);border-radius:var(--radius-sm)}
 .stat-num{font-size:18px;font-weight:800;color:var(--text-primary)}
 .stat-label{font-size:10px;color:var(--text-tertiary);margin-top:2px}
-
-/* Action Buttons */
-.action-panel{display:flex;gap:8px;padding:16px;background:var(--bg-card);border-radius:var(--radius-md);border:1px solid var(--border-light);box-shadow:var(--shadow-sm);margin-top:14px}
-.a-btn{flex:1;padding:12px 4px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all .2s}
+.desc-card{background:var(--bg-page);border-radius:var(--radius-md);padding:14px;margin-bottom:16px}
+.desc-title{font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:8px}
+.desc-text{font-size:13px;color:var(--text-secondary);line-height:1.7}
+.action-panel{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.a-btn{background:var(--bg-card);border-radius:var(--radius-md);padding:14px 6px;text-align:center;border:1px solid var(--border);box-shadow:var(--shadow-sm);cursor:pointer;transition:transform .2s}
 .a-btn:active{transform:scale(.95)}
-.a-primary{background:var(--gradient-brand);color:#fff;box-shadow:0 4px 16px rgba(79,70,229,.2)}
-.a-warn{background:rgba(245,158,11,.1);color:var(--warning)}
-.a-secondary{background:var(--bg-page);color:var(--text-secondary)}
-.a-danger{background:rgba(239,68,68,.1);color:var(--danger)}
-.a-icon{font-size:18px}
-
-/* Bottom Fixed Nav */
-.bottom-nav{position:absolute;bottom:0;left:0;right:0;background:rgba(255,255,255,.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border-light);display:flex;align-items:center;gap:10px;padding:10px 16px;padding-bottom:max(10px,env(safe-area-inset-bottom));z-index:80}
-.back-btn{width:38px;height:38px;border-radius:50%;background:var(--bg-page);border:none;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
-.back-btn:active{transform:scale(.9)}
-.bottom-btn{flex:1;height:44px;border-radius:14px;font-size:14px;font-weight:600;border:none;cursor:pointer;transition:all .2s}
-.bottom-btn:active{transform:scale(.97)}
-.bottom-btn--ghost{background:var(--bg-page);color:var(--text-secondary)}
-.bottom-btn--brand{background:var(--gradient-brand);color:#fff;box-shadow:0 4px 16px rgba(79,70,229,.25)}
+.a-icon{font-size:20px;margin-bottom:6px}
+.a-label{font-size:12px;font-weight:600;color:var(--text-primary)}
+.a-danger .a-label{color:var(--danger)}.a-warn .a-label{color:var(--warning)}
+.bottom-nav{position:absolute;bottom:0;left:0;right:0;background:rgba(255,255,255,.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;padding:12px 16px;z-index:80}
+.b-btn{flex:1;height:44px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;border:none;cursor:pointer;transition:all .2s}
+.b-btn:active{transform:scale(.97)}
+.b-ghost{background:var(--bg-page);color:var(--text-secondary)}
+.b-brand{background:var(--gradient-brand);color:#fff;box-shadow:0 8px 32px rgba(79,70,229,.25)}
+.b-accent{background:var(--success);color:#fff}
 </style>
 </head>
 <body>
-<div class="phone-frame safe-bottom">
+<div class="phone-frame">
   <div class="island"></div>
-  <div class="status-bar"><span>9:41</span><span>●●●●●</span></div>
+  <div class="status-bar"><span>9:41</span><span style="display:flex;gap:6px;align-items:center">
+    <svg width="16" height="12" viewBox="0 0 16 12"><path d="M1 10.5a1 1 0 01-.5-1.86A8 8 0 018 2a8 8 0 018.5 6.64 1 1 0 01-1 1.86A6 6 0 008 4a6 6 0 00-7 6.5z" fill="#10b981"/><path d="M4 7.5a1 1 0 01-.5-1.86A4 4 0 018 2a4 4 0 014.5 3.64 1 1 0 01-1 1.86A2 2 0 008 4a2 2 0 00-4.5 3.5z" fill="#10b981"/></svg>
+    <svg width="16" height="12" viewBox="0 0 16 12"><rect x="1" y="4" width="3" height="8" rx=".5" fill-opacity=".3"/><rect x="5.5" y="2.5" width="3" height="9.5" rx=".5" fill-opacity=".5"/><rect x="10" y="0" width="3" height="12" rx=".5"/></svg>
+    <svg width="28" height="12" viewBox="0 0 28 12"><rect x=".5" y=".5" width="23" height="11" rx="3" stroke="#000" fill="none"/><rect x="2" y="2" width="16" height="8" rx="1.5" fill="#10b981"/></svg>
+  </span></div>
+
+  <!-- Nav -->
+  <div class="nav-bar">
+    <button class="back-btn" onclick="history.back()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <span style="font-size:17px;font-weight:700;color:var(--text-primary)">商品详情</span>
+    <button class="back-btn">⋮</button>
+  </div>
 
   <div class="page-content">
-    <!-- Carousel -->
+    <!-- Image Carousel -->
     <div class="carousel">
-      <div class="carousel-slide hero-section">👟</div>
+      <div class="carousel-emoji">👟</div>
       <div class="carousel-dots"><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
     </div>
 
-    <!-- Product Info Card -->
+    <!-- Product Info -->
     <div class="info-card">
       <div class="tags">
-        <span class="chip chip-green">在售</span>
+        <span class="chip chip-green">● 在售</span>
         <span class="chip chip-violet">新品</span>
       </div>
-      <h1 class="product-title-text">全新Nike Air Force 1 空军一号白色板鞋 低帮经典百搭</h1>
+      <h1 class="item-title">全新Nike Air Force 1 空军一号白色板鞋 低帮经典百搭</h1>
       <div class="price-row">
-        <span class="price-main"><span class="price-symbol">¥</span>299</span>
+        <span class="price-main">¥299</span>
         <span class="price-original">¥599</span>
         <span class="discount-tag">4.7折</span>
       </div>
-      <div class="meta-grid">
-        <div class="meta-item"><div class="meta-val">12</div><div class="meta-label">库存</div></div>
-        <div class="meta-item"><div class="meta-val">1.2k</div><div class="meta-label">浏览量</div></div>
-        <div class="meta-item"><div class="meta-val">89</div><div class="meta-label">收藏</div></div>
+
+      <!-- Stats Row -->
+      <div class="stats-row">
+        <div class="stat-cell"><div class="stat-num">1.2k</div><div class="stat-label">浏览量</div></div>
+        <div class="stat-cell"><div class="stat-num">89</div><div class="stat-label">收藏</div></div>
+        <div class="stat-cell"><div class="stat-num">12</div><div class="stat-label">订单</div></div>
+        <div class="stat-cell"><div class="stat-num">5</div><div class="stat-label">库存</div></div>
       </div>
+
+      <!-- Description -->
       <div class="desc-card">
         <div class="desc-title">商品描述</div>
         <p class="desc-text">全新未穿，专柜购入，含原始发票。尺码：42。颜色：纯白。购买渠道：Nike官方店。支持验货，假一赔十。</p>
       </div>
     </div>
 
-    <!-- Quick Stats -->
-    <div class="stats-row">
-      <div class="stat-cell"><div class="stat-icon">✅</div><div class="stat-label">在售中</div></div>
-      <div class="stat-cell"><div class="stat-num">12天</div><div class="stat-label">发布时长</div></div>
-      <div class="stat-cell"><div class="stat-num">890</div><div class="stat-label">总浏览</div></div>
-      <div class="stat-cell"><div class="stat-num">12次</div><div class="stat-label">最近擦亮</div></div>
+    <!-- Actions -->
+    <div class="action-panel" style="margin:0 16px 20px">
+      <div class="a-btn"><div class="a-icon">✨</div><div class="a-label">擦亮</div></div>
+      <div class="a-btn"><div class="a-icon">🔄</div><div class="a-label">同步</div></div>
+      <div class="a-btn"><div class="a-icon">✏️</div><div class="a-label">编辑</div></div>
+      <div class="a-btn a-warn"><div class="a-icon">⏸</div><div class="a-label">下架</div></div>
     </div>
-
-    <!-- Action Buttons -->
-    <div class="action-panel">
-      <button class="a-btn a-primary"><span class="a-icon">✨</span>擦亮</button>
-      <button class="a-btn a-warn"><span class="a-icon">🔄</span>同步</button>
-      <button class="a-btn a-secondary"><span class="a-icon">✏️</span>编辑</button>
-      <button class="a-btn a-danger"><span class="a-icon">⏸</span>下架</button>
-    </div>
-
-    <!-- Spacer for bottom nav -->
-    <div style="height:60px"></div>
   </div>
 
-  <!-- Bottom Fixed Navigation -->
+  <!-- Bottom Navigation -->
   <div class="bottom-nav">
-    <button class="back-btn">‹</button>
-    <button class="bottom-btn bottom-btn--ghost">💬 聊天</button>
-    <button class="bottom-btn bottom-btn--brand">上架 / 下架</button>
+    <button class="b-btn b-ghost" onclick="location.href='list.html'">← 返回</button>
+    <button class="b-btn b-brand">上架/下架</button>
+    <button class="b-btn b-accent">✨ 擦亮</button>
   </div>
 </div>
 </body>

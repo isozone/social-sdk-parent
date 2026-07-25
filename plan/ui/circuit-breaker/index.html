@@ -2,47 +2,126 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>熔断器 - AI 鱼多宝</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>熔断面板 - AI 鱼多宝</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}:root{--brand:#4f46e5;--cyan:#22d3ee;--bg-page:#f5f5f7;--text-primary:#111827;--text-secondary:#6b7280;--text-tertiary:#9ca3af;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--info:#3b82f6;--border:#e5e7eb;--radius-md:16px;--gradient-brand:linear-gradient(135deg,#4f46e5,#7c3aed)}.phone{width:393px;height:852px;border-radius:54px;background:var(--bg-page);position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.18)}.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}.status-bar{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:14px;font-weight:600;color:var(--text-primary)}.page-content{position:absolute;top:58px;left:0;right:0;bottom:84px;overflow-y:auto;-webkit-overflow-scrolling:touch}.page-content::-webkit-scrollbar{display:none}.nav{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}.h-title{font-size:17px;font-weight:700;color:var(--text-primary);flex:1;text-align:center}.badge{padding:3px 10px;border-radius:10px;font-size:10px;font-weight:700}.badge-closed{background:rgba(239,68,68,.1);color:var(--danger)}.badge-open{background:rgba(16,185,129,.1);color:var(--success)}.badge-half{background:rgba(245,158,11,.1);color:var(--warning)}.card{background:#fff;border-radius:var(--radius-md);padding:16px;border:1px solid var(--border);margin:0 16px 12px;box-shadow:0 1px 4px rgba(0,0,0,.03)}.service-row{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border-light)}.service-row:last-child{border-bottom:none}.service-name{font-size:14px;font-weight:600;color:var(--text-primary)}.service-account{font-size:11px;color:var(--text-tertiary);margin-top:2px}.circuit-card{background:#fff;border-radius:var(--radius-md);padding:16px;border:1px solid var(--border);margin:0 16px 12px;box-shadow:0 1px 4px rgba(0,0,0,.03)}.circuit-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.circuit-name{font-size:15px;font-weight:700;color:var(--text-primary)}.circuit-status{display:flex;align-items:center;gap:6px}.circuit-dot{width:8px;height:8px;border-radius:50%}.circuit-dot.closed{background:var(--danger)}.circuit-dot.open{background:var(--success)}.circuit-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}.circuit-metric{background:var(--bg-page);border-radius:10px;padding:10px;text-align:center}.circuit-metric-value{font-size:16px;font-weight:800;color:var(--text-primary)}.circuit-metric-label{font-size:9px;color:var(--text-tertiary);margin-top:2px}.circuit-progress{height:8px;background:var(--bg-page);border-radius:4px;overflow:hidden;margin-bottom:10px}.circuit-progress-fill{height:100%;border-radius:4px;transition:width .3s}.circuit-footer{display:flex;gap:8px}.circuit-btn{flex:1;height:36px;border-radius:10px;font-size:12px;font-weight:600;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px}.btn-danger{background:rgba(239,68,68,.1);color:var(--danger)}.btn-primary{background:var(--gradient-brand);color:#fff}.btn-gray{background:var(--bg-page);color:var(--text-secondary)}.global-bar{margin:0 16px 12px;display:flex;gap:8px}.global-btn{flex:1;height:42px;border-radius:12px;font-size:12px;font-weight:600;border:1px solid var(--border);background:#fff;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}.global-btn.danger{border-color:var(--danger);color:var(--danger)}
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--brand:#4f46e5;--violet:#7c3aed;--accent:#22d3ee;--bg:#f5f5f7;--t1:#111827;--t2:#6b7280;--t3:#9ca3af;--border:#e5e7eb;--success:#10b981;--warning:#f59e0b;--danger:#ef4444}
+body{font-family:-apple-system,'PingFang SC','SF Pro Display',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+.phone{width:393px;height:852px;border-radius:48px;background:var(--bg);position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.2)}
+.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}
+.st{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:14px;font-weight:600;color:var(--t1)}
+.ct{position:absolute;top:58px;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}.ct::-webkit-scrollbar{display:none}
+.hd{background:#fff;padding:10px 16px 8px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20}
+.bk{font-size:22px;color:var(--t2);cursor:pointer;padding:4px}
+.pt{flex:1;text-align:center;font-size:16px;font-weight:600;color:var(--t1);margin-right:28px}
+/* Status summary bar */
+.summary-bar{display:flex;gap:8px;padding:14px 16px}
+.sbar-item{flex:1;border-radius:14px;padding:14px 8px;text-align:center}
+.sbar-green{background:rgba(16,185,129,.1)}.sbar-amber{background:rgba(245,158,11,.1)}.sbar-red{background:rgba(239,68,68,.1)}.sbar-total{background:#fff;border:1px solid var(--border)}
+.sbar-num{font-size:22px;font-weight:800;line-height:1}.sbar-label{font-size:11px;color:var(--t3);margin-top:3px}
+.sbar-green .sbar-num{color:var(--success)}.sbar-amber .sbar-num{color:var(--warning)}.sbar-red .sbar-num{color:var(--danger)}
+/* Breaker card */
+.breaker-card{background:#fff;border-radius:16px;margin:0 16px 10px;padding:16px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.03)}
+.bc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.bc-name{display:flex;align-items:center;gap:8px}
+.bc-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.bc-icon.green{background:rgba(16,185,129,.1)}.bc-icon.amber{background:rgba(245,158,11,.1)}.bc-icon.red{background:rgba(239,68,68,.1)}
+.bc-title{font-size:15px;font-weight:600;color:var(--t1)}.bc-sub{font-size:11px;color:var(--t3);margin-top:2px}
+.bc-state{padding:4px 10px;border-radius:8px;font-size:11px;font-weight:700}
+.bs-green{background:rgba(16,185,129,.1);color:var(--success)}.bs-amber{background:rgba(245,158,11,.1);color:var(--warning)}.bs-red{background:rgba(239,68,68,.1);color:var(--danger)}
+/* Failure rate ring */
+.fr-row{display:flex;align-items:center;gap:16px;margin-bottom:12px}
+.fr-ring{width:64px;height:64px;position:relative;flex-shrink:0}
+.fr-ring svg{width:64px;height:64px;transform:rotate(-90deg)}
+.fr-ring circle{fill:none;stroke-width:6;stroke-linecap:round}
+.fr-ring .bg-ring{stroke:#f3f4f6}
+.fr-ring .fg-ring{transition:stroke-dashoffset .6s cubic-bezier(.16,1,.3,1)}
+.fr-value{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:var(--t1)}
+.fr-info{flex:1}
+.fr-label{font-size:13px;color:var(--t2);margin-bottom:6px}
+.fr-metric{display:flex;gap:12px;margin-bottom:4px}
+.fr-metric-item{font-size:12px;color:var(--t3)}.fr-metric-val{font-weight:700;color:var(--t1)}
+/* Reset button */
+.reset-btn{width:100%;height:40px;border-radius:10px;font-size:13px;font-weight:600;text-align:center;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;transition:all .15s}
+.reset-btn:active{transform:scale(.97)}
+.reset-primary{background:linear-gradient(135deg,var(--brand),var(--violet));color:#fff;box-shadow:0 3px 12px rgba(79,70,229,.25)}
+.reset-secondary{background:#f3f4f6;color:var(--t2)}
+.reset-danger{background:rgba(239,68,68,.08);color:var(--danger);border:1px solid rgba(239,68,68,.15)}
+/* Global reset section */
+.global-section{background:#fff;border-radius:16px;margin:0 16px 16px;padding:16px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.03)}
+.gs-title{font-size:15px;font-weight:700;color:var(--t1);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.gs-alert{background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:12px;padding:12px;margin-bottom:12px}
+.gs-alert-text{font-size:12px;color:var(--warning);font-weight:600;display:flex;align-items:center;gap:6px}
+.gs-btn{width:100%;height:44px;border-radius:12px;font-size:14px;font-weight:600;text-align:center;display:flex;align-items:center;justify-content:center;cursor:pointer;border:none;transition:all .15s}
+.gs-btn:active{transform:scale(.97)}
+.gs-btn.primary{background:linear-gradient(135deg,var(--brand),var(--violet));color:#fff;box-shadow:0 4px 16px rgba(79,70,229,.25)}
+.gs-btn.outline{background:#fff;color:var(--brand);border:1.5px solid rgba(79,70,229,.2)}
+/* Service status */
+.service-list{padding:0 16px 16px}
+.service-item{display:flex;align-items:center;gap:12px;background:#fff;border-radius:12px;padding:12px 16px;margin-bottom:8px;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,.03)}
+.si-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.si-dot.green{background:var(--success)}.si-dot.amber{background:var(--warning)}.si-dot.red{background:var(--danger)}
+.si-info{flex:1}.si-name{font-size:14px;font-weight:600;color:var(--t1)}.si-detail{font-size:11px;color:var(--t3);margin-top:2px}
+.si-status{font-size:12px;font-weight:600}
+.ss-green{color:var(--success)}.ss-amber{color:var(--warning)}.ss-red{color:var(--danger)}
+.safe-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}
 </style>
 </head>
 <body>
-<div class="phone">
-  <div class="island"></div>
-  <div class="status-bar"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
-  <div class="page-content">
-    <div class="nav"><span class="h-title">熔断器</span><span style="font-size:13px;color:var(--brand);font-weight:600">全局重置</span></div>
-    <!-- Global Actions -->
-    <div class="global-bar">
-      <button class="global-btn danger">🔄 全部重置</button>
-      <button class="global-btn">📊 健康检查</button>
-    </div>
-    <!-- Circuit Breakers -->
-    <div class="section-head"><div class="section-title">服务熔断状态</div><span style="font-size:11px;color:var(--text-tertiary)">MTOP API · 实时</span></div>
-    <div style="padding:0 16px 20px;display:flex;flex-direction:column;gap:12px">
-      <div class="circuit-card">
-        <div class="circuit-header"><div><div class="circuit-name">goods.query</div><div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">主力号 · 商品查询</div></div><div class="circuit-status"><div class="circuit-dot open"></div><span class="badge badge-open">闭合</span></div></div>
-        <div class="circuit-metrics"><div class="circuit-metric"><div class="circuit-metric-value">99.2%</div><div class="circuit-metric-label">成功率</div></div><div class="circuit-metric"><div class="circuit-metric-value">128ms</div><div class="circuit-metric-label">平均延迟</div></div><div class="circuit-metric"><div class="circuit-metric-value" style="color:var(--success)">0</div><div class="circuit-metric-label">连续失败</div></div></div>
-        <div class="circuit-progress"><div class="circuit-progress-fill" style="width:25%;background:var(--success)"></div></div>
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-tertiary)"><span>熔断阈值：错误率 > 80% 触发</span><span>错误率 25%</span></div>
-      </div>
-      <div class="circuit-card">
-        <div class="circuit-header"><div><div class="circuit-name">message.sync</div><div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">副业号 · 消息同步</div></div><div class="circuit-status"><div class="circuit-dot closed"></div><span class="badge badge-closed">熔断中</span></div></div>
-        <div class="circuit-metrics"><div class="circuit-metric"><div class="circuit-metric-value" style="color:var(--danger)">42.1%</div><div class="circuit-metric-label">成功率</div></div><div class="circuit-metric"><div class="circuit-metric-value" style="color:var(--danger)">2.8s</div><div class="circuit-metric-label">平均延迟</div></div><div class="circuit-metric"><div class="circuit-metric-value" style="color:var(--danger)">12</div><div class="circuit-metric-label">连续失败</div></div></div>
-        <div class="circuit-progress"><div class="circuit-progress-fill" style="width:82%;background:var(--danger)"></div></div>
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-tertiary);margin-bottom:12px"><span>熔断阈值：错误率 > 80% 触发</span><span>错误率 82%</span></div>
-        <div class="circuit-footer"><button class="circuit-btn btn-danger">⏸ 已熔断</button><button class="circuit-btn btn-primary">🔄 手动重置</button></div>
-      </div>
-      <div class="circuit-card">
-        <div class="circuit-header"><div><div class="circuit-name">order.create</div><div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">主力号 · 订单创建</div></div><div class="circuit-status"><div class="circuit-dot open"></div><span class="badge badge-open">闭合</span></div></div>
-        <div class="circuit-metrics"><div class="circuit-metric"><div class="circuit-metric-value">97.5%</div><div class="circuit-metric-label">成功率</div></div><div class="circuit-metric"><div class="circuit-metric-value">340ms</div><div class="circuit-metric-label">平均延迟</div></div><div class="circuit-metric"><div class="circuit-metric-value" style="color:var(--success)">0</div><div class="circuit-metric-label">连续失败</div></div></div>
-        <div class="circuit-progress"><div class="circuit-progress-fill" style="width:15%;background:var(--success)"></div></div>
-        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-tertiary)"><span>熔断阈值：错误率 > 80% 触发</span><span>错误率 15%</span></div>
-      </div>
-    </div>
-  </div>
+<div class="phone safe-bottom">
+<div class="island"></div>
+<div class="st"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
+<div class="ct">
+<div class="hd"><div class="bk">&#8592;</div><div class="pt">熔断面板</div><div style="font-size:20px;color:var(--t2);cursor:pointer">&#8942;</div></div>
+<!-- Summary -->
+<div class="summary-bar">
+<div class="sbar-total"><div class="sbar-num">6</div><div class="sbar-label">总计</div></div>
+<div class="sbar-green"><div class="sbar-num">3</div><div class="sbar-label">健康</div></div>
+<div class="sbar-amber"><div class="sbar-num">2</div><div class="sbar-label">警告</div></div>
+<div class="sbar-red"><div class="sbar-num">1</div><div class="sbar-label">已熔断</div></div>
+</div>
+<!-- Breaker Cards -->
+<!-- Green -->
+<div class="breaker-card">
+<div class="bc-header"><div class="bc-name"><div class="bc-icon green">&#128994;</div><div><div class="bc-title">消息服务</div><div class="bc-sub">自动回复 · 消息推送</div></div></div><div class="bc-state bs-green">正常</div></div>
+<div class="fr-row"><div class="fr-ring"><svg viewBox="0 0 64 64"><circle class="bg-ring" cx="32" cy="32" r="28"/><circle class="fg-ring" cx="32" cy="32" r="28" stroke="#10b981" stroke-dasharray="175.9" stroke-dashoffset="163" /></svg><div class="fr-value">6.2%</div></div><div class="fr-info"><div class="fr-label">最近 1 小时故障率</div><div class="fr-metric"><div class="fr-metric-item">请求 <span class="fr-metric-val">1,284</span></div><div class="fr-metric-item">失败 <span class="fr-metric-val">80</span></div><div class="fr-metric-item">阈值 <span class="fr-metric-val">30%</span></div></div></div></div>
+<button class="reset-btn reset-secondary">无需操作</button>
+</div>
+<!-- Green -->
+<div class="breaker-card">
+<div class="bc-header"><div class="bc-name"><div class="bc-icon green">&#128187;</div><div><div class="bc-title">商品同步</div><div class="bc-sub">闲鱼 API · 库存同步</div></div></div><div class="bc-state bs-green">正常</div></div>
+<div class="fr-row"><div class="fr-ring"><svg viewBox="0 0 64 64"><circle class="bg-ring" cx="32" cy="32" r="28"/><circle class="fg-ring" cx="32" cy="32" r="28" stroke="#10b981" stroke-dasharray="175.9" stroke-dashoffset="168" /></svg><div class="fr-value">3.8%</div></div><div class="fr-info"><div class="fr-label">最近 1 小时故障率</div><div class="fr-metric"><div class="fr-metric-item">请求 <span class="fr-metric-val">856</span></div><div class="fr-metric-item">失败 <span class="fr-metric-val">33</span></div><div class="fr-metric-item">阈值 <span class="fr-metric-val">25%</span></div></div></div></div>
+<button class="reset-btn reset-secondary">无需操作</button>
+</div>
+<!-- Amber -->
+<div class="breaker-card">
+<div class="bc-header"><div class="bc-name"><div class="bc-icon amber">&#9888;</div><div><div class="bc-title">支付回调</div><div class="bc-sub">微信支付 · 订单确认</div></div></div><div class="bc-state bs-amber">半开</div></div>
+<div class="fr-row"><div class="fr-ring"><svg viewBox="0 0 64 64"><circle class="bg-ring" cx="32" cy="32" r="28"/><circle class="fg-ring" cx="32" cy="32" r="28" stroke="#f59e0b" stroke-dasharray="175.9" stroke-dashoffset="116" /></svg><div class="fr-value">24.5%</div></div><div class="fr-info"><div class="fr-label">最近 30 分钟故障率</div><div class="fr-metric"><div class="fr-metric-item">请求 <span class="fr-metric-val">342</span></div><div class="fr-metric-item">失败 <span class="fr-metric-val">84</span></div><div class="fr-metric-item">阈值 <span class="fr-metric-val">20%</span></div></div></div></div>
+<button class="reset-btn reset-primary">尝试恢复</button>
+</div>
+<!-- Red -->
+<div class="breaker-card">
+<div class="bc-header"><div class="bc-name"><div class="bc-icon red">&#128308;</div><div><div class="bc-title">AI 模型调用</div><div class="bc-sub">大模型推理 · 智能回复</div></div></div><div class="bc-state bs-red">熔断</div></div>
+<div class="fr-row"><div class="fr-ring"><svg viewBox="0 0 64 64"><circle class="bg-ring" cx="32" cy="32" r="28"/><circle class="fg-ring" cx="32" cy="32" r="28" stroke="#ef4444" stroke-dasharray="175.9" stroke-dashoffset="26" /></svg><div class="fr-value">78.3%</div></div><div class="fr-info"><div class="fr-label">最近 15 分钟故障率（持续熔断）</div><div class="fr-metric"><div class="fr-metric-item">请求 <span class="fr-metric-val">128</span></div><div class="fr-metric-item">失败 <span class="fr-metric-val">100</span></div><div class="fr-metric-item">阈值 <span class="fr-metric-val">15%</span></div></div></div></div>
+<button class="reset-btn reset-danger">强制重置熔断</button>
+</div>
+<!-- Global Reset -->
+<div class="global-section">
+<div class="gs-title">&#128717; 全局操作</div>
+<div class="gs-alert"><div class="gs-alert-text">&#9888; 当前有 1 个熔断器处于打开状态，建议优先处理</div></div>
+<button class="gs-btn primary">一键重置所有熔断器</button>
+<button class="gs-btn outline" style="margin-top:8px">查看熔断历史日志</button>
+</div>
+<!-- Service Status -->
+<div class="service-list">
+<div class="service-item"><div class="si-dot green"></div><div class="si-info"><div class="si-name">闲鱼开放平台</div><div class="si-detail">API 延迟 120ms</div></div><div class="si-status ss-green">正常</div></div>
+<div class="service-item"><div class="si-dot green"></div><div class="si-info"><div class="si-name">消息推送网关</div><div class="si-detail">队列积压 12 条</div></div><div class="si-status ss-green">正常</div></div>
+<div class="service-item"><div class="si-dot amber"></div><div class="si-info"><div class="si-name">微信支付回调</div><div class="si-detail">超时率上升</div></div><div class="si-status ss-amber">降级</div></div>
+<div class="service-item"><div class="si-dot red"></div><div class="si-info"><div class="si-name">AI 大模型服务</div><div class="si-detail">接口超时 · 连续失败</div></div><div class="si-status ss-red">熔断</div></div>
+<div class="service-item"><div class="si-dot green"></div><div class="si-info"><div class="si-name">云存储 OSS</div><div class="si-detail">读写正常</div></div><div class="si-status ss-green">正常</div></div>
+</div>
+</div>
 </div>
 </body>
 </html>

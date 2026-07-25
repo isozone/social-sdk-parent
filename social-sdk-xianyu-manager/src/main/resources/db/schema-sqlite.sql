@@ -134,6 +134,8 @@ CREATE TABLE IF NOT EXISTS xianyu_order (
     amount REAL,
     status VARCHAR(32) DEFAULT 'PENDING',
     trade_status_enum VARCHAR(32), -- 闲鱼原始状态枚举 (tradeStatusEnum)
+    order_status VARCHAR(32) DEFAULT 'CREATED', -- BOT-O1 订单状态机：CREATED/PAID/SHIPPED/DELIVERED/COMPLETED/REFUNDING/REFUNDED/CLOSED
+    pre_refund_status VARCHAR(32), -- BOT-O1 退款前状态快照，退款取消/驳回后回滚用
     is_seller INTEGER DEFAULT 0, -- 是否为卖家订单
     tracking_no VARCHAR(64),
     order_time DATETIME, -- 订单创建时间(来自闲鱼 API)
@@ -1376,3 +1378,142 @@ CREATE TABLE IF NOT EXISTS scheduled_red_flower_log (
     deleted             INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_red_flower_started ON scheduled_red_flower_log(started_at, deleted);
+
+-- ======================== B4 定时擦亮 ========================
+CREATE TABLE IF NOT EXISTS scheduled_polish_log (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    trigger_source      VARCHAR(16),
+    account_id          INTEGER,
+    total_count         INTEGER DEFAULT 0,
+    success_count       INTEGER DEFAULT 0,
+    failed_count        INTEGER DEFAULT 0,
+    skipped_count       INTEGER DEFAULT 0,
+    status              VARCHAR(16),
+    started_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at            DATETIME,
+    failure_summary     VARCHAR(2000),
+    batch_job_id        INTEGER,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_polish_started ON scheduled_polish_log(started_at, deleted);
+CREATE INDEX IF NOT EXISTS idx_polish_account ON scheduled_polish_log(account_id, started_at);
+
+CREATE TABLE IF NOT EXISTS scheduled_close_notice_log (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    trigger_source      VARCHAR(16),
+    account_id          INTEGER,
+    total_count         INTEGER DEFAULT 0,
+    success_count       INTEGER DEFAULT 0,
+    failed_count        INTEGER DEFAULT 0,
+    skipped_count       INTEGER DEFAULT 0,
+    status              VARCHAR(16),
+    started_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at            DATETIME,
+    failure_summary     VARCHAR(2000),
+    batch_job_id        INTEGER,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_close_notice_started ON scheduled_close_notice_log(started_at, deleted);
+CREATE INDEX IF NOT EXISTS idx_close_notice_account ON scheduled_close_notice_log(account_id, started_at);
+
+-- BOT-O3 发货匹配规则（关键词→卡券，决定发哪张卡/发几次；≠ A7 拦截阻断）
+CREATE TABLE IF NOT EXISTS delivery_rules (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id          INTEGER,
+    item_id             VARCHAR(64),
+    keyword             VARCHAR(500) NOT NULL,
+    match_mode          VARCHAR(16) DEFAULT 'CONTAINS',
+    card_id             INTEGER NOT NULL,
+    delivery_count      INTEGER DEFAULT 1,
+    priority            INTEGER DEFAULT 100,
+    enabled             INTEGER DEFAULT 1,
+    last_hit_at         DATETIME,
+    hit_count           INTEGER DEFAULT 0,
+    remark              VARCHAR(500),
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_delivery_rules_account ON delivery_rules(account_id, enabled, deleted);
+CREATE INDEX IF NOT EXISTS idx_delivery_rules_item ON delivery_rules(item_id, enabled, deleted);
+
+-- BOT-O4 发货日志（每次尝试发货必有一条；可按订单反查）
+CREATE TABLE IF NOT EXISTS delivery_log (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id          INTEGER,
+    order_id            INTEGER,
+    product_id          INTEGER,
+    buyer_id            VARCHAR(64),
+    ship_card_id        INTEGER,
+    rule_decision       VARCHAR(32),
+    hit_rule_name       VARCHAR(128),
+    deliver_content     TEXT,
+    status              VARCHAR(16),
+    failure_reason      VARCHAR(2000),
+    batch_job_id        INTEGER,
+    shipped_at          DATETIME,
+    duration_ms         INTEGER,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_delivery_log_order ON delivery_log(order_id, deleted);
+CREATE INDEX IF NOT EXISTS idx_delivery_log_account ON delivery_log(account_id, shipped_at, deleted);
+
+-- BOT-O5 发货终态（多数量订单按 unit 跟踪 sent/finalized；支持部分成功）
+CREATE TABLE IF NOT EXISTS delivery_finalization (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    order_id            INTEGER NOT NULL,
+    unit_index          INTEGER NOT NULL,
+    total_units         INTEGER DEFAULT 1,
+    card_id             INTEGER,
+    reservation_id      VARCHAR(64),
+    status              VARCHAR(16) DEFAULT 'PENDING',
+    delivery_log_id     INTEGER,
+    finalized_at        DATETIME,
+    reason              VARCHAR(500),
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_delivery_finalization ON delivery_finalization(order_id, unit_index, deleted);
+CREATE INDEX IF NOT EXISTS idx_delivery_finalization_status ON delivery_finalization(status, deleted);
+
+-- BOT-O6 卡密预留（发货前预留→成功确认消耗→失败释放；唯一约束防双花）
+CREATE TABLE IF NOT EXISTS data_card_reservations (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    card_id             INTEGER NOT NULL,
+    data_card_id        INTEGER NOT NULL,
+    reserved_for        INTEGER NOT NULL,
+    buyer_id            VARCHAR(64),
+    status              VARCHAR(16) DEFAULT 'RESERVED',
+    reserved_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+    confirmed_at        DATETIME,
+    reason              VARCHAR(500),
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_data_card_reservation ON data_card_reservations(data_card_id, status, deleted);
+CREATE INDEX IF NOT EXISTS idx_data_card_reservation_order ON data_card_reservations(reserved_for, status, deleted);
+
+-- BOT-B1 评价模板（多条+激活+账号级开关；≠ A11 AutoRateConfig 单条配置）
+CREATE TABLE IF NOT EXISTS comment_templates (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id          INTEGER,
+    category            VARCHAR(16) DEFAULT 'POSITIVE',
+    content             VARCHAR(2000) NOT NULL,
+    name                VARCHAR(128),
+    enabled             INTEGER DEFAULT 1,
+    priority            INTEGER DEFAULT 100,
+    use_count           INTEGER DEFAULT 0,
+    remark              VARCHAR(500),
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_comment_templates_account ON comment_templates(account_id, category, enabled, deleted);

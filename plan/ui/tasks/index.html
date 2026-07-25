@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>监控任务 - AI 鱼多宝</title>
+<style>
+@import url('../_design-system.css');
+body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px}
+.nav-brand{position:absolute;top:58px;left:0;right:0;height:auto;padding:20px 16px 20px;border-radius:0 0 24px 24px;background:var(--gradient-brand);z-index:50;display:flex;align-items:center;gap:12px}
+.nav-back-text{color:#fff;font-size:22px;cursor:pointer}
+.nav-title-style{color:#fff;font-size:17px;font-weight:700;flex:1;text-align:center}
+.btn-create{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer}
+.filter-tabs{display:flex;gap:6px;padding:14px 16px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.filter-tabs::-webkit-scrollbar{display:none}
+.ftab{flex:0 0 auto;padding:7px 14px;border-radius:var(--radius-full);font-size:12px;font-weight:500;background:var(--bg-card);border:1px solid var(--border);color:var(--text-secondary)}
+.ftab.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:0 16px 4px}
+.stat-mini{background:var(--bg-card);border-radius:12px;padding:10px 6px;text-align:center;border:1px solid var(--border)}
+.stat-mini .stat-value{font-size:16px;font-weight:800;color:var(--text-primary)}
+.stat-mini .stat-unit{font-size:10px;color:var(--text-tertiary)}
+.task-cards{padding:0 16px 20px;display:flex;flex-direction:column;gap:12px}
+.tcard{background:var(--bg-card);border-radius:var(--radius-md);padding:16px;border:1px solid var(--border);box-shadow:var(--shadow-sm)}
+.tcard-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.tcard-name{font-size:15px;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:8px}
+.t-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.t-status-dot.active{background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.15);animation:pulse 2s infinite}
+.t-status-dot.paused{background:#9ca3af}
+.t-status-dot.failed{background:#ef4444}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(16,185,129,.15)}50%{box-shadow:0 0 0 6px rgba(16,185,129,.08)}}
+.t-schedule{font-size:11px;color:var(--text-tertiary);margin-bottom:6px;display:flex;align-items:center;gap:4px}
+.t-desc{font-size:12px;color:var(--text-secondary);line-height:1.5;margin-bottom:10px}
+.t-progress-wrap{margin-bottom:10px}
+.t-progress-label{display:flex;justify-content:space-between;font-size:11px;color:var(--text-tertiary);margin-bottom:4px}
+.t-progress-bar{height:6px;background:var(--bg-input);border-radius:3px;overflow:hidden}
+.t-progress-fill{height:100%;border-radius:3px;background:var(--gradient-brand);transition:width .5s ease}
+.t-progress-fill.success{background:linear-gradient(90deg,#10b981,#34d399)}
+.t-progress-fill.error{background:linear-gradient(90deg,#ef4444,#f87171)}
+.t-meta{display:flex;align-items:center;justify-content:space-between;padding-top:10px;border-top:1px solid var(--border-light)}
+.t-next{font-size:11px;color:var(--text-tertiary)}
+.t-next b{color:var(--text-primary);font-weight:600}
+.t-actions{display:flex;gap:6px}
+.tbtn{padding:5px 12px;border-radius:8px;font-size:11px;font-weight:600;border:none;cursor:pointer}
+.tbtn-start{background:rgba(16,185,129,.08);color:#10b981}
+.tbtn-stop{background:rgba(245,158,11,.08);color:#d97706}
+.tbtn-retry{background:rgba(239,68,68,.08);color:#ef4444}
+.tbtn-edit{background:var(--bg-page);color:var(--text-secondary)}
+.content-wrap{position:absolute;top:128px;left:0;right:0;bottom:0;overflow-y:auto}
+.content-wrap::-webkit-scrollbar{display:none}
+.fab-tasks{position:absolute;bottom:100px;right:24px;width:56px;height:56px;border-radius:50%;background:var(--gradient-brand);color:#fff;font-size:24px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(79,70,229,.35);z-index:50;cursor:pointer;transition:all .25s cubic-bezier(.16,1,.3,1)}
+.fab-tasks:active{transform:scale(.92)}
+.empty-state{text-align:center;padding:48px 24px;color:var(--text-tertiary)}
+.empty-icon{font-size:48px;margin-bottom:12px;opacity:.4}
+.empty-text{font-size:14px}
+</style>
+</head>
+<body>
+<div class="phone-frame safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
+
+  <div class="nav-brand">
+    <span class="nav-back-text">‹</span>
+    <span class="nav-title-style">监控任务</span>
+    <button class="btn-create">+ 新建</button>
+  </div>
+
+  <div class="content-wrap">
+    <div class="filter-tabs">
+      <div class="ftab active">全部 (6)</div>
+      <div class="ftab">运行中</div>
+      <div class="ftab">已暂停</div>
+      <div class="ftab">执行失败</div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-mini"><div class="stat-value">6</div><div class="stat-unit">总任务</div></div>
+      <div class="stat-mini"><div class="stat-value">4</div><div class="stat-unit">运行中</div></div>
+      <div class="stat-mini"><div class="stat-value">48</div><div class="stat-unit">今日完成</div></div>
+      <div class="stat-mini"><div class="stat-value">96%</div><div class="stat-unit">成功率</div></div>
+    </div>
+
+    <div class="task-cards">
+      <div class="tcard">
+        <div class="tcard-head">
+          <span class="tcard-name"><span class="t-status-dot active"></span>商品同步</span>
+          <div style="display:flex;gap:4px">
+            <span class="chip amber">每小时</span>
+          </div>
+        </div>
+        <div class="t-schedule">调度规则: 每 60 分钟 · 所有账号</div>
+        <div class="t-desc">自动拉取闲鱼商品数据，更新库存、价格、标题信息</div>
+        <div class="t-progress-wrap">
+          <div class="t-progress-label"><span>本轮进度</span><span>78%</span></div>
+          <div class="t-progress-bar"><div class="t-progress-fill" style="width:78%"></div></div>
+        </div>
+        <div class="t-meta">
+          <span class="t-next">下次执行: <b>17:35</b></span>
+          <div class="t-actions">
+            <button class="tbtn tbtn-stop">暂停</button>
+            <button class="tbtn tbtn-edit">编辑</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tcard">
+        <div class="tcard-head">
+          <span class="tcard-name"><span class="t-status-dot active"></span>消息同步</span>
+          <div style="display:flex;gap:4px">
+            <span class="chip cyan">5 分钟</span>
+          </div>
+        </div>
+        <div class="t-schedule">调度规则: 每 5 分钟 · 所有账号</div>
+        <div class="t-desc">拉取买家留言与系统通知，触发自动回复匹配</div>
+        <div class="t-progress-wrap">
+          <div class="t-progress-label"><span>本轮进度</span><span>100%</span></div>
+          <div class="t-progress-bar"><div class="t-progress-fill success" style="width:100%"></div></div>
+        </div>
+        <div class="t-meta">
+          <span class="t-next">下次执行: <b>17:32</b></span>
+          <div class="t-actions">
+            <button class="tbtn tbtn-stop">暂停</button>
+            <button class="tbtn tbtn-edit">编辑</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tcard">
+        <div class="tcard-head">
+          <span class="tcard-name"><span class="t-status-dot active"></span>批量擦亮</span>
+          <div style="display:flex;gap:4px">
+            <span class="chip green">每日</span>
+          </div>
+        </div>
+        <div class="t-schedule">调度规则: 每天 08:00 · 全量商品</div>
+        <div class="t-desc">定时刷新商品曝光权重，提升搜索排名</div>
+        <div class="t-progress-wrap">
+          <div class="t-progress-label"><span>昨日完成</span><span>120/132</span></div>
+          <div class="t-progress-bar"><div class="t-progress-fill success" style="width:91%"></div></div>
+        </div>
+        <div class="t-meta">
+          <span class="t-next">下次执行: <b>明日 08:00</b></span>
+          <div class="t-actions">
+            <button class="tbtn tbtn-stop">暂停</button>
+            <button class="tbtn tbtn-edit">编辑</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tcard">
+        <div class="tcard-head">
+          <span class="tcard-name"><span class="t-status-dot paused"></span>数据清理</span>
+          <div style="display:flex;gap:4px">
+            <span class="chip slate">每周</span>
+          </div>
+        </div>
+        <div class="t-schedule">调度规则: 每周日 02:00 · 30 天前数据</div>
+        <div class="t-desc">归档过期订单记录，释放存储空间</div>
+        <div class="t-progress-wrap">
+          <div class="t-progress-label"><span>上次结果</span><span>已暂停</span></div>
+          <div class="t-progress-bar"><div class="t-progress-fill" style="width:0%"></div></div>
+        </div>
+        <div class="t-meta">
+          <span class="t-next">下次执行: <b>周日 02:00</b></span>
+          <div class="t-actions">
+            <button class="tbtn tbtn-start">启动</button>
+            <button class="tbtn tbtn-edit">编辑</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tcard">
+        <div class="tcard-head">
+          <span class="tcard-name"><span class="t-status-dot failed"></span>AI 客服摘要</span>
+          <div style="display:flex;gap:4px">
+            <span class="chip red">异常</span>
+          </div>
+        </div>
+        <div class="t-schedule">调度规则: 每 30 分钟 · 所有客服会话</div>
+        <div class="t-desc">汇总 AI 客服对话，生成用户反馈摘要报告</div>
+        <div class="t-progress-wrap">
+          <div class="t-progress-label"><span>上次结果</span><span>超时失败</span></div>
+          <div class="t-progress-bar"><div class="t-progress-fill error" style="width:45%"></div></div>
+        </div>
+        <div class="t-meta">
+          <span class="t-next">下次重试: <b>17:05</b></span>
+          <div class="t-actions">
+            <button class="tbtn tbtn-retry">重试</button>
+            <button class="tbtn tbtn-edit">编辑</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="tcard">
+        <div class="tcard-head">
+          <span class="tcard-name"><span class="t-status-dot active"></span>评论监控</span>
+          <div style="display:flex;gap:4px">
+            <span class="chip violet">10 分钟</span>
+          </div>
+        </div>
+        <div class="t-schedule">调度规则: 每 10 分钟 · 所有商品评价</div>
+        <div class="t-desc">监听新评价，差评自动提醒并建议回复话术</div>
+        <div class="t-progress-wrap">
+          <div class="t-progress-label"><span>本轮进度</span><span>62%</span></div>
+          <div class="t-progress-bar"><div class="t-progress-fill" style="width:62%"></div></div>
+        </div>
+        <div class="t-meta">
+          <span class="t-next">下次执行: <b>17:42</b></span>
+          <div class="t-actions">
+            <button class="tbtn tbtn-stop">暂停</button>
+            <button class="tbtn tbtn-edit">编辑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fab-tasks">+</div>
+
+  <div class="tab-bar safe-bottom">
+    <div class="tab-item"><span class="tab-icon">📊</span><span class="tab-label">首页</span></div>
+    <div class="tab-item"><span class="tab-icon">💬</span><span class="tab-label">消息</span></div>
+    <div class="tab-item"><span class="tab-icon">🛒</span><span class="tab-label">商品</span></div>
+    <div class="tab-item active"><span class="tab-icon">👤</span><span class="tab-label">我的</span></div>
+  </div>
+</div>
+</body>
+</html>

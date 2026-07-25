@@ -2,9 +2,10 @@
   "pages": [
     { "path": "pages/login/index", "style": { "navigationStyle": "custom", "disableScroll": false } },
     { "path": "pages/index/index", "style": { "navigationStyle": "custom" } },
-    { "path": "pages/orders/list", "style": { "navigationStyle": "custom" } },
-    { "path": "pages/products/list", "style": { "navigationStyle": "custom" } },
     { "path": "pages/messages/list", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/products/list", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/orders/list", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/orders/detail", "style": { "navigationStyle": "custom" } },
     { "path": "pages/profile/index", "style": { "navigationStyle": "custom" } }
   ],
   "subPackages": [
@@ -93,26 +94,26 @@
       {
         "pagePath": "pages/index/index",
         "text": "首页",
-        "iconPath": "static/tab/home.png",
-        "selectedIconPath": "static/tab/home-active.png"
+        "iconPath": "static/tab/home.svg",
+        "selectedIconPath": "static/tab/home-active.svg"
       },
       {
         "pagePath": "pages/messages/list",
         "text": "消息",
-        "iconPath": "static/tab/message.png",
-        "selectedIconPath": "static/tab/message-active.png"
+        "iconPath": "static/tab/message.svg",
+        "selectedIconPath": "static/tab/message-active.svg"
       },
       {
         "pagePath": "pages/products/list",
         "text": "商品",
-        "iconPath": "static/tab/product.png",
-        "selectedIconPath": "static/tab/product-active.png"
+        "iconPath": "static/tab/product.svg",
+        "selectedIconPath": "static/tab/product-active.svg"
       },
       {
         "pagePath": "pages/profile/index",
         "text": "我的",
-        "iconPath": "static/tab/user.png",
-        "selectedIconPath": "static/tab/user-active.png"
+        "iconPath": "static/tab/user.svg",
+        "selectedIconPath": "static/tab/user-active.svg"
       }
     ]
   },

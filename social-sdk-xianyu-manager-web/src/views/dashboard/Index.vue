@@ -355,13 +355,22 @@ async function loadDashboard() {
       orderTrend.value = res.data.orderTrend || []
       messageActivity.value = res.data.messageActivity || []
       accountStatus.value = res.data.accountStatus || []
+    } else {
+      ElMessage.error(res.message || '加载仪表盘数据失败')
     }
-  } catch (e) { ElMessage.error('加载仪表盘数据失败') }
+  } catch (e) { /* 拦截器已提示 */ }
 }
 
 async function refreshCharts() {
-  try { await api.post('/monitor/cache/clear'); await loadDashboard(); ElMessage.success('数据已刷新') }
-  catch (e) {}
+  try {
+    const res = await api.post('/monitor/cache/clear')
+    if (res.success) {
+      await loadDashboard()
+      ElMessage.success('数据已刷新')
+    } else {
+      ElMessage.error(res.message || '刷新缓存失败')
+    }
+  } catch (e) { /* 拦截器已提示 */ }
 }
 
 onMounted(() => { loadDashboard() })

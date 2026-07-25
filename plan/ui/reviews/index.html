@@ -5,58 +5,50 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>评价与退款 - AI 鱼多宝</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
+@import url('../_design-system.css');
 body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
-:root{--brand:#4f46e5;--violet:#7c3aed;--cyan:#22d3ee;--bg-page:#f5f5f7;--text-primary:#111827;--text-secondary:#6b7280;--text-tertiary:#9ca3af;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--border:#e5e7eb}
-.phone{width:393px;height:852px;border-radius:54px;background:var(--bg-page);position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.18)}
-.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}
-.status-bar{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:14px;font-weight:600;color:var(--text-primary)}
-.page-content{position:absolute;top:58px;left:0;right:0;bottom:84px;overflow-y:auto}
-.page-content::-webkit-scrollbar{display:none}
-.header{background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:18px 16px 18px;border-radius:0 0 22px 22px;display:flex;align-items:center;justify-content:space-between}
-.h-title{color:#fff;font-size:17px;font-weight:700}
-.stat-pills{display:flex;gap:8px}
-.pill{padding:6px 12px;border-radius:20px;font-size:11px;font-weight:600;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.2)}
-.review-tabs{display:flex;gap:6px;padding:12px 16px}
-.r-tab{flex:1;padding:10px;border-radius:12px;background:#fff;border:1px solid var(--border);text-align:center;font-size:13px;font-weight:500;color:var(--text-secondary)}
-.r-tab.active{background:var(--brand);color:#fff;border-color:var(--brand)}
-.review-list{padding:0 16px 20px;display:flex;flex-direction:column;gap:12px}
-.review-card{background:#fff;border-radius:18px;padding:16px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.03)}
-.review-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.review-tabs{display:flex;gap:6px;padding:0 16px}
+.r-tab{flex:1;padding:10px;border-radius:12px;background:var(--bg-card);border:1px solid var(--border);text-align:center;font-size:13px;font-weight:500;color:var(--text-secondary);cursor:pointer;transition:all .2s}
+.r-tab:active{transform:scale(.95)}
+.r-tab.active{background:var(--brand);color:#fff;border-color:var(--brand);font-weight:600}
+.review-list{padding:14px 16px 20px;display:flex;flex-direction:column;gap:12px}
+.review-card{background:var(--bg-card);border-radius:var(--radius-md);border:1px solid var(--border);box-shadow:var(--shadow-sm);padding:16px;transition:transform .2s cubic-bezier(.16,1,.3,1)}
+.review-card:active{transform:scale(.98)}
+.review-card.warning{border-color:rgba(245,158,11,.3)}
+.review-info-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .review-user{display:flex;align-items:center;gap:10px}
-.review-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff}
-.rav-1{background:linear-gradient(135deg,#4f46e5,#7c3aed)}.rav-2{background:linear-gradient(135deg,#f59e0b,#ef4444)}.rav-3{background:linear-gradient(135deg,#10b981,#22c55e)}
-.review-name{font-size:14px;font-weight:600;color:var(--text-primary)}.review-date{font-size:11px;color:var(--text-tertiary)}
-.review-stars{color:#f59e0b;font-size:12px;letter-spacing:1px}
+.review-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;flex-shrink:0}
+.ra-violet{background:var(--gradient-brand)}.ra-warm{background:var(--gradient-warm)}.ra-green{background:var(--gradient-success)}
+.review-name{font-size:14px;font-weight:600;color:var(--text-primary)}.review-date{font-size:11px;color:var(--text-tertiary);margin-top:1px}
+.review-stars{color:var(--warning);font-size:12px;letter-spacing:1px}
 .review-product{font-size:13px;color:var(--text-primary);margin-bottom:6px;font-weight:500}
 .review-content{font-size:13px;color:var(--text-secondary);line-height:1.6}
 .review-actions{display:flex;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border-light)}
-.r-action{flex:1;height:36px;border-radius:10px;font-size:12px;font-weight:600;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px}
-.r-positive{background:rgba(16,185,129,.08);color:var(--success)}
-.r-negative{background:rgba(239,68,68,.08);color:var(--danger)}
-.r-refund{background:rgba(245,158,11,.08);color:var(--warning)}
-.refund-tag{display:inline-block;padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700}
-.rt-pending{background:rgba(245,158,11,.1);color:var(--warning)}
-.rt-approved{background:rgba(16,185,129,.1);color:var(--success)}
-.empty-state{text-align:center;padding:60px 40px;color:var(--text-tertiary)}
-.empty-icon{font-size:48px;margin-bottom:16px;opacity:.5}
-.tab-bar{position:absolute;bottom:0;left:0;right:0;height:84px;background:rgba(255,255,255,.94);backdrop-filter:blur(20px);border-top:1px solid var(--border-light);display:flex;z-index:80;padding-bottom:8px}
-.tab-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}.tab-item:active{transform:scale(.92)}.tab-icon{font-size:20px}.tab-label{font-size:10px;color:var(--text-tertiary);font-weight:400}
-.tab-item.active .tab-icon{color:var(--brand)}.tab-item.active .tab-label{color:var(--brand);font-weight:600}
-.safe-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}
+.r-action{flex:1;height:36px;border-radius:10px;font-size:12px;font-weight:600;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;transition:transform .15s}
+.r-action:active{transform:scale(.95)}
+.r-positive{background:rgba(16,185,129,.1);color:var(--success)}.r-negative{background:rgba(239,68,68,.1);color:var(--danger)}.r-refund{background:rgba(245,158,11,.1);color:var(--warning)}.r-view{background:var(--bg-page);color:var(--text-secondary)}
+.refund-tag{padding:3px 10px;border-radius:8px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px}
+.rt-pending{background:rgba(245,158,11,.1);color:var(--warning)}.rt-approved{background:rgba(16,185,129,.1);color:var(--success)}.rt-rejected{background:rgba(239,68,68,.1);color:var(--danger)}
 </style>
 </head>
 <body>
-<div class="phone safe-bottom">
+<div class="phone-frame safe-bottom">
   <div class="island"></div>
   <div class="status-bar"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
   <div class="page-content">
-    <div class="header">
-      <span class="h-title">评价与退款</span>
-      <div class="stat-pills">
-        <span class="pill">好评 128</span>
-        <span class="pill" style="background:rgba(239,68,68,.2)">退款 2</span>
-      </div>
+    <div class="nav-bar" style="position:static;border-radius:0;background:var(--bg-card);border-bottom:1px solid var(--border-light);z-index:50">
+      <button class="nav-back"><svg width="10" height="18" viewBox="0 0 10 18" fill="none"><path d="M8 1L2 9L8 17" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg> 返回</button>
+      <span class="nav-title">评价与退款</span>
+      <div class="nav-actions"><button class="nav-icon-btn">📊</button></div>
+    </div>
+    <div class="section-header" style="padding-left:0;padding-right:0">
+      <div><div class="section-title" style="font-size:16px">数据概览</div></div>
+      <span class="chip chip-slate">本月</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 16px;margin-top:-6px">
+      <div class="stat-card"><div class="stat-value">128</div><div class="stat-label">好评数</div></div>
+      <div class="stat-card"><div class="stat-value">4.8</div><div class="stat-label">平均评分</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:var(--danger)">2</div><div class="stat-label">退款申请</div></div>
     </div>
     <div class="review-tabs">
       <div class="r-tab active">全部评价</div>
@@ -65,40 +57,49 @@ body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:fle
     </div>
     <div class="review-list">
       <div class="review-card">
-        <div class="review-header">
+        <div class="review-info-header">
           <div class="review-user">
-            <div class="review-avatar rav-1">张</div>
+            <div class="review-avatar ra-violet">张</div>
             <div><div class="review-name">张三</div><div class="review-date">2026-07-25 10:30</div></div>
           </div>
           <div class="review-stars">★★★★★</div>
         </div>
         <div class="review-product">Nike Air Force 1 · 42码</div>
         <div class="review-content">东西收到了，包装完好，正品验过没问题。卖家态度也很好，下次还来！</div>
-        <div class="review-actions"><button class="r-action r-positive">✓ 好评</button><button class="r-action r-negative">✗ 差评</button></div>
+        <div class="review-actions">
+          <button class="r-action r-positive">✓ 好评</button>
+          <button class="r-action r-negative">✗ 差评</button>
+        </div>
       </div>
       <div class="review-card">
-        <div class="review-header">
+        <div class="review-info-header">
           <div class="review-user">
-            <div class="review-avatar rav-2">王</div>
+            <div class="review-avatar ra-warm">王</div>
             <div><div class="review-name">王五</div><div class="review-date">2026-07-24 16:15</div></div>
           </div>
           <div class="review-stars">★★★★☆</div>
         </div>
         <div class="review-product">Apple Watch · 45mm GPS</div>
-        <div class="review-content"> overall满意，就是发货稍微慢了一点。产品本身没问题。</div>
-        <div class="review-actions"><button class="r-action r-positive">✓ 好评</button><button class="r-action r-negative">✗ 差评</button></div>
+        <div class="review-content">整体满意，就是发货稍微慢了一点。产品本身没问题。</div>
+        <div class="review-actions">
+          <button class="r-action r-positive">✓ 好评</button>
+          <button class="r-action r-negative">✗ 差评</button>
+        </div>
       </div>
-      <div class="review-card" style="border-color:rgba(239,68,68,.2)">
-        <div class="review-header">
+      <div class="review-card warning">
+        <div class="review-info-header">
           <div class="review-user">
-            <div class="review-avatar rav-3">钱</div>
+            <div class="review-avatar ra-green">钱</div>
             <div><div class="review-name">钱七</div><div class="review-date">2026-07-23 09:00</div></div>
           </div>
-          <div style="display:flex;flex-direction:column;align-items:end;gap:4px"><span class="refund-tag rt-pending">退款处理中</span></div>
+          <div><span class="refund-tag rt-pending">⏳ 退款处理中</span></div>
         </div>
         <div class="review-product">LV Neverfull MM 老花托特包</div>
         <div class="review-content">颜色和图片有差异，想申请退款。物流单号已填。</div>
-        <div class="review-actions"><button class="r-action r-refund">🔄 退款处理</button><button class="r-action r-positive">查看详情</button></div>
+        <div class="review-actions">
+          <button class="r-action r-refund">🔄 退款处理</button>
+          <button class="r-action r-view">查看详情</button>
+        </div>
       </div>
     </div>
   </div>

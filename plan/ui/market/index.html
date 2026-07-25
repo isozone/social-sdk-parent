@@ -2,55 +2,118 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>市场情报 - AI 鱼多宝</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}:root{--brand:#4f46e5;--violet:#7c3aed;--cyan:#22d3ee;--bg-page:#f5f5f7;--text-primary:#111827;--text-secondary:#6b7280;--text-tertiary:#9ca3af;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--info:#3b82f6;--border:#e5e7eb;--radius-md:16px;--gradient-brand:linear-gradient(135deg,#4f46e5,#7c3aed)}.phone{width:393px;height:852px;border-radius:54px;background:var(--bg-page);position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.18)}.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}.status-bar{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:14px;font-weight:600;color:var(--text-primary)}.page-content{position:absolute;top:58px;left:0;right:0;bottom:84px;overflow-y:auto;-webkit-overflow-scrolling:touch}.page-content::-webkit-scrollbar{display:none}.nav{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}.h-title{font-size:17px;font-weight:700;color:var(--text-primary);flex:1;text-align:center}.card{background:#fff;border-radius:var(--radius-md);padding:16px;border:1px solid var(--border);margin:0 16px 12px;box-shadow:0 1px 4px rgba(0,0,0,.03)}.section-head{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 10px}.section-title{font-size:16px;font-weight:700;color:var(--text-primary)}.section-link{font-size:12px;color:var(--brand);font-weight:600;text-decoration:none}.keyword-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border-light)}.keyword-row:last-child{border-bottom:none}.keyword-name{flex:1;font-size:14px;font-weight:600;color:var(--text-primary)}.keyword-trend{font-size:12px;font-weight:700}.trend-up{color:var(--danger)}.trend-down{color:var(--success)}.badge{padding:3px 8px;border-radius:6px;font-size:10px;font-weight:600}.badge-hot{background:rgba(239,68,68,.1);color:var(--danger)}.badge-warm{background:rgba(245,158,11,.1);color:var(--warning)}.chart-area{height:100px;display:flex;align-items:end;gap:4px;padding:12px 8px 0}.chart-bar{flex:1;background:var(--gradient-brand);border-radius:4px 4px 0 0;min-height:8px;transition:height .3s}.filter-bar{display:flex;gap:8px;padding:0 16px 12px;overflow-x:auto}.filter-chip{white-space:nowrap;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:500;background:#fff;border:1px solid var(--border);color:var(--text-secondary)}.filter-chip.active{background:var(--brand);color:#fff;border-color:var(--brand)}.stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:0 16px 12px}.stat-box{background:#fff;border-radius:14px;padding:14px;border:1px solid var(--border)}.stat-value{font-size:20px;font-weight:800;color:var(--text-primary)}.stat-label{font-size:10px;color:var(--text-tertiary);margin-top:2px}.add-btn{position:absolute;bottom:100px;right:24px;width:56px;height:56px;border-radius:50%;background:var(--gradient-brand);color:#fff;font-size:28px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(79,70,229,.35);z-index:50}
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--brand:#4f46e5;--violet:#7c3aed;--accent:#22d3ee;--bg:#f5f5f7;--t1:#111827;--t2:#6b7280;--t3:#9ca3af;--border:#e5e7eb;--success:#10b981;--warning:#f59e0b;--danger:#ef4444}
+body{font-family:-apple-system,'PingFang SC','SF Pro Display',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+.phone{width:393px;height:852px;border-radius:48px;background:var(--bg);position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.2)}
+.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}
+.st{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:14px;font-weight:600;color:var(--t1)}
+.ct{position:absolute;top:58px;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}.ct::-webkit-scrollbar{display:none}
+.hd{background:#fff;padding:10px 16px 8px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20}
+.bk{font-size:22px;color:var(--t2);cursor:pointer;padding:4px}
+.pt{flex:1;text-align:center;font-size:16px;font-weight:600;color:var(--t1);margin-right:28px}
+/* Hero */
+.m-hero{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);padding:22px 20px 28px;position:relative;overflow:hidden}
+.m-hero::before{content:'';position:absolute;top:-30%;right:-15%;width:200px;height:200px;background:radial-gradient(circle,rgba(34,211,238,.22),transparent 70%);border-radius:50%}
+.m-hero-inner{position:relative;z-index:1}
+.m-search{background:rgba(255,255,255,.15);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.2);border-radius:14px;padding:12px 16px;display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.m-search-icon{font-size:18px;color:rgba(255,255,255,.7)}
+.m-search-input{flex:1;background:none;border:none;outline:none;color:#fff;font-size:15px;font-family:inherit}
+.m-search-input::placeholder{color:rgba(255,255,255,.55)}
+.m-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.m-stat{background:rgba(255,255,255,.12);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:12px 10px;text-align:center}
+.m-stat-val{font-size:20px;font-weight:800;color:#fff;line-height:1.2}
+.m-stat-label{font-size:11px;color:rgba(255,255,255,.65);margin-top:3px}
+/* Cards */
+.card{background:#fff;border-radius:18px;margin:14px 16px;padding:16px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.03)}
+.ch2{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.ct3{font-size:15px;font-weight:700;color:var(--t1)}.cs2{font-size:12px;color:var(--t3);margin-top:2px}
+.cl{font-size:12px;color:var(--brand);text-decoration:none;font-weight:600}
+/* Trend keywords */
+.kw-list{display:flex;flex-direction:column;gap:10px}
+.kw-item{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fafafa;border-radius:12px}
+.kw-rank{width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0}
+.kw-rank-1{background:linear-gradient(135deg,#f59e0b,#ef4444)}.kw-rank-2{background:linear-gradient(135deg,#6366f1,#8b5cf6)}.kw-rank-3{background:linear-gradient(135deg,#3b82f6,#06b6d4)}
+.kw-default{background:rgba(156,163,175,.15);color:var(--t2)}
+.kw-name{flex:1;font-size:14px;font-weight:600;color:var(--t1)}.kw-tag{font-size:11px;color:var(--t3)}
+.kw-spark{display:flex;align-items:end;gap:1px;height:24px}
+.kw-bar{width:3px;border-radius:2px 2px 0 0;background:var(--brand)}
+.kw-trend{font-size:12px;font-weight:700;white-space:nowrap}
+.tw-up{color:var(--success)}.tw-down{color:var(--danger)}
+/* Price distribution */
+.dist-item{display:flex;align-items:center;gap:10px;padding:6px 0}
+.dist-label{font-size:12px;color:var(--t2);width:72px;text-align:right;white-space:nowrap}
+.dist-track{flex:1;height:24px;background:#f3f4f6;border-radius:8px;overflow:hidden;position:relative}
+.dist-fill{height:100%;border-radius:8px;display:flex;align-items:center;padding-left:8px;font-size:10px;font-weight:700;color:#fff;transition:width .6s cubic-bezier(.16,1,.3,1)}
+.dist-count{font-size:11px;color:var(--t3);width:48px;text-align:left}
+/* Data cards */
+.data-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.data-card{background:linear-gradient(135deg,#f8f9ff,#f0f0ff);border-radius:14px;padding:14px;border:1px solid rgba(79,70,229,.08)}
+.data-card-icon{font-size:22px;margin-bottom:8px}
+.data-card-val{font-size:20px;font-weight:800;color:var(--t1)}.data-card-lab{font-size:11px;color:var(--t3);margin-top:2px}
+.data-card-sub{font-size:11px;color:var(--success);font-weight:600;margin-top:4px}
+/* Crawl button */
+.crawl-area{padding:0 16px 20px}
+.crawl-btn{width:100%;height:52px;background:linear-gradient(135deg,var(--brand),var(--violet));border:none;border-radius:14px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 24px rgba(79,70,229,.3);display:flex;align-items:center;justify-content:center;gap:8px;letter-spacing:1px;transition:all .3s cubic-bezier(.16,1,.3,1)}
+.crawl-btn:active{transform:scale(.97);box-shadow:0 4px 16px rgba(79,70,229,.2)}
+.crawl-btn::after{content:'🕷️'}
+.safe-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}
 </style>
 </head>
 <body>
-<div class="phone">
-  <div class="island"></div>
-  <div class="status-bar"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
-  <div class="page-content">
-    <div class="nav"><span class="h-title">市场情报</span><span style="font-size:20px;cursor:pointer">⚙️</span></div>
-    <!-- Overview Stats -->
-    <div class="stat-grid">
-      <div class="stat-box"><div class="stat-value">15</div><div class="stat-label">追踪关键词</div></div>
-      <div class="stat-box"><div class="stat-value">3</div><div class="stat-label">今日抓取</div></div>
-      <div class="stat-box"><div class="stat-value">¥299</div><div class="stat-label">均价区间</div></div>
-      <div class="stat-box"><div class="stat-value">↑ 12%</div><div class="stat-label">热度变化</div></div>
-    </div>
-    <!-- Keyword List -->
-    <div class="section-head"><div class="section-title">关键词监控</div><a href="#" class="section-link">+ 添加</a></div>
-    <div class="filter-bar">
-      <div class="filter-chip active">全部</div>
-      <div class="filter-chip">热门</div>
-      <div class="filter-chip">关注</div>
-      <div class="filter-chip">已暂停</div>
-    </div>
-    <div style="padding:0 16px 20px;display:flex;flex-direction:column;gap:10px">
-      <div class="card" style="margin:0">
-        <div class="keyword-row" style="border:none;margin-bottom:12px"><div class="keyword-name">Air Jordan 1</div><span class="badge badge-hot">🔥 热门</span><span class="keyword-trend trend-up">+18%</span></div>
-        <div class="chart-area"><div class="chart-bar" style="height:45%"></div><div class="chart-bar" style="height:60%"></div><div class="chart-bar" style="height:52%"></div><div class="chart-bar" style="height:78%"></div><div class="chart-bar" style="height:65%"></div><div class="chart-bar" style="height:90%"></div><div class="chart-bar" style="height:85%"></div><div class="chart-bar" style="height:72%"></div><div class="chart-bar" style="height:88%"></div><div class="chart-bar" style="height:95%"></div></div>
-        <div style="display:flex;justify-content:space-between;margin-top:8px"><span style="font-size:10px;color:var(--text-tertiary)">最近 10 天浏览量</span><span style="font-size:10px;color:var(--text-tertiary)">12,480</span></div>
-      </div>
-      <div class="card" style="margin:0">
-        <div class="keyword-row" style="border:none;margin-bottom:12px"><div class="keyword-name">Nike Dunk Low</div><span class="badge badge-warm">📈 升温</span><span class="keyword-trend trend-up">+7%</span></div>
-        <div class="chart-area"><div class="chart-bar" style="height:55%"></div><div class="chart-bar" style="height:50%"></div><div class="chart-bar" style="height:62%"></div><div class="chart-bar" style="height:58%"></div><div class="chart-bar" style="height:70%"></div><div class="chart-bar" style="height:64%"></div><div class="chart-bar" style="height:68%"></div><div class="chart-bar" style="height:72%"></div><div class="chart-bar" style="height:66%"></div><div class="chart-bar" style="height:70%"></div></div>
-        <div style="display:flex;justify-content:space-between;margin-top:8px"><span style="font-size:10px;color:var(--text-tertiary)">最近 10 天浏览量</span><span style="font-size:10px;color:var(--text-tertiary)">8,920</span></div>
-      </div>
-      <div class="card" style="margin:0">
-        <div class="keyword-row" style="border:none;margin-bottom:12px"><div class="keyword-name">New Balance 530</div><span class="badge badge-hot">🔥 热门</span><span class="keyword-trend trend-down">↓ 3%</span></div>
-        <div class="chart-area"><div class="chart-bar" style="height:80%"></div><div class="chart-bar" style="height:75%"></div><div class="chart-bar" style="height:72%"></div><div class="chart-bar" style="height:68%"></div><div class="chart-bar" style="height:70%"></div><div class="chart-bar" style="height:65%"></div><div class="chart-bar" style="height:62%"></div><div class="chart-bar" style="height:58%"></div><div class="chart-bar" style="height:60%"></div><div class="chart-bar" style="height:58%"></div></div>
-        <div style="display:flex;justify-content:space-between;margin-top:8px"><span style="font-size:10px;color:var(--text-tertiary)">最近 10 天浏览量</span><span style="font-size:10px;color:var(--text-tertiary)">6,340</span></div>
-      </div>
-    </div>
-  </div>
-  <div style="position:absolute;bottom:96px;right:20px;display:flex;flex-direction:column;gap:10px;z-index:50">
-    <button style="width:44px;height:44px;border-radius:50%;background:#fff;border:1px solid var(--border);box-shadow:0 4px 12px rgba(0,0,0,.1);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">🔍</button>
-    <button style="width:44px;height:44px;border-radius:50%;background:#fff;border:1px solid var(--border);box-shadow:0 4px 12px rgba(0,0,0,.1);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center">📊</button>
-  </div>
+<div class="phone safe-bottom">
+<div class="island"></div>
+<div class="st"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
+<div class="ct">
+<!-- Header -->
+<div class="hd"><div class="bk">&#8592;</div><div class="pt">市场情报</div></div>
+<!-- Hero Search -->
+<div class="m-hero">
+<div class="m-hero-inner">
+<div class="m-search"><span class="m-search-icon">&#128269;</span><input class="m-search-input" placeholder="输入关键词追踪市场需求" readonly></div>
+<div class="m-stats">
+<div class="m-stat"><div class="m-stat-val">2,847</div><div class="m-stat-label">追踪热词</div></div>
+<div class="m-stat"><div class="m-stat-val">156</div><div class="m-stat-label">新增趋势</div></div>
+<div class="m-stat"><div class="m-stat-val">89</div><div class="m-stat-label">价格异动</div></div>
+</div>
+</div>
+</div>
+<!-- Trend Keywords -->
+<div class="card">
+<div class="ch2"><div><div class="ct3">趋势关键词</div><div class="cs2">过去 7 天热度上升 TOP 5</div></div><a href="#" class="cl">全部 ></a></div>
+<div class="kw-list">
+<div class="kw-item"><div class="kw-rank kw-rank-1">1</div><div><div class="kw-name">iPad 平替笔</div><div class="kw-tag">数码配件</div></div><div class="kw-spark"><div class="kw-bar" style="height:40%"></div><div class="kw-bar" style="height:55%"></div><div class="kw-bar" style="height:35%"></div><div class="kw-bar" style="height:70%"></div><div class="kw-bar" style="height:60%"></div><div class="kw-bar" style="height:85%"></div><div class="kw-bar" style="height:100%"></div></div><div class="kw-trend tw-up">+128%</div></div>
+<div class="kw-item"><div class="kw-rank kw-rank-2">2</div><div><div class="kw-name">二手 AirPods 降噪</div><div class="kw-tag">音频设备</div></div><div class="kw-spark"><div class="kw-bar" style="height:50%"></div><div class="kw-bar" style="height:45%"></div><div class="kw-bar" style="height:60%"></div><div class="kw-bar" style="height:55%"></div><div class="kw-bar" style="height:80%"></div><div class="kw-bar" style="height:75%"></div><div class="kw-bar" style="height:90%"></div></div><div class="kw-trend tw-up">+87%</div></div>
+<div class="kw-item"><div class="kw-rank kw-rank-3">3</div><div><div class="kw-name">Switch 二手卡带</div><div class="kw-tag">游戏周边</div></div><div class="kw-spark"><div class="kw-bar" style="height:70%"></div><div class="kw-bar" style="height:65%"></div><div class="kw-bar" style="height:50%"></div><div class="kw-bar" style="height:60%"></div><div class="kw-bar" style="height:45%"></div><div class="kw-bar" style="height:70%"></div><div class="kw-bar" style="height:80%"></div></div><div class="kw-trend tw-up">+52%</div></div>
+<div class="kw-item"><div class="kw-rank kw-default">4</div><div><div class="kw-name">露营装备套装</div><div class="kw-tag">户外休闲</div></div><div class="kw-spark"><div class="kw-bar" style="height:60%"></div><div class="kw-bar" style="height:75%"></div><div class="kw-bar" style="height:80%"></div><div class="kw-bar" style="height:65%"></div><div class="kw-bar" style="height:50%"></div><div class="kw-bar" style="height:40%"></div><div class="kw-bar" style="height:35%"></div></div><div class="kw-trend tw-down">-18%</div></div>
+<div class="kw-item"><div class="kw-rank kw-default">5</div><div><div class="kw-name">机械键盘青轴</div><div class="kw-tag">电脑外设</div></div><div class="kw-spark"><div class="kw-bar" style="height:45%"></div><div class="kw-bar" style="height:50%"></div><div class="kw-bar" style="height:55%"></div><div class="kw-bar" style="height:52%"></div><div class="kw-bar" style="height:58%"></div><div class="kw-bar" style="height:60%"></div><div class="kw-bar" style="height:62%"></div></div><div class="kw-trend tw-up">+12%</div></div>
+</div>
+</div>
+<!-- Price Distribution -->
+<div class="card">
+<div class="ch2"><div><div class="ct3">价格分布</div><div class="cs2">当前类目商品均价带</div></div><a href="#" class="cl">详情 ></a></div>
+<div class="dist-item"><div class="dist-label">0-50 元</div><div class="dist-track"><div class="dist-fill" style="width:45%;background:linear-gradient(90deg,#a5b4fc,#818cf8)">218 件</div></div></div>
+<div class="dist-item"><div class="dist-label">50-150 元</div><div class="dist-track"><div class="dist-fill" style="width:72%;background:linear-gradient(90deg,#818cf8,#6366f1)">586 件</div></div></div>
+<div class="dist-item"><div class="dist-label">150-300 元</div><div class="dist-track"><div class="dist-fill" style="width:58%;background:linear-gradient(90deg,#6366f1,#7c3aed)">423 件</div></div></div>
+<div class="dist-item"><div class="dist-label">300-800 元</div><div class="dist-track"><div class="dist-fill" style="width:35%;background:linear-gradient(90deg,#7c3aed,#9333ea)">197 件</div></div></div>
+<div class="dist-item"><div class="dist-label">800+ 元</div><div class="dist-track"><div class="dist-fill" style="width:18%;background:linear-gradient(90deg,#9333ea,#a855f7)">89 件</div></div></div>
+</div>
+<!-- Latest Market Data -->
+<div class="card">
+<div class="ch2"><div><div class="ct3">最新市场数据</div><div class="cs2">实时采集更新</div></div><span style="font-size:11px;color:var(--success);font-weight:600">· 刚刚更新</span></div>
+<div class="data-grid">
+<div class="data-card"><div class="data-card-icon">🔥</div><div class="data-card-val">3,421</div><div class="data-card-lab">日均搜索量</div><div class="data-card-sub">↑ 15.3%</div></div>
+<div class="data-card"><div class="data-card-icon">💰</div><div class="data-card-val">¥128</div><div class="data-card-lab">热门成交价</div><div class="data-card-sub">↑ 8.7%</div></div>
+<div class="data-card"><div class="data-card-icon">📦</div><div class="data-card-val">2,301</div><div class="data-card-lab">在售商品</div><div class="data-card-sub">↓ 3.2%</div></div>
+<div class="data-card"><div class="data-card-icon">⚡</div><div class="data-card-val">6.8%</div><div class="data-card-lab">转化率</div><div class="data-card-sub">↑ 1.2pp</div></div>
+</div>
+</div>
+<!-- Crawl Action -->
+<div class="crawl-area"><button class="crawl-btn">立即采集市场数据</button></div>
+</div>
 </div>
 </body>
 </html>

@@ -106,8 +106,10 @@ async function loadAccounts() {
         selectedAccountId.value = accounts.value[0].id
         await loadWallet()
       }
+    } else {
+      ElMessage.error(res.message || '加载账号列表失败')
     }
-  } catch (e) {}
+  } catch (e) { /* 拦截器已提示 */ }
 }
 
 async function loadWallet() {

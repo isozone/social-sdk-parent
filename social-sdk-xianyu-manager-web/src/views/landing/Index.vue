@@ -29,9 +29,7 @@
       <div class="feature-grid">
         <div class="feature-card" v-for="f in features" :key="f.title">
           <div class="feature-icon-wrap" :class="'icon-' + f.key">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <component :is="getFeatureIcon(f.key)" />
-            </svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" v-html="getFeatureIcon(f.key)"></svg>
           </div>
           <h3>{{ f.title }}</h3>
           <p>{{ f.desc }}</p>
@@ -45,9 +43,7 @@
       <div class="scene-grid">
         <div class="scene-card" v-for="s in scenes" :key="s.title">
           <div class="scene-icon" :class="'icon-' + s.key">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <component :is="getSceneIcon(s.key)" />
-            </svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" v-html="getSceneIcon(s.key)"></svg>
           </div>
           <h3>{{ s.title }}</h3>
           <p>{{ s.desc }}</p>
