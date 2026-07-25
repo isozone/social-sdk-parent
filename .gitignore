@@ -101,4 +101,4 @@ data/
 *.swp
 chrome-profiles
 
-social-sdk-xianyu-manager/src/main/resources/application-local.yml
+social-sdk-xianyu-manager/src/main/resources/application-local.ymlsocial-sdk-xianyu-manager/src/main/resources/application-mysql.yml
