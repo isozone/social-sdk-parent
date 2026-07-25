@@ -1,0 +1,100 @@
+{
+  "name": "AI鱼多宝",
+  "appid": "__UNI__XIANYU_MINI",
+  "description": "闲鱼移动经营助手",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "app-plus": {
+    "usingComponents": true,
+    "splashscreen": {
+      "alwaysShowBeforeRender": true,
+      "waiting": true,
+      "autoclose": true,
+      "delay": 0
+    }
+  },
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": true,
+      "es6": true,
+      "postcss": true,
+      "minified": true,
+      "newFeature": true
+    },
+    "usingComponents": true,
+    "optimization": {
+      "subPackages": true
+    },
+    "permission": {
+      "scope.userLocation": {
+        "desc": "用于获取位置信息以优化商品推荐"
+      }
+    },
+    "requiredPrivateInfos": [],
+    "lazyCodeLoading": "requiredComponents"
+  },
+  "mp-alipay": {
+    "appid": "",
+    "usingComponents": true,
+    "optimization": {
+      "subPackages": true
+    }
+  },
+  "mp-toutiao": {
+    "appid": "",
+    "usingComponents": true,
+    "optimization": {
+      "subPackages": true
+    }
+  },
+  "mp-baidu": {
+    "appid": "",
+    "usingComponents": true,
+    "optimization": {
+      "subPackages": true
+    }
+  },
+  "mp-qq": {
+    "appid": "",
+    "usingComponents": true,
+    "optimization": {
+      "subPackages": true
+    }
+  },
+  "mp-kuaishou": {
+    "appid": "",
+    "usingComponents": true,
+    "optimization": {
+      "subPackages": true
+    }
+  },
+  "mp-lark": {
+    "appid": "",
+    "usingComponents": true,
+    "optimization": {
+      "subPackages": true
+    }
+  },
+  "mp-dingtalk": {
+    "appid": "",
+    "usingComponents": true,
+    "optimization": {
+      "subPackages": true
+    }
+  },
+  "mp-meituan": {
+    "appid": "",
+    "usingComponents": true,
+    "optimization": {
+      "subPackages": true
+    }
+  },
+  "quickapp": {},
+  "web": {
+    "router": {
+      "mode": "hash"
+    }
+  }
+}

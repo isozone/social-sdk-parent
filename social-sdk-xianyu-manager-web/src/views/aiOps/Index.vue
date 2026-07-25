@@ -1,12 +1,18 @@
 <template>
   <div class="page-root noflex">
     <!-- 批量上品卡片 -->
-    <el-card style="margin-bottom: 20px;">
-      <template #header>
-        <span>🤖 AI 批量上品</span>
-      </template>
+    <el-card shadow="never" style="margin-bottom: 20px;">
+      <div class="card-head">
+        <div class="card-head-left">
+          <div class="card-chip chip-violet"><el-icon><MagicStick /></el-icon></div>
+          <div class="card-head-text">
+            <div class="card-title">AI 批量上品</div>
+            <div class="card-sub">基于商品种子，调用 AI 生成标题、关键词与描述，批量上架闲鱼</div>
+          </div>
+        </div>
+      </div>
 
-      <el-form :model="batchForm" label-width="100px">
+      <el-form :model="batchForm" label-width="100px" class="aiops-form">
         <el-form-item label="闲鱼账号">
           <el-select v-model="batchForm.accountId" placeholder="选择闲鱼账号" style="width: 250px;">
             <el-option v-for="acc in accounts" :key="acc.id" :label="acc.accountName" :value="acc.id" />
@@ -44,12 +50,18 @@
     </el-card>
 
     <!-- 多账号同步卡片 -->
-    <el-card style="margin-bottom: 20px;">
-      <template #header>
-        <span>🔄 多账号同步</span>
-      </template>
+    <el-card shadow="never" style="margin-bottom: 20px;">
+      <div class="card-head">
+        <div class="card-head-left">
+          <div class="card-chip chip-cyan"><el-icon><Refresh /></el-icon></div>
+          <div class="card-head-text">
+            <div class="card-title">多账号同步</div>
+            <div class="card-sub">将一个源账号的商品同步到多个目标账号，自动错开发布间隔</div>
+          </div>
+        </div>
+      </div>
 
-      <el-form :model="syncForm" label-width="120px">
+      <el-form :model="syncForm" label-width="120px" class="aiops-form">
         <el-form-item label="源账号">
           <el-select v-model="syncForm.sourceAccountId" placeholder="选择源账号" style="width: 250px;" @change="loadSourceProducts">
             <el-option v-for="acc in accounts" :key="acc.id" :label="acc.accountName" :value="acc.id" />
@@ -67,7 +79,7 @@
         </el-form-item>
         <el-form-item label="错开时间(分)">
           <el-input-number v-model="syncForm.delayMinutesPerAccount" :min="0" :max="120" />
-          <span style="margin-left: 8px; color: #909399; font-size: 12px;">每个账号之间错开的分钟数</span>
+          <span style="color: var(--text-3); font-size: 12px; margin-left: 8px;">每个账号之间错开的分钟数</span>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="startMultiSync" :loading="syncLoading">
@@ -84,20 +96,24 @@
     </el-card>
 
     <!-- 运营周报卡片 -->
-    <el-card>
-      <template #header>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span>📊 AI 运营周报</span>
-          <div style="display: flex; gap: 10px;">
-            <el-select v-model="reportAccountId" placeholder="选择账号" style="width: 180px;">
-              <el-option v-for="acc in accounts" :key="acc.id" :label="acc.accountName" :value="acc.id" />
-            </el-select>
-            <el-button type="primary" @click="generateReport" :loading="reportLoading">
-              <el-icon><DataAnalysis /></el-icon> 生成周报
-            </el-button>
+    <el-card shadow="never">
+      <div class="card-head">
+        <div class="card-head-left">
+          <div class="card-chip chip-amber"><el-icon><DataAnalysis /></el-icon></div>
+          <div class="card-head-text">
+            <div class="card-title">AI 运营周报</div>
+            <div class="card-sub">按账号汇总本周商品、浏览、成交与营收指标，并生成 AI 优化建议</div>
           </div>
         </div>
-      </template>
+        <div class="card-head-right">
+          <el-select v-model="reportAccountId" placeholder="选择账号" style="width: 180px;">
+            <el-option v-for="acc in accounts" :key="acc.id" :label="acc.accountName" :value="acc.id" />
+          </el-select>
+          <el-button type="primary" @click="generateReport" :loading="reportLoading">
+            <el-icon><DataAnalysis /></el-icon>生成周报
+          </el-button>
+        </div>
+      </div>
 
       <div v-if="report">
         <el-descriptions :column="4" border style="margin-bottom: 20px;">
@@ -113,10 +129,17 @@
           <el-descriptions-item label="营收">¥{{ report.totalRevenue }}</el-descriptions-item>
         </el-descriptions>
 
-        <el-card v-if="report.suggestions && report.suggestions.length > 0">
-          <template #header><span>💡 AI 运营建议</span></template>
-          <ul style="padding-left: 20px;">
-            <li v-for="(s, i) in report.suggestions" :key="i" style="margin-bottom: 8px; line-height: 1.6;">{{ s }}</li>
+        <el-card v-if="report.suggestions && report.suggestions.length > 0" shadow="never" class="suggestion-card">
+          <div class="card-head" style="margin-bottom: 12px;">
+            <div class="card-head-left">
+              <div class="card-chip chip-green"><el-icon><ChatDotRound /></el-icon></div>
+              <div class="card-head-text">
+                <div class="card-title">AI 运营建议</div>
+              </div>
+            </div>
+          </div>
+          <ul class="suggestion-list">
+            <li v-for="(s, i) in report.suggestions" :key="i">{{ s }}</li>
           </ul>
         </el-card>
       </div>
@@ -155,7 +178,6 @@ const taskAlertType = s => ({ COMPLETED: 'success', RUNNING: 'warning', FAILED: 
 const loadAccounts = async () => {
   try {
     const res = await api.get('/accounts')
-    // /accounts 返回 ApiResponse<List>（裸数组），不是分页对象；兼容两种结构
     const list = Array.isArray(res.data) ? res.data : (res.data?.records || [])
     accounts.value = list.filter(a => a.status === 'ACTIVE')
   } catch {}
@@ -164,7 +186,6 @@ const loadAccounts = async () => {
 const loadAiModels = async () => {
   try {
     const res = await api.get('/ai/models', { params: { size: 100 } })
-    // /ai/models 返回分页 Page（含 records）；兼容裸数组
     const list = Array.isArray(res.data) ? res.data : (res.data?.records || [])
     aiModels.value = list.filter(m => m.enabled !== false)
   } catch {}
@@ -175,7 +196,6 @@ const loadSourceProducts = async () => {
   if (!syncForm.value.sourceAccountId) { sourceProducts.value = []; return }
   try {
     const res = await api.get('/products', { params: { accountId: syncForm.value.sourceAccountId, status: 'ON_SALE', size: 100 } })
-    // /products 可能返回分页 Page 或裸数组，兼容两种
     const list = Array.isArray(res.data) ? res.data : (res.data?.records || [])
     sourceProducts.value = list
   } catch {}
@@ -242,3 +262,20 @@ onMounted(() => {
   loadAiModels()
 })
 </script>
+
+<style scoped>
+.aiops-form :deep(.el-form-item) {
+  margin-bottom: 18px;
+}
+.suggestion-list {
+  padding-left: 20px;
+}
+.suggestion-list li {
+  margin-bottom: 8px;
+  line-height: 1.7;
+  color: var(--text-2);
+}
+.suggestion-card :deep(.el-card__body) {
+  padding: 0;
+}
+</style>

@@ -64,8 +64,8 @@
       <el-card>
         <template #header>
           <span>价格趋势 - {{ keyword }}</span>
-          <span v-if="latestStat" style="margin-left:16px;color:#909399;font-size:13px;">
-            最新：均价 {{ latestStat.avgPrice }} | 中位数 {{ latestStat.medianPrice | '-' }} | 最低 {{ latestStat.minPrice }} | 最高 {{ latestStat.maxPrice }}
+          <span v-if="latestStat" style="margin-left:16px;color:var(--text-3);font-size:13px;">
+            最新：均价 {{ latestStat.avgPrice ?? '-' }} | 中位数 {{ latestStat.medianPrice ?? '-' }} | 最低 {{ latestStat.minPrice ?? '-' }} | 最高 {{ latestStat.maxPrice ?? '-' }}
           </span>
         </template>
         <v-chart :option="trendOption" autoresize style="height:360px;" />
@@ -98,10 +98,10 @@
       </el-card>
 
       <el-row :gutter="16" v-if="distribution">
-        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.min | '-' }}</div><div class="stat-lbl">最低价</div></div></el-card></el-col>
-        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.max | '-' }}</div><div class="stat-lbl">最高价</div></div></el-card></el-col>
-        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.avg | '-' }}</div><div class="stat-lbl">平均价</div></div></el-card></el-col>
-        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.median | '-' }}</div><div class="stat-lbl">中位数</div></div></el-card></el-col>
+        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.min ?? '-' }}</div><div class="stat-lbl">最低价</div></div></el-card></el-col>
+        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.max ?? '-' }}</div><div class="stat-lbl">最高价</div></div></el-card></el-col>
+        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.avg ?? '-' }}</div><div class="stat-lbl">平均价</div></div></el-card></el-col>
+        <el-col :xs="12" :sm="12" :md="12" :lg="6"><el-card><div class="stat-box"><div class="stat-num">{{ distribution.median ?? '-' }}</div><div class="stat-lbl">中位数</div></div></el-card></el-col>
       </el-row>
 
       <p v-if="distribution" style="color:#909399;margin-top:12px;">P25: {{ distribution.p25 | '-' }} / P75: {{ distribution.p75 | '-' }} / 样本数: {{ distribution.sampleCount }}</p>

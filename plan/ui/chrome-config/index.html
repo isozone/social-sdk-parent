@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Chrome 配置 - AI 鱼多宝</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}:root{--brand:#4f46e5;--cyan:#22d3ee;--bg-page:#f5f5f7;--text-primary:#111827;--text-secondary:#6b7280;--text-tertiary:#9ca3af;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--info:#3b82f6;--border:#e5e7eb;--radius-md:16px;--gradient-brand:linear-gradient(135deg,#4f46e5,#7c3aed)}.phone{width:393px;height:852px;border-radius:54px;background:var(--bg-page);position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.18)}.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}.status-bar{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:14px;font-weight:600;color:var(--text-primary)}.page-content{position:absolute;top:58px;left:0;right:0;bottom:84px;overflow-y:auto;-webkit-overflow-scrolling:touch}.page-content::-webkit-scrollbar{display:none}.nav{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}.h-title{font-size:17px;font-weight:700;color:var(--text-primary);flex:1;text-align:center}.card{background:#fff;border-radius:var(--radius-md);padding:16px;border:1px solid var(--border);margin:0 16px 12px;box-shadow:0 1px 4px rgba(0,0,0,.03)}.section-head{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 10px}.section-title{font-size:16px;font-weight:700;color:var(--text-primary)}.section-link{font-size:12px;color:var(--brand);font-weight:600;text-decoration:none}.config-item{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border-light)}.config-item:last-child{border-bottom:none}.config-label{font-size:14px;font-weight:500;color:var(--text-primary)}.config-value{font-size:12px;color:var(--text-tertiary)}input[type=text],input[type=url],textarea{width:100%;height:44px;background:var(--bg-page);border:1px solid var(--border);border-radius:10px;padding:0 14px;font-size:13px;color:var(--text-primary);outline:none}.input-textarea{height:80px;padding:12px;resize:none}.input-field:focus{border-color:var(--brand);background:#fff;box-shadow:0 0 0 3px rgba(79,70,229,.1)}.detect-card{background:#fff;border-radius:var(--radius-md);padding:16px;border:1px solid var(--border);margin:0 16px 12px;box-shadow:0 1px 4px rgba(0,0,0,.03)}.detect-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}.detect-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}.detect-info{flex:1}.detect-name{font-size:14px;font-weight:700;color:var(--text-primary)}.detect-path{font-size:11px;color:var(--text-tertiary);font-family:'JetBrains Mono',monospace}.detect-status{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:700}.det-ok{color:var(--success)}.det-fail{color:var(--danger)}.det-pending{color:var(--text-tertiary)}.btn-row{display:flex;gap:8px;margin-top:12px}.btn{flex:1;height:42px;border-radius:12px;font-size:13px;font-weight:600;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}.btn-primary{background:var(--gradient-brand);color:#fff}.btn-outline{background:#fff;border:1px solid var(--border);color:var(--text-secondary)}.btn-success{background:var(--success);color:#fff}.btn-danger{background:rgba(239,68,68,.1);color:var(--danger)}.install-btn{height:48px;border-radius:14px;background:var(--bg-page);border:1px dashed var(--border);font-size:13px;font-weight:600;color:var(--text-secondary);cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:8px}.download-bar{margin:0 16px 12px;display:flex;gap:8px}.dl-btn{flex:1;height:44px;border-radius:12px;font-size:13px;font-weight:600;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}.dl-download{background:rgba(59,130,246,.1);color:var(--info)}.dl-validate{background:rgba(16,185,129,.1);color:var(--success)}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
+  <div class="page-content">
+    <div class="nav"><span class="h-title">Chrome 配置</span><span style="font-size:13px;color:var(--brand);font-weight:600">保存</span></div>
+    <!-- Browser Detection -->
+    <div class="section-head"><div class="section-title">浏览器探测</div><span style="font-size:12px;color:var(--brand);font-weight:600">全量扫描</span></div>
+    <div style="padding:0 16px 20px;display:flex;flex-direction:column;gap:10px">
+      <div class="detect-card" style="margin:0"><div class="detect-header"><div class="detect-icon" style="background:rgba(59,130,246,.1);color:var(--info)">🌐</div><div class="detect-info"><div class="detect-name">Google Chrome</div><div class="detect-path">/Applications/Google Chrome.app</div></div><div class="detect-status det-ok">● 已安装</div></div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-tertiary)"><span>版本：120.0.6099.119</span><span>端口：9222</span></div></div>
+      <div class="detect-card" style="margin:0"><div class="detect-header"><div class="detect-icon" style="background:rgba(245,158,11,.1);color:var(--warning)">🦊</div><div class="detect-info"><div class="detect-name">Firefox</div><div class="detect-path">/Applications/Firefox.app</div></div><div class="detect-status det-pending">○ 未启用</div></div></div>
+      <div class="detect-card" style="margin:0"><div class="detect-header"><div class="detect-icon" style="background:rgba(239,68,68,.1);color:var(--danger)">⚙️</div><div class="detect-info"><div class="detect-name">Edge</div><div class="detect-path">未检测到</div></div><div class="detect-status det-fail">✕ 未安装</div></div></div>
+    </div>
+    <!-- Config Form -->
+    <div class="section-head"><div class="section-title">路径配置</div></div>
+    <div class="card">
+      <div class="config-item"><span class="config-label">Chrome 路径</span><span class="config-value">/Applications/Google Chrome.app</span></div>
+      <div class="config-item"><span class="config-label">CDP 调试端口</span><span class="config-value">9222</span></div>
+      <div class="config-item"><span class="config-label">用户数据目录</span><span class="config-value">~/Library/Application Support/Google/Chrome</span></div>
+      <div class="config-item"><span class="config-label">远程调试模式</span><span class="config-value" style="color:var(--success);font-weight:600">✅ 已启用</span></div>
+    </div>
+    <!-- Manual Input -->
+    <div class="card">
+      <div style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:14px">手动配置路径</div>
+      <div style="margin-bottom:12px"><label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px">可执行文件路径</label><input type="text" value="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"></div>
+      <div style="margin-bottom:12px"><label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px">CDP 端口</label><input type="text" value="9222"></div>
+      <div style="margin-bottom:12px"><label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px">用户数据目录</label><textarea class="input-textarea">~/Library/Application Support/Google/Chrome</textarea></div>
+      <div class="btn-row"><button class="btn btn-outline">🔍 校验路径</button><button class="btn btn-primary">💾 保存配置</button></div>
+    </div>
+    <!-- Download -->
+    <div class="section-head"><div class="section-title">下载 Chrome</div></div>
+    <div style="margin:0 16px 20px;display:flex;gap:8px"><button class="dl-btn dl-download">📥 自动下载安装</button><button class="dl-btn dl-validate">✅ 打开偏好设置</button></div>
+  </div>
+</div>
+</body>
+</html>

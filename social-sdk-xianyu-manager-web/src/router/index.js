@@ -205,6 +205,12 @@ const routes = [
         name: 'CookiesRefreshLogs',
         component: () => import('@/views/logs/cookiesRefresh/Index.vue'),
         meta: { title: 'Cookie 刷新日志' }
+      },
+      {
+        path: 'logs/login-renew',
+        name: 'LoginRenewLogs',
+        component: () => import('@/views/logs/loginRenew/Index.vue'),
+        meta: { title: '登录续期日志' }
       }
     ]
   }

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>仪表盘 - AI 鱼多宝</title>
+<style>
+@import url('_design-system.css');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+.kpi-label{font-size:11px;color:var(--text-tertiary)}
+.trend-up{color:var(--success)}.trend-down{color:var(--danger)}
+.bar-card-bg{background:var(--bg-page);border-radius:10px;height:100px;display:flex;align-items:end;padding:4px}
+.bar-fill-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.bar-wrap{width:100%;height:100px;background:var(--bg-page);border-radius:10px;overflow:hidden;display:flex;align-items:end;padding:4px}
+.bar-value{font-size:9px;color:var(--text-tertiary)}
+.bar-day{font-size:10px;color:var(--text-tertiary)}
+.quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 16px 24px}
+.quick-item{background:var(--bg-card);border-radius:16px;padding:14px 8px;text-align:center;border:1px solid var(--border)}
+.quick-icon{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:20px;margin:0 auto 8px}
+.quick-text{font-size:11px;color:var(--text-secondary);font-weight:500}
+.account-row{display:flex;align-items:center;gap:12px}
+</style>
+</head>
+<body>
+<div class="phone-frame safe-area">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="display:flex;gap:5px;align-items:center"><svg width="16" height="12" viewBox="0 0 16 12"><path d="M1 10.5a1 1 0 01-.5-1.86A8 8 0 018 2a8 8 0 018.5 6.64 1 1 0 01-1 1.86A6 6 0 008 4a6 6 0 00-7 6.5z"/><path d="M4 7.5a1 1 0 01-.5-1.86A4 4 0 018 2a4 4 0 014.5 3.64 1 1 0 01-1 1.86A2 2 0 008 4a2 2 0 00-4.5 3.5z" fill="#10b981"/></svg><svg width="16" height="12" viewBox="0 0 16 12"><rect x="1" y="4" width="3" height="8" rx=".5" fill-opacity=".3"/><rect x="5.5" y="2.5" width="3" height="9.5" rx=".5" fill-opacity=".5"/><rect x="10" y="0" width="3" height="12" rx=".5"/></svg><svg width="26" height="12" viewBox="0 0 28 12"><rect x=".5" y=".5" width="23" height="11" rx="3" stroke="#fff" fill="none"/><rect x="2" y="2" width="16" height="8" rx="1.5" fill="#10b981"/></svg></span></div>
+  <div class="page-content">
+    <div class="hero-section">
+      <div style="position:relative;z-index:1;display:flex;justify-content:space-between;align-items:start">
+        <div>
+          <div style="font-size:14px;color:rgba(255,255,255,.7);font-weight:500">下午好，Vim 👋</div>
+          <h1 style="font-size:24px;font-weight:800;color:#fff;margin-top:4px;text-shadow:0 2px 8px rgba(0,0,0,.12)">AI 鱼多宝</h1>
+          <p style="font-size:12px;color:rgba(255,255,255,.5);margin-top:4px">2026年7月25日 · 星期六</p>
+        </div>
+        <div class="avatar avatar-gradient" style="background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.25)">🐟</div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px;position:relative;z-index:1">
+        <span style="padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;color:#fff;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2)">⚡ 2 个账号运行中</span>
+        <span style="padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;color:#fff;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2)">🔔 3 条新通知</span>
+      </div>
+    </div>
+    <div style="padding:0 16px;margin-top:-20px;position:relative;z-index:2;display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+      <div class="stat-card"><div class="stat-icon" style="background:linear-gradient(135deg,rgba(79,70,229,.12),rgba(124,58,237,.06))"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div><div class="stat-value">12.8<span class="stat-unit">k</span></div><div class="kpi-label">总浏览</div><div class="stat-trend trend-up">↑ 12.5%</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:linear-gradient(135deg,rgba(34,211,238,.12),rgba(59,130,246,.06))"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div><div class="stat-value">156</div><div class="kpi-label">消息数</div><div class="stat-trend trend-up">↑ 8.2%</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(239,68,68,.06))"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg></div><div class="stat-value">23</div><div class="kpi-label">今日订单</div><div class="stat-trend trend-down">↓ 2 待发货</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(34,211,238,.06))"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div><div class="stat-value">89</div><div class="kpi-label">擦亮次数</div><div class="stat-trend trend-up" style="color:var(--success)">匹配 92%</div></div>
+    </div>
+    <div class="card" style="margin:16px 16px 0">
+      <div class="section-header" style="padding:0 0 14px">
+        <div><div class="section-title">成交趋势</div><div class="section-subtitle">近 7 日 · 单位：元</div></div>
+        <div style="display:flex;gap:2px;background:var(--bg-page);border-radius:9px;padding:2px"><div style="font-size:11px;padding:4px 10px;border-radius:7px;color:var(--text-secondary)">周</div><div style="font-size:11px;padding:4px 10px;border-radius:7px;background:#fff;color:var(--brand);font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.06)">月</div></div>
+      </div>
+      <div style="display:flex;gap:6px;padding:0 8px;height:130px;align-items:end">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div class="bar-value">¥86</div><div class="bar-wrap"><div style="width:80%;height:45%;background:var(--gradient-brand);border-radius:7px 7px 4px 4px;margin:0 auto"></div></div><div class="bar-day">一</div></div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div class="bar-value">¥124</div><div class="bar-wrap"><div style="width:80%;height:62%;background:var(--gradient-brand);border-radius:7px 7px 4px 4px;margin:0 auto"></div></div><div class="bar-day">二</div></div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div class="bar-value">¥98</div><div class="bar-wrap"><div style="width:80%;height:50%;background:var(--gradient-brand);border-radius:7px 7px 4px 4px;margin:0 auto"></div></div><div class="bar-day">三</div></div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div class="bar-value">¥156</div><div class="bar-wrap"><div style="width:80%;height:80%;background:var(--gradient-cold);border-radius:7px 7px 4px 4px;margin:0 auto"></div></div><div class="bar-day">四</div></div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div class="bar-value">¥142</div><div class="bar-wrap"><div style="width:80%;height:72%;background:var(--gradient-brand);border-radius:7px 7px 4px 4px;margin:0 auto"></div></div><div class="bar-day">五</div></div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div class="bar-value">¥178</div><div class="bar-wrap"><div style="width:80%;height:90%;background:var(--gradient-cold);border-radius:7px 7px 4px 4px;margin:0 auto"></div></div><div class="bar-day">六</div></div>
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px"><div class="bar-value">¥115</div><div class="bar-wrap"><div style="width:80%;height:58%;background:var(--gradient-brand);border-radius:7px 7px 4px 4px;margin:0 auto"></div></div><div class="bar-day">日</div></div>
+      </div>
+    </div>
+    <div class="section-header"><div><div class="section-title">账号健康</div><div class="section-subtitle">当前 3 个账号运行中</div></div><a href="#" class="section-link">管理 ></a></div>
+    <div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:10px">
+      <div class="card" style="margin:0;padding:14px 16px;display:flex;align-items:center;gap:12px"><div style="width:46px;height:46px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;color:#fff;background:var(--gradient-brand)">🐟</div><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:700;color:var(--text-primary)">闲鱼-主力号</div><div style="font-size:11px;color:var(--text-tertiary);margin-top:3px">在线 · 自动回复已开启 · 商品 156 件</div><div class="progress-bar" style="margin-top:8px"><div class="progress-fill progress-fill--green" style="width:96%"></div></div></div><div style="text-align:right;flex-shrink:0"><div style="font-size:20px;font-weight:800;color:var(--success)">96</div><span class="chip chip-green">健康</span></div></div>
+      <div class="card" style="margin:0;padding:14px 16px;display:flex;align-items:center;gap:12px"><div style="width:46px;height:46px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;color:#fff;background:var(--gradient-warm)">⚡</div><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:700;color:var(--text-primary)">闲鱼-副业号</div><div style="font-size:11px;color:var(--text-tertiary);margin-top:3px">Cookie 将于 7 天后过期 · 商品 89 件</div><div class="progress-bar" style="margin-top:8px"><div class="progress-fill progress-fill--warm" style="width:72%"></div></div></div><div style="text-align:right;flex-shrink:0"><div style="font-size:20px;font-weight:800;color:var(--warning)">72</div><span class="chip chip-amber">注意</span></div></div>
+      <div class="card" style="margin:0;padding:14px 16px;display:flex;align-items:center;gap:12px"><div style="width:46px;height:46px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;color:#fff;background:linear-gradient(135deg,#10b981,#22c55e)">🛒</div><div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:700;color:var(--text-primary)">闲鱼-测试号</div><div style="font-size:11px;color:var(--text-tertiary);margin-top:3px">已暂停 · 商品 12 件</div><div class="progress-bar" style="margin-top:8px"><div class="progress-fill" style="width:0%"></div></div></div><div style="text-align:right;flex-shrink:0"><div style="font-size:20px;font-weight:800;color:var(--text-tertiary)">—</div><span class="chip chip-slate">暂停</span></div></div>
+    </div>
+    <div class="section-header"><div class="section-title">快捷操作</div></div>
+    <div class="quick-grid">
+      <div class="quick-item"><div class="quick-icon" style="background:rgba(79,70,229,.08)">🔄</div><div class="quick-text">同步商品</div></div>
+      <div class="quick-item"><div class="quick-icon" style="background:rgba(34,211,238,.1)">✨</div><div class="quick-text">批量擦亮</div></div>
+      <div class="quick-item"><div class="quick-icon" style="background:rgba(245,158,11,.08)">➕</div><div class="quick-text">发新商品</div></div>
+      <div class="quick-item"><div class="quick-icon" style="background:rgba(16,185,129,.08)">🔔</div><div class="quick-text">同步消息</div></div>
+    </div>
+  </div>
+  <div class="tab-bar safe-bottom">
+    <div class="tab-item active"><span class="tab-icon">📊</span><span class="tab-label">首页</span></div>
+    <div class="tab-item"><span class="tab-icon">💬</span><span class="tab-label">消息</span></div>
+    <div class="tab-item"><span class="tab-icon">🛒</span><span class="tab-label">商品</span></div>
+    <div class="tab-item"><span class="tab-icon">👤</span><span class="tab-label">我的</span></div>
+  </div>
+</div>
+</body>
+</html>

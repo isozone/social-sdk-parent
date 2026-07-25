@@ -1,35 +1,46 @@
 <template>
   <div class="page-root">
-    <el-card style="margin: 0;">
-      <template #header>
-        <span>自动回复日志</span>
-      </template>
+    <el-card shadow="never" style="margin: 0;">
+      <!-- 卡片头 -->
+      <div class="card-head">
+        <div class="card-head-left">
+          <div class="card-chip chip-cyan"><el-icon><Document /></el-icon></div>
+          <div class="card-head-text">
+            <div class="card-title">自动回复日志</div>
+            <div class="card-sub">追踪每条自动回复的触发规则、命中状态与对话明细</div>
+          </div>
+        </div>
+      </div>
 
-      <!-- 筛选 -->
-      <el-form :inline="true" :model="filterForm">
-        <el-form-item label="账号">
-          <el-select v-model="filterForm.accountId" placeholder="全部账号" clearable style="width: 180px;">
-            <el-option v-for="a in accounts" :key="a.id" :label="a.displayName || a.accountName" :value="a.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="类型">
-          <el-select v-model="filterForm.replyType" clearable style="width: 120px;">
-            <el-option label="关键词" value="KEYWORD" />
-            <el-option label="AI" value="AI" />
-            <el-option label="兜底" value="AUTO" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="匹配">
-          <el-select v-model="filterForm.matched" clearable style="width: 100px;">
-            <el-option label="命中" :value="true" />
-            <el-option label="未命中" :value="false" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="loadLogs">查询</el-button>
-          <el-button @click="resetFilter">重置</el-button>
-        </el-form-item>
-      </el-form>
+      <!-- 筛选工具栏 -->
+      <div class="page-toolbar">
+        <div class="toolbar-left">
+          <el-form :inline="true" :model="filterForm" class="filter-bar">
+            <el-form-item label="账号">
+              <el-select v-model="filterForm.accountId" placeholder="全部账号" clearable style="width: 180px;">
+                <el-option v-for="a in accounts" :key="a.id" :label="a.displayName || a.accountName" :value="a.id" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="类型">
+              <el-select v-model="filterForm.replyType" clearable style="width: 120px;">
+                <el-option label="关键词" value="KEYWORD" />
+                <el-option label="AI" value="AI" />
+                <el-option label="兜底" value="AUTO" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="匹配">
+              <el-select v-model="filterForm.matched" clearable style="width: 100px;">
+                <el-option label="命中" :value="true" />
+                <el-option label="未命中" :value="false" />
+              </el-select>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="loadLogs">查询</el-button>
+              <el-button @click="resetFilter">重置</el-button>
+            </el-form-item>
+          </el-form>
+        </div>
+      </div>
 
       <el-table :data="logs" stripe v-loading="loading">
         <el-table-column prop="id" label="ID" width="60" />
@@ -77,6 +88,7 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { Document, Refresh, Search } from '@element-plus/icons-vue'
 import { listAccounts } from '@/api/account'
 import { listReplyLogs } from '@/api/replyLogs'
 
@@ -138,3 +150,9 @@ onMounted(async () => {
   await loadLogs()
 })
 </script>
+
+<style scoped>
+.filter-bar :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+</style>

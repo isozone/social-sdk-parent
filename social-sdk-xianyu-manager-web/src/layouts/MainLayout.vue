@@ -1,20 +1,24 @@
 <template>
   <el-container class="layout">
-    <el-aside width="220px" class="sidebar">
+    <el-aside width="224px" class="sidebar">
       <div class="logo">
-        <div class="logo-icon">AI</div>
+        <div class="logo-icon"><span>AI</span></div>
         <div class="logo-text">
           <div class="logo-title">AI鱼多宝</div>
           <div class="logo-tag">Xianyu Manager</div>
           <div class="logo-subtitle">智能运营平台</div>
         </div>
       </div>
+
       <el-menu
         :default-active="route.path"
         router
         class="sidebar-menu"
+        background-color="transparent"
+        text-color="var(--text-2)"
+        active-text-color="#fff"
       >
-        <el-menu-item index="/dashboard">
+        <el-menu-item index="/app/dashboard">
           <span class="menu-icon-box"><el-icon><DataAnalysis /></el-icon></span>
           <span>仪表盘</span>
         </el-menu-item>
@@ -97,6 +101,10 @@
             <span class="menu-icon-box"><el-icon><Refresh /></el-icon></span>
             <span>Cookie 刷新日志</span>
           </el-menu-item>
+          <el-menu-item index="/app/logs/login-renew">
+            <span class="menu-icon-box"><el-icon><Avatar /></el-icon></span>
+            <span>登录续期日志</span>
+          </el-menu-item>
         </el-menu-item-group>
 
         <el-menu-item-group title="数据资产">
@@ -124,7 +132,7 @@
         </el-menu-item>
         <el-menu-item index="/app/chrome">
           <span class="menu-icon-box"><el-icon><Setting /></el-icon></span>
-          <span>谷歌浏览器配置</span>
+          <span>浏览器配置</span>
         </el-menu-item>
         <el-menu-item index="/app/proxy">
           <span class="menu-icon-box"><el-icon><Connection /></el-icon></span>
@@ -134,6 +142,7 @@
           <span class="menu-icon-box"><el-icon><Warning /></el-icon></span>
           <span>熔断器管理</span>
         </el-menu-item>
+
         <el-menu-item-group title="系统">
           <el-menu-item index="/app/profile">
             <span class="menu-icon-box"><el-icon><User /></el-icon></span>
@@ -142,10 +151,13 @@
         </el-menu-item-group>
       </el-menu>
     </el-aside>
+
     <el-container>
       <el-header class="header">
         <div class="header-left">
-          <span class="page-icon-box">{{ currentIcon }}</span>
+          <span class="page-icon-box">
+            <el-icon :size="15"><component :is="headerIconComponent" /></el-icon>
+          </span>
           <div class="page-title-area">
             <div class="page-title">{{ currentTitle }}</div>
             <div class="page-breadcrumb">
@@ -169,27 +181,28 @@
             </el-button>
           </el-badge>
           <el-dropdown @command="handleCommand">
-          <span class="user-info">
-            <span class="avatar">{{ (authStore.user?.displayName || '管').charAt(0) }}</span>
-            {{ authStore.user?.displayName || '管理员' }}
-            <el-icon><ArrowDown /></el-icon>
-          </span>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="profile">
-                <el-icon><User /></el-icon> 个人中心
-              </el-dropdown-item>
-              <el-dropdown-item command="changePassword">
-                <el-icon><Lock /></el-icon> 修改密码
-              </el-dropdown-item>
-              <el-dropdown-item divided command="logout">
-                <el-icon><SwitchButton /></el-icon> 退出登录
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+            <span class="user-info">
+              <span class="avatar">{{ (authStore.user?.displayName || '管').charAt(0) }}</span>
+              <span class="user-name">{{ authStore.user?.displayName || '管理员' }}</span>
+              <el-icon class="avatar-arrow"><ArrowDown /></el-icon>
+            </span>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="profile">
+                  <el-icon><User /></el-icon> 个人中心
+                </el-dropdown-item>
+                <el-dropdown-item command="changePassword">
+                  <el-icon><Lock /></el-icon> 修改密码
+                </el-dropdown-item>
+                <el-dropdown-item divided command="logout">
+                  <el-icon><SwitchButton /></el-icon> 退出登录
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </el-header>
+
       <el-main class="main-content">
         <router-view v-slot="{ Component }">
           <transition name="fade-slide" mode="out-in">
@@ -197,34 +210,27 @@
           </transition>
         </router-view>
       </el-main>
-      <el-footer class="app-footer" height="auto">
+
+      <el-footer class="app-footer">
         <span class="coop-label">商务合作</span>
         <button class="coop-item" type="button" @click="openWechatQr" title="点击查看二维码">
           <svg class="coop-ico wechat" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
             <path d="M8.5 3C4.9 3 2 5.6 2 8.8c0 1.8 1 3.4 2.6 4.4L4 15.5l2.7-1.4c.8.2 1.6.3 2.5.3h.4c-.2-.7-.3-1.4-.3-2.1 0-3.1 2.9-5.5 6.5-5.5h.5C15.6 4.9 12.4 3 8.5 3z" />
             <path d="M21.5 13.2c0-2.5-2.5-4.5-5.6-4.5S10.3 10.7 10.3 13.2s2.5 4.5 5.6 4.5c.7 0 1.4-.1 2-.3l2.4 1.2-.5-1.9c1.2-.7 1.8-1.8 1.8-3z" />
           </svg>
-          worker_680
+          <span>worker_680</span>
         </button>
         <a class="coop-item" href="tel:18268185209">
           <svg class="coop-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2 4.1 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7A2 2 0 0 1 22 16.9z" />
           </svg>
-          18268185209
+          <span>18268185209</span>
         </a>
         <span class="footer-divider">·</span>
         <span class="copyright">© 2026 AI鱼多宝</span>
       </el-footer>
 
-      <el-dialog v-model="qrVisible" title="扫码添加微信" width="360px" align-center class="qr-dialog">
-        <div class="qr-wrap">
-          <el-image :src="qrSrc" fit="contain" class="qr-img" :preview-src-list="[qrSrc]" />
-          <p class="qr-tip">请使用微信「扫一扫」添加：<strong>worker_680</strong></p>
-          <el-button type="primary" class="qr-copy" @click="copyWechat">复制微信号</el-button>
-        </div>
-      </el-dialog>
-
-      <!-- 站内通知收件箱 -->
+      <!-- 站内通知收件箱抽屉 -->
       <el-drawer v-model="inboxVisible" title="站内通知" direction="rtl" size="380px">
         <div class="inbox-head">
           <span v-if="unread > 0">有 <strong>{{ unread }}</strong> 条未读</span>
@@ -248,7 +254,7 @@
         </div>
       </el-drawer>
 
-      <!-- 浏览器配置可视化表单抽屉 -->
+      <!-- 浏览器配置抽屉 -->
       <el-drawer
         v-model="browserConfigVisible"
         title="浏览器配置"
@@ -257,7 +263,6 @@
         :before-close="handleBrowserConfigClose"
       >
         <div class="browser-config-drawer">
-          <!-- 状态总览 -->
           <div class="bc-summary">
             <div class="bc-summary-card" :class="browserSummary.status">
               <div class="bc-summary-icon">
@@ -278,15 +283,8 @@
             </el-button>
           </div>
 
-          <!-- 表单 -->
-          <el-form
-            ref="browserFormRef"
-            :model="browserForm"
-            label-position="top"
-            class="bc-form"
-          >
+          <el-form ref="browserFormRef" :model="browserForm" label-position="top" class="bc-form">
             <el-divider content-position="left">浏览器路径</el-divider>
-
             <el-form-item>
               <template #label>
                 <span>可执行文件路径</span>
@@ -303,13 +301,10 @@
                 已探测到 {{ browserForm.detected.type }}：{{ browserForm.detected.path }}
                 <el-button type="primary" link size="small" @click="useDetected">使用</el-button>
               </div>
-              <div class="bc-form-hint muted" v-else>
-                未发现浏览器，请手动指定或下载
-              </div>
+              <div class="bc-form-hint muted" v-else>未发现浏览器，请手动指定或下载</div>
             </el-form-item>
 
             <el-divider content-position="left">运行模式</el-divider>
-
             <el-form-item>
               <template #label>
                 <span>启动模式</span>
@@ -318,10 +313,7 @@
                 </el-tooltip>
               </template>
               <el-radio-group v-model="browserForm.headless">
-                <el-radio :value="false">
-                  <span>有界面模式</span>
-                  <span class="bc-recommend">(推荐)</span>
-                </el-radio>
+                <el-radio :value="false"><span>有界面模式</span><span class="bc-recommend">(推荐)</span></el-radio>
                 <el-radio :value="true">无头模式</el-radio>
               </el-radio-group>
             </el-form-item>
@@ -339,6 +331,7 @@
               </el-radio-group>
             </el-form-item>
 
+            <el-divider content-position="left">高级配置</el-divider>
             <el-form-item>
               <template #label>
                 <span>窗口尺寸</span>
@@ -353,9 +346,6 @@
                 <span class="bc-form-hint muted">推荐 1366×768</span>
               </div>
             </el-form-item>
-
-            <el-divider content-position="left">高级配置</el-divider>
-
             <el-form-item>
               <template #label>
                 <span>CDP 端口范围</span>
@@ -369,7 +359,6 @@
                 <el-input-number v-model="browserForm.portRangeEnd" :min="1024" :max="65535" />
               </div>
             </el-form-item>
-
             <el-form-item>
               <template #label>
                 <span>用户数据目录</span>
@@ -379,7 +368,6 @@
               </template>
               <el-input v-model="browserForm.userDataDirRoot" placeholder="./chrome-profiles" />
             </el-form-item>
-
             <el-form-item>
               <template #label>
                 <span>多账号指纹噪声</span>
@@ -389,7 +377,6 @@
               </template>
               <el-switch v-model="browserForm.perAccountSeedNoise" active-text="启用" inactive-text="关闭" />
             </el-form-item>
-
             <el-form-item>
               <template #label>
                 <span>启动超时</span>
@@ -400,7 +387,6 @@
               <el-input-number v-model="browserForm.launchTimeoutSeconds" :min="5" :max="120" :step="5" />
               <span class="bc-form-hint muted">　秒</span>
             </el-form-item>
-
             <el-form-item>
               <template #label>
                 <span>崩溃恢复次数</span>
@@ -410,7 +396,6 @@
               </template>
               <el-input-number v-model="browserForm.maxCrashRecoveryAttempts" :min="0" :max="10" />
             </el-form-item>
-
             <el-form-item>
               <template #label>
                 <span>自定义启动参数</span>
@@ -442,7 +427,13 @@ import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { DataAnalysis, User, Goods, ChatDotRound, List, Operation, Money, Star, Cpu, Promotion, Van, UploadFilled, Monitor, Document, Bell, UserFilled, ArrowDown, FullScreen, Shop, Medal, Connection, Service, Sunrise, Switch, Timer, Setting, TrendCharts, Compass, Search, Download, Check, InfoFilled, Warning, Lock, SwitchButton } from '@element-plus/icons-vue'
+import {
+  DataAnalysis, User, Goods, ChatDotRound, List, Money, Star,
+  Promotion, UploadFilled, Monitor, Document, Bell, UserFilled, ArrowDown, FullScreen,
+  Medal, Connection, Service, Sunrise, Switch, Timer, Setting, Compass,
+  Search, Download, Check, InfoFilled, Warning, Lock, SwitchButton,
+  Refresh, Avatar, ChatLineSquare
+} from '@element-plus/icons-vue'
 import * as notify from '@/api/notification'
 import { getChromeConfig, detectChrome, saveChromeConfig, downloadChrome, validateChromePath } from '@/api/chrome'
 
@@ -450,7 +441,6 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
-// 面包屑映射
 const breadcrumbMap = {
   '/app/dashboard': ['仪表盘'],
   '/app/products': ['店铺管理', '商品管理'],
@@ -468,6 +458,7 @@ const breadcrumbMap = {
   '/app/rules': ['规则合规', '规则管理'],
   '/app/notify': ['规则合规', '消息通知'],
   '/app/audit': ['规则合规', '审计日志'],
+  '/app/reply-logs': ['规则合规', '自动回复日志'],
   '/app/wallet': ['数据资产', '钱包资产'],
   '/app/monitor': ['数据资产', '监控面板'],
   '/app/market': ['数据资产', '市场情报'],
@@ -477,36 +468,31 @@ const breadcrumbMap = {
   '/app/profile': ['系统', '个人中心']
 }
 
-const currentBreadcrumb = computed(() => breadcrumbMap[route.path] || ['管理后台'])
-
-// 页面图标映射
-const pageIconMap = {
-  '/app/dashboard': '📊',
-  '/app/products': '📦',
-  '/app/orders': '📋',
-  '/app/messages': '💬',
-  '/app/collect': '⭐',
-  '/app/reviews': '🏅',
-  '/app/ai-ops': '🚀',
-  '/app/ai': '🔗',
-  '/app/ai-cs': '🎧',
-  '/app/polish': '✨',
-  '/app/virtual-ship': '🔄',
-  '/app/cloud-storage': '☁️',
-  '/app/tasks': '⏱️',
-  '/app/rules': '⚙️',
-  '/app/notify': '🔔',
-  '/app/audit': '📄',
-  '/app/wallet': '💰',
-  '/app/monitor': '🖥️',
-  '/app/market': '🧭',
-  '/app/buyer': '👤',
-  '/app/circuit-breaker': '⚠️',
-  '/app/accounts': '👤',
-  '/app/profile': '👤'
+const headerIconMap = {
+  '/app/dashboard': 'DataAnalysis',
+  '/app/products': 'Goods',
+  '/app/orders': 'List',
+  '/app/messages': 'ChatDotRound',
+  '/app/collect': 'Star',
+  '/app/reviews': 'Medal',
+  '/app/ai-ops': 'Promotion',
+  '/app/ai': 'Connection',
+  '/app/ai-cs': 'Service',
+  '/app/polish': 'Sunrise',
+  '/app/virtual-ship': 'Switch',
+  '/app/cloud-storage': 'UploadFilled',
+  '/app/tasks': 'Timer',
+  '/app/rules': 'Setting',
+  '/app/notify': 'Bell',
+  '/app/audit': 'Document',
+  '/app/wallet': 'Money',
+  '/app/monitor': 'Monitor',
+  '/app/market': 'Compass',
+  '/app/buyer': 'User',
+  '/app/circuit-breaker': 'Warning',
+  '/app/accounts': 'UserFilled',
+  '/app/profile': 'User'
 }
-
-const currentIcon = computed(() => pageIconMap[route.path] || '📄')
 
 const titleMap = {
   '/app/dashboard': '仪表盘',
@@ -533,63 +519,48 @@ const titleMap = {
   '/app/profile': '个人中心'
 }
 
+const currentBreadcrumb = computed(() => breadcrumbMap[route.path] || ['管理后台'])
+const headerIconComponent = computed(() => headerIconMap[route.path] || 'Document')
 const currentTitle = computed(() => titleMap[route.path] || '管理后台')
 
-function openDataBoard() {
-  window.open('/data-board', '_blank')
-}
+function openDataBoard() { window.open('/data-board', '_blank') }
 
 function handleCommand(cmd) {
-  if (cmd === 'profile') {
-    router.push('/app/profile')
-  } else if (cmd === 'changePassword') {
-    router.push('/app/profile')
-  } else if (cmd === 'logout') {
+  if (cmd === 'profile' || cmd === 'changePassword') router.push('/app/profile')
+  else if (cmd === 'logout') {
     ElMessageBox.confirm('确认退出登录？', '提示', { type: 'warning' }).then(() => {
-      authStore.logout()
-      router.push('/login')
+      authStore.logout(); router.push('/login')
     })
   }
 }
 
+// ===== 商务合作 =====
 const wechatId = 'worker_680'
 const qrSrc = '/wechat.jpg'
 const qrVisible = ref(false)
-function openWechatQr() {
-  qrVisible.value = true
-}
+function openWechatQr() { qrVisible.value = true }
 function copyWechat() {
   const ok = () => ElMessage.success('微信号已复制：' + wechatId)
   const fallback = () => {
     const ta = document.createElement('textarea')
-    ta.value = wechatId
-    ta.style.position = 'fixed'
-    ta.style.opacity = '0'
-    document.body.appendChild(ta)
-    ta.select()
-    try {
-      document.execCommand('copy')
-      ok()
-    } catch (e) {
-      ElMessage.error('复制失败，请手动复制：' + wechatId)
-    }
+    ta.value = wechatId; ta.style.position = 'fixed'; ta.style.opacity = '0'
+    document.body.appendChild(ta); ta.select()
+    try { document.execCommand('copy'); ok() }
+    catch (e) { ElMessage.error('复制失败，请手动复制：' + wechatId) }
     document.body.removeChild(ta)
   }
-  if (navigator.clipboard && navigator.clipboard.writeText) {
+  if (navigator.clipboard && navigator.clipboard.writeText)
     navigator.clipboard.writeText(wechatId).then(ok).catch(fallback)
-  } else {
-    fallback()
-  }
+  else fallback()
 }
 
-// ===== 站内通知收件箱 =====
+// ===== 站内通知 =====
 const inboxVisible = ref(false)
 const messages = ref([])
 const unread = ref(0)
 const scenarioMap = ref({})
 
 function scenarioLabel(s) { return scenarioMap.value[s] || s }
-
 async function loadScenarios() {
   try {
     const res = await notify.listScenarios()
@@ -599,99 +570,61 @@ async function loadScenarios() {
     }
   } catch (e) {}
 }
-
 async function loadUnread() {
   try {
     const res = await notify.unreadCount()
     if (res.success) unread.value = res.data?.unread || 0
   } catch (e) {}
 }
-
 async function loadMessages() {
   try {
     const res = await notify.listMessages({ page: 1, size: 30 })
     if (res.success) messages.value = res.data?.records || []
   } catch (e) {}
 }
-
-async function openInbox() {
-  inboxVisible.value = true
-  await loadMessages()
-}
-
+async function openInbox() { inboxVisible.value = true; await loadMessages() }
 async function readMsg(m) {
-  if (!m.isRead) {
-    try {
-      await notify.markRead(m.id)
-      m.isRead = true
-      await loadUnread()
-    } catch (e) {}
-  }
+  if (!m.isRead) { try { await notify.markRead(m.id); m.isRead = true; await loadUnread() } catch (e) {} }
 }
-
 async function readAll() {
   try {
     const res = await notify.markAllRead()
-    if (res.success) {
-      messages.value.forEach(m => { m.isRead = true })
-      unread.value = 0
-      ElMessage.success('已全部标记为已读')
-    }
+    if (res.success) { messages.value.forEach(m => { m.isRead = true }); unread.value = 0; ElMessage.success('已全部标记为已读') }
   } catch (e) {}
 }
 
 let pollTimer = null
-onMounted(() => {
-  loadScenarios()
-  loadUnread()
-  pollTimer = setInterval(loadUnread, 30000)
-})
+onMounted(() => { loadScenarios(); loadUnread(); pollTimer = setInterval(loadUnread, 30000) })
 onUnmounted(() => { if (pollTimer) clearInterval(pollTimer) })
 
-// ===== 浏览器配置抽屉 =====
+// ===== 浏览器配置 =====
 const browserConfigVisible = ref(false)
 const bcDetecting = ref(false)
 const bcDownloading = ref(false)
 const bcSaving = ref(false)
 const browserFormRef = ref(null)
-
 const browserForm = ref({
-  executablePath: '',
-  headless: false,
-  headlessMode: 'new',
-  portRangeStart: 9222,
-  portRangeEnd: 9322,
-  userDataDirRoot: './chrome-profiles',
-  windowWidth: 1366,
-  windowHeight: 768,
-  perAccountSeedNoise: true,
-  launchTimeoutSeconds: 30,
-  maxCrashRecoveryAttempts: 3,
-  customLaunchArgsText: '',
-  detected: { found: false, path: '', type: '' }
+  executablePath: '', headless: false, headlessMode: 'new',
+  portRangeStart: 9222, portRangeEnd: 9322, userDataDirRoot: './chrome-profiles',
+  windowWidth: 1366, windowHeight: 768, perAccountSeedNoise: true,
+  launchTimeoutSeconds: 30, maxCrashRecoveryAttempts: 3,
+  customLaunchArgsText: '', detected: { found: false, path: '', type: '' }
 })
 
 const browserSummary = computed(() => {
   const f = browserForm.value
-  if (!f.executablePath && !f.detected.path) {
+  if (!f.executablePath && !f.detected.path)
     return { status: 'warning', title: '未配置浏览器', desc: '请指定路径或先探测系统浏览器' }
-  }
-  if (f.detected.found) {
+  if (f.detected.found)
     return { status: 'success', title: '浏览器可用', desc: `${f.detected.type} · ${f.detected.path}` }
-  }
   return { status: 'success', title: '浏览器路径已设置', desc: f.executablePath }
 })
 
 function openBrowserConfig() {
   browserConfigVisible.value = true
-  if (!browserForm.value.executablePath && !browserForm.value.detected.path) {
-    loadBrowserConfig()
-  }
+  if (!browserForm.value.executablePath && !browserForm.value.detected.path) loadBrowserConfig()
 }
-
-function handleBrowserConfigClose(done) {
-  done()
-}
+function handleBrowserConfigClose(done) { done() }
 
 async function loadBrowserConfig() {
   try {
@@ -699,28 +632,18 @@ async function loadBrowserConfig() {
     if (res.success && res.data) {
       const d = res.data
       browserForm.value = {
-        executablePath: d.executablePath || '',
-        headless: d.headless ?? false,
-        headlessMode: d.headlessMode || 'new',
-        portRangeStart: d.portRangeStart || 9222,
-        portRangeEnd: d.portRangeEnd || 9322,
-        userDataDirRoot: d.userDataDirRoot || './chrome-profiles',
-        windowWidth: d.windowWidth || 1366,
-        windowHeight: d.windowHeight || 768,
+        executablePath: d.executablePath || '', headless: d.headless ?? false,
+        headlessMode: d.headlessMode || 'new', portRangeStart: d.portRangeStart || 9222,
+        portRangeEnd: d.portRangeEnd || 9322, userDataDirRoot: d.userDataDirRoot || './chrome-profiles',
+        windowWidth: d.windowWidth || 1366, windowHeight: d.windowHeight || 768,
         perAccountSeedNoise: d.perAccountSeedNoise ?? true,
         launchTimeoutSeconds: d.launchTimeoutSeconds || 30,
         maxCrashRecoveryAttempts: d.maxCrashRecoveryAttempts || 3,
         customLaunchArgsText: (d.customLaunchArgs || []).join('\n'),
-        detected: {
-          found: d.detected?.found || false,
-          path: d.detected?.path || '',
-          type: d.detected?.type || ''
-        }
+        detected: { found: d.detected?.found || false, path: d.detected?.path || '', type: d.detected?.type || '' }
       }
     }
-  } catch (e) {
-    ElMessage.error('加载浏览器配置失败：' + (e.message || e))
-  }
+  } catch (e) { ElMessage.error('加载浏览器配置失败：' + (e.message || e)) }
 }
 
 async function handleBrowserDetect() {
@@ -728,87 +651,49 @@ async function handleBrowserDetect() {
   try {
     const res = await detectChrome()
     if (res.success && res.data) {
-      browserForm.value.detected = {
-        found: res.data.found,
-        path: res.data.path || '',
-        type: res.data.type || ''
-      }
-      if (res.data.found) {
-        ElMessage.success(`发现浏览器：${res.data.type}`)
-      } else {
-        ElMessage.warning('未发现浏览器，请手动指定或下载')
-      }
+      browserForm.value.detected = { found: res.data.found, path: res.data.path || '', type: res.data.type || '' }
+      if (res.data.found) ElMessage.success(`发现浏览器：${res.data.type}`)
+      else ElMessage.warning('未发现浏览器，请手动指定或下载')
     }
-  } catch (e) {
-    ElMessage.error('探测失败：' + (e.message || e))
-  } finally {
-    bcDetecting.value = false
-  }
+  } catch (e) { ElMessage.error('探测失败：' + (e.message || e)) }
+  finally { bcDetecting.value = false }
 }
 
 function useDetected() {
-  if (browserForm.value.detected.path) {
-    browserForm.value.executablePath = browserForm.value.detected.path
-  }
+  if (browserForm.value.detected.path) browserForm.value.executablePath = browserForm.value.detected.path
 }
 
 async function handleBrowserValidate() {
-  if (!browserForm.value.executablePath) {
-    ElMessage.warning('请先输入路径')
-    return
-  }
+  if (!browserForm.value.executablePath) { ElMessage.warning('请先输入路径'); return }
   try {
     const res = await validateChromePath(browserForm.value.executablePath)
     if (res.success && res.data) {
-      if (res.data.valid) {
-        ElMessage.success('路径校验通过，可执行')
-      } else {
-        ElMessage.warning('路径不可用：' + (res.data.reason || '不存在或无执行权限'))
-      }
+      if (res.data.valid) ElMessage.success('路径校验通过，可执行')
+      else ElMessage.warning('路径不可用：' + (res.data.reason || '不存在或无执行权限'))
     }
-  } catch (e) {
-    ElMessage.error('校验失败：' + (e.message || e))
-  }
+  } catch (e) { ElMessage.error('校验失败：' + (e.message || e)) }
 }
 
 async function handleBrowserDownload() {
   bcDownloading.value = true
   try {
     const res = await downloadChrome()
-    if (res.success && res.data) {
-      ElMessage.success(res.data.message || '下载完成')
-    } else {
-      ElMessage.warning(res.message || res.data?.message || '下载失败，请使用系统包管理器安装')
-    }
-  } catch (e) {
-    ElMessage.error('下载失败：' + (e.message || e))
-  } finally {
-    bcDownloading.value = false
-  }
+    if (res.success && res.data) ElMessage.success(res.data.message || '下载完成')
+    else ElMessage.warning(res.message || res.data?.message || '下载失败，请使用系统包管理器安装')
+  } catch (e) { ElMessage.error('下载失败：' + (e.message || e)) }
+  finally { bcDownloading.value = false }
 }
 
 async function handleBrowserSave() {
   bcSaving.value = true
   try {
-    const args = browserForm.value.customLaunchArgsText
-      .split('\n')
-      .map(s => s.trim())
-      .filter(Boolean)
-    const payload = {
-      ...browserForm.value,
-      customLaunchArgs: args.length ? args : null
-    }
+    const args = browserForm.value.customLaunchArgsText.split('\n').map(s => s.trim()).filter(Boolean)
+    const payload = { ...browserForm.value, customLaunchArgs: args.length ? args : null }
     const res = await saveChromeConfig(payload)
-    if (res.success) {
-      ElMessage.success('浏览器配置已保存')
-    } else {
-      ElMessage.error(res.message || '保存失败')
-    }
-  } catch (e) {
-    ElMessage.error('保存失败：' + (e.message || e))
-  } finally {
-    bcSaving.value = false
-  }
+    if (res.success) ElMessage.success('浏览器配置已保存')
+    else ElMessage.error(res.message || '保存失败')
+  } catch (e) { ElMessage.error('保存失败：' + (e.message || e)) }
+  finally { bcSaving.value = false }
 }
 
 async function handleBrowserReset() {
@@ -821,452 +706,217 @@ async function handleBrowserReset() {
 </script>
 
 <style scoped>
+/* ========== 全局布局 ========== */
 .layout { height: 100vh; }
 .sidebar {
-  background: #fff;
+  background: var(--color-white, #fff);
   overflow-y: auto;
-  border-right: 1px solid #e4e7ed;
+  border-right: 1px solid var(--border);
+  flex-shrink: 0;
 }
+
+/* ========== Logo ========== */
 .logo {
   height: 60px;
   display: flex;
   align-items: center;
   padding: 0 16px;
-  border-bottom: 1px solid #f0f2f5;
+  border-bottom: 1px solid var(--bg-soft);
   gap: 10px;
+  flex-shrink: 0;
 }
 .logo-icon {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  background: var(--brand-gradient);
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   font-size: 13px;
   font-weight: 700;
-  flex-shrink: 0;
-}
-.logo-text {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.2;
-}
-.logo-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #303133;
-}
-.logo-tag {
-  font-size: 10px;
-  color: #999;
   letter-spacing: 0.5px;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
 }
-.logo-subtitle {
-  font-size: 11px;
-  color: #909399;
-  margin-top: 2px;
-}
+.logo-text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.logo-title { font-size: 15px; font-weight: 700; color: var(--text-1); letter-spacing: 0.3px; }
+.logo-tag { font-size: 10px; color: var(--text-3); letter-spacing: 0.5px; font-weight: 500; }
+.logo-subtitle { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+
+/* ========== Header ========== */
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #fff;
-  border-bottom: 1px solid #e4e7ed;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
   padding: 0 24px;
+  z-index: 10;
 }
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
+.header-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .page-icon-box {
-  width: 28px;
-  height: 28px;
-  background: #eef2ff;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #4f46e5;
-  font-size: 14px;
-  flex-shrink: 0;
+  width: 30px; height: 30px;
+  background: var(--el-color-primary-light-9);
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--brand); font-size: 15px; flex-shrink: 0;
 }
-.page-title-area {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.3;
-}
-.page-title {
-  font-size: 15px;
-  font-weight: 500;
-  color: #303133;
-}
-.page-breadcrumb {
-  font-size: 11px;
-  color: #909399;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.crumb-sep {
-  color: #c0c4cc;
-  margin: 0 2px;
-}
-.crumb {
-  color: #909399;
-}
+.page-title-area { display: flex; flex-direction: column; line-height: 1.3; }
+.page-title { font-size: 16px; font-weight: 600; color: var(--text-1); }
+.page-breadcrumb { font-size: 11px; color: var(--text-3); display: flex; align-items: center; gap: 4px; }
+.crumb { color: var(--text-3); }
+.crumb-sep { color: var(--text-3); margin: 0 2px; }
+
+.header-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.header-right .el-button { color: var(--text-2); }
+.header-right .el-button:hover { color: var(--brand); }
+.bell-badge { margin-right: 2px; }
+.bell-badge :deep(.el-button) { color: var(--text-2); }
+
+/* 用户头像下拉 */
 .user-info {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  color: #606266;
-  font-size: 13px;
+  display: flex; align-items: center; gap: 7px;
+  cursor: pointer; color: var(--text-2); font-size: 13px;
+  padding: 4px 8px; border-radius: 8px;
+  transition: background 0.15s ease;
 }
+.user-info:hover { background: var(--bg-soft); }
 .avatar {
-  width: 28px;
-  height: 28px;
-  background: #f0f2f5;
+  width: 30px; height: 30px;
+  background: var(--bg-soft);
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #606266;
-  font-size: 12px;
-  font-weight: 500;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-2); font-size: 12px; font-weight: 600;
 }
+.user-name { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.avatar-arrow { font-size: 12px; }
+
+/* ========== 主内容区 ========== */
 .main-content {
-  background: #f5f7fa;
+  background: var(--bg-soft);
   padding: 16px !important;
   overflow: auto;
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  min-height: 0;
 }
 
-/* 页面切换淡入滑动过渡 */
-.fade-slide-enter-active,
-.fade-slide-leave-active {
-  transition: opacity 0.25s ease, transform 0.25s ease;
-}
-.fade-slide-enter-from {
-  opacity: 0;
-  transform: translateY(12px);
-}
-.fade-slide-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
-}
-.fade-slide-enter-to,
-.fade-slide-leave-from {
-  opacity: 1;
-  transform: translateY(0);
-}
+/* ========== 页面切换过渡 ========== */
+.fade-slide-enter-active, .fade-slide-leave-active { transition: opacity 0.25s ease, transform 0.25s ease; }
+.fade-slide-enter-from { opacity: 0; transform: translateY(12px); }
+.fade-slide-leave-to { opacity: 0; transform: translateY(-8px); }
+.fade-slide-enter-to, .fade-slide-leave-from { opacity: 1; transform: translateY(0); }
 
-/* 侧边栏菜单样式 — 紫色主题 */
-.sidebar-menu {
-  border-right: none !important;
-  padding: 8px 0;
-}
+/* ========== 侧边栏菜单 ========== */
+.sidebar-menu { border-right: none !important; padding: 8px 0 20px; }
 .sidebar-menu :deep(.el-menu-item) {
-  margin: 0 8px;
-  border-radius: 6px;
-  height: 40px;
-  line-height: 40px;
-  color: #606266;
+  margin: 2px 10px;
+  border-radius: 8px;
+  height: 42px; line-height: 42px;
+  color: var(--text-2);
   font-size: 13px;
   padding: 0 12px !important;
+  transition: all 0.2s ease;
 }
-.sidebar-menu :deep(.el-menu-item:hover) {
-  background: #f5f7fa !important;
-  color: #303133;
-}
+.sidebar-menu :deep(.el-menu-item:hover) { background: var(--bg-soft) !important; color: var(--text-1); }
 .sidebar-menu :deep(.el-menu-item.is-active) {
-  background: #eef2ff !important;
-  color: #4f46e5 !important;
+  background: var(--brand-gradient) !important;
+  color: #fff !important;
   font-weight: 500;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
 }
 .sidebar-menu :deep(.el-menu-item-group__title) {
-  padding: 12px 20px 6px;
-  font-size: 11px;
-  color: #909399;
-  font-weight: 500;
-  letter-spacing: 0.5px;
+  padding: 16px 20px 6px 14px;
+  font-size: 10.5px;
+  color: var(--text-3);
+  font-weight: 600;
+  letter-spacing: 0.8px;
   text-transform: uppercase;
 }
 .menu-icon-box {
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
+  align-items: center; justify-content: center;
+  width: 22px; height: 22px;
   margin-right: 8px;
-  border-radius: 4px;
-  background: #f0f2f5;
-  color: #606266;
-  font-size: 14px;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-2);
   flex-shrink: 0;
+  transition: background 0.2s ease, color 0.2s ease;
 }
+.sidebar-menu :deep(.el-menu-item:hover) .menu-icon-box { background: rgba(0,0,0,0.04); color: var(--text-1); }
 .sidebar-menu :deep(.el-menu-item.is-active) .menu-icon-box {
-  background: #4f46e5;
-  color: #fff;
+  background: rgba(255,255,255,0.2); color: #fff;
 }
 
-/* 业务合作页脚 */
+/* ========== 页脚 ========== */
 .app-footer {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 6px 18px;
-  padding: 12px 16px;
-  background: #f5f7fa;
-  border-top: 1px solid #e4e7ed;
-  color: #909399;
-  font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  flex-wrap: wrap; gap: 6px 18px;
+  padding: 10px 16px;
+  background: var(--bg-soft);
+  border-top: 1px solid var(--border);
+  color: var(--text-3); font-size: 12.5px;
 }
-.coop-label {
-  color: #606266;
-  font-weight: 600;
-  letter-spacing: 1px;
-}
+.coop-label { color: var(--text-2); font-weight: 600; letter-spacing: 1px; }
 .coop-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: #606266;
-  font-size: 13px;
-  text-decoration: none;
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px 10px;
-  border-radius: 8px;
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--text-2); font-size: 12.5px; text-decoration: none;
+  background: none; border: none; cursor: pointer;
+  padding: 3px 9px; border-radius: 8px;
   transition: color 0.2s, background 0.2s;
 }
-.coop-item:hover {
-  color: #4f46e5;
-  background: rgba(79, 70, 229, 0.08);
-}
-.coop-ico { width: 15px; height: 15px; }
+.coop-item:hover { color: var(--brand); background: rgba(79, 70, 229, 0.08); }
+.coop-ico { width: 14px; height: 14px; }
 .coop-ico.wechat { color: #07c160; }
-.footer-divider { color: #c0c4cc; }
-.copyright { color: #a8abb2; }
+.footer-divider { color: var(--text-3); }
+.copyright { color: var(--text-3); }
 
-/* 二维码弹窗 */
-.qr-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  padding: 6px 0 2px;
-}
-.qr-img {
-  width: 220px;
-  height: 280px;
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  background: #fff;
-  cursor: zoom-in;
-}
-.qr-tip {
-  color: #606266;
-  font-size: 14px;
-  margin: 0;
-}
-.qr-tip strong { color: #303133; }
-
-/* 顶部右侧：通知铃铛 + 用户 */
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.bell-badge { margin-right: 4px; }
-.bell-badge :deep(.el-button) {
-  color: #606266;
-}
-
-/* 站内通知收件箱 */
+/* ========== 通知抽屉 ========== */
 .inbox-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  color: #606266;
-  font-size: 13px;
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; color: var(--text-2); font-size: 13px;
 }
 .inbox-item {
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid #ebeef5;
-  margin-bottom: 10px;
-  cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
+  padding: 12px; border-radius: 8px;
+  border: 1px solid var(--border); margin-bottom: 10px;
+  cursor: pointer; transition: background 0.2s, border-color 0.2s;
 }
-.inbox-item:hover { background: #f5f7fa; }
-.inbox-item.unread { border-color: #c4b5fd; background: #eef2ff; }
-.inbox-title {
-  font-weight: 600;
-  font-size: 14px;
-  color: #303133;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.inbox-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #4f46e5;
-  flex: 0 0 auto;
-}
-.inbox-content {
-  margin-top: 6px;
-  color: #606266;
-  font-size: 13px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-.inbox-meta {
-  margin-top: 6px;
-  color: #a8abb2;
-  font-size: 12px;
-}
+.inbox-item:hover { background: var(--bg-soft); }
+.inbox-item.unread { border-color: var(--el-color-primary-light-5); background: var(--el-color-primary-light-9); }
+.inbox-title { font-weight: 600; font-size: 14px; color: var(--text-1); display: flex; align-items: center; gap: 6px; }
+.inbox-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--brand); flex: 0 0 auto; }
+.inbox-content { margin-top: 6px; color: var(--text-2); font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; }
+.inbox-meta { margin-top: 6px; color: var(--text-3); font-size: 12px; }
 
-/* 浏览器配置抽屉 */
-.browser-config-drawer {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding-bottom: 16px;
-}
-
-.bc-summary {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
+/* ========== 浏览器配置抽屉 ========== */
+.browser-config-drawer { display: flex; flex-direction: column; gap: 16px; padding-bottom: 16px; }
+.bc-summary { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .bc-summary-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: #f5f7fa;
-  border: 1px solid #ebeef5;
-  flex: 1;
-  min-width: 200px;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: 8px;
+  background: var(--bg-soft); border: 1px solid var(--border);
+  flex: 1; min-width: 200px;
 }
-
-.bc-summary-card.success {
-  background: #f0f9eb;
-  border-color: #c2e7b0;
-  color: #67c23a;
-}
-
-.bc-summary-card.warning {
-  background: #fdf6ec;
-  border-color: #f5dab1;
-  color: #e6a23c;
-}
-
-.bc-summary-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.bc-summary-info {
-  flex: 1;
-}
-
-.bc-summary-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.bc-summary-desc {
-  font-size: 12px;
-  color: #909399;
-  margin-top: 2px;
-  word-break: break-all;
-}
-
-.bc-form {
-  background: #fafbfc;
-  border-radius: 8px;
-  padding: 16px 16px 4px;
-}
-
-.bc-form :deep(.el-form-item__label) {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 500;
-}
-
-.bc-tip-icon {
-  color: #909399;
-  cursor: help;
-  font-size: 14px;
-}
-
-.bc-form-hint {
-  margin-top: 6px;
-  font-size: 12px;
-  color: #67c23a;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.bc-form-hint.muted {
-  color: #909399;
-}
-
-.bc-input-row {
-  display: flex;
-  gap: 8px;
-}
-
-.bc-input-row :deep(.el-input) {
-  flex: 1;
-}
-
-.bc-recommend {
-  font-size: 12px;
-  color: #67c23a;
-  margin-left: 4px;
-}
-
-.bc-size-row,
-.bc-range-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.bc-size-sep {
-  color: #909399;
-}
-
-.bc-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  padding-top: 16px;
-  border-top: 1px solid #ebeef5;
-}
-
-.bc-divider {
-  margin: 12px 0;
-}
+.bc-summary-card.success { background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25); color: var(--color-success); }
+.bc-summary-card.warning { background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.25); color: var(--color-warning); }
+.bc-summary-icon { display: flex; align-items: center; justify-content: center; }
+.bc-summary-info { flex: 1; }
+.bc-summary-title { font-size: 14px; font-weight: 600; color: var(--text-1); }
+.bc-summary-desc { font-size: 12px; color: var(--text-3); margin-top: 2px; word-break: break-all; }
+.bc-form { background: var(--bg-soft); border-radius: 8px; padding: 16px 16px 4px; }
+.bc-form :deep(.el-form-item__label) { display: flex; align-items: center; gap: 6px; font-weight: 500; }
+.bc-tip-icon { color: var(--text-3); cursor: help; font-size: 14px; }
+.bc-form-hint { margin-top: 6px; font-size: 12px; color: var(--color-success); display: flex; align-items: center; gap: 4px; }
+.bc-form-hint.muted { color: var(--text-3); }
+.bc-input-row { display: flex; gap: 8px; }
+.bc-input-row :deep(.el-input) { flex: 1; }
+.bc-recommend { font-size: 12px; color: var(--color-success); margin-left: 4px; }
+.bc-size-row, .bc-range-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.bc-size-sep { color: var(--text-3); }
+.bc-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 16px; border-top: 1px solid var(--border); }
 </style>

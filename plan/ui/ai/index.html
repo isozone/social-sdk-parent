@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>AI 管理中心 - AI 鱼多宝</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+:root{--brand:#4f46e5;--violet:#7c3aed;--cyan:#22d3ee;--bg-page:#f5f5f7;--text-primary:#111827;--text-secondary:#6b7280;--text-tertiary:#9ca3af;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--border:#e5e7eb}
+.phone{width:393px;height:852px;border-radius:54px;background:var(--bg-page);position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.18)}
+.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}
+.status-bar{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:14px;font-weight:600;color:var(--text-primary)}
+.page-content{position:absolute;top:58px;left:0;right:0;bottom:84px;overflow-y:auto}
+.page-content::-webkit-scrollbar{display:none}
+.ai-hero{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 50%,#22d3ee 100%);padding:48px 20px 30px;border-radius:0 0 28px 28px;position:relative;overflow:hidden;text-align:center}
+.ai-hero::before{content:'';position:absolute;top:-40%;right:-15%;width:200px;height:200px;background:radial-gradient(circle,rgba(255,255,255,.08),transparent 70%);border-radius:50%}
+.ai-icon{font-size:44px;margin-bottom:8px;filter:drop-shadow(0 4px 12px rgba(0,0,0,.2))}
+.ai-title{font-size:22px;font-weight:800;color:#fff;letter-spacing:1px}
+.ai-subtitle{font-size:12px;color:rgba(255,255,255,.7);margin-top:4px}
+/* AI Cards Grid */
+.ai-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:0 16px 16px}
+.ai-card{background:#fff;border-radius:20px;padding:20px 16px;text-align:center;border:1px solid var(--border);box-shadow:0 2px 8px rgba(0,0,0,.04);transition:all .2s;cursor:pointer}
+.ai-card:active{transform:scale(.95)}
+.ai-card-icon{width:52px;height:52px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 12px;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.ai-chat-icon{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff}
+.ai-cs-icon{background:linear-gradient(135deg,#22d3ee,#3b82f6);color:#fff}
+.ai-ops-icon{background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff}
+.ai-models-icon{background:linear-gradient(135deg,#10b981,#22c55e);color:#fff}
+.ai-card-title{font-size:14px;font-weight:700;color:var(--text-primary)}.ai-card-desc{font-size:11px;color:var(--text-tertiary);margin-top:4px;line-height:1.4}
+.ai-card-badge{display:inline-block;margin-top:8px;padding:3px 10px;border-radius:10px;font-size:10px;font-weight:600;background:rgba(79,70,229,.08);color:var(--brand)}
+.ai-card-badge.hot{background:rgba(239,68,68,.08);color:var(--danger)}
+.ai-card-badge.new{background:rgba(16,185,129,.1);color:var(--success)}
+/* Recent Activity */
+.activity-section{margin:0 16px 20px;background:#fff;border-radius:20px;padding:18px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.03)}
+.act-head{font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.act-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border-light)}
+.act-item:last-child{border-bottom:none}
+.act-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.act-dot-green{background:var(--success)}.act-dot-blue{background:var(--brand)}.act-dot-amber{background:var(--warning)}
+.act-info{flex:1}.act-title{font-size:13px;font-weight:500;color:var(--text-primary)}.act-desc{font-size:11px;color:var(--text-tertiary);margin-top:2px}
+.act-time{font-size:10px;color:var(--text-tertiary);white-space:nowrap}
+/* Model Stats */
+.model-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 16px 16px;background:#fff;border-radius:20px;padding:16px;border:1px solid var(--border)}
+.ms-cell{text-align:center}.ms-val{font-size:20px;font-weight:800;color:var(--brand)}.ms-label{font-size:10px;color:var(--text-tertiary);margin-top:3px}
+.tab-bar{position:absolute;bottom:0;left:0;right:0;height:84px;background:rgba(255,255,255,.94);backdrop-filter:blur(20px);border-top:1px solid var(--border-light);display:flex;z-index:80;padding-bottom:8px}
+.tab-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}.tab-item:active{transform:scale(.92)}.tab-icon{font-size:20px}.tab-label{font-size:10px;color:var(--text-tertiary);font-weight:400}
+.tab-item.active .tab-icon{color:var(--brand)}.tab-item.active .tab-label{color:var(--brand);font-weight:600}
+.safe-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}
+</style>
+</head>
+<body>
+<div class="phone safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
+  <div class="page-content">
+    <div class="ai-hero">
+      <div class="ai-icon">🤖</div>
+      <div class="ai-title">AI 管理中心</div>
+      <div class="ai-subtitle">智能助手 · 自动客服 · 运营加速</div>
+    </div>
+    <!-- Model Stats -->
+    <div class="model-stats">
+      <div class="ms-cell"><div class="ms-val">3</div><div class="ms-label">AI 厂商</div></div>
+      <div class="ms-cell"><div class="ms-val">8</div><div class="ms-label">可用模型</div></div>
+      <div class="ms-cell"><div class="ms-val">1.2k</div><div class="ms-label">本月调用</div></div>
+    </div>
+    <!-- AI Function Grid -->
+    <div class="ai-grid">
+      <div class="ai-card">
+        <div class="ai-card-icon ai-chat-icon">💬</div>
+        <div class="ai-card-title">AI 对话测试</div>
+        <div class="ai-card-desc">快速测试模型效果，调整回复策略</div>
+        <span class="ai-card-badge new">推荐</span>
+      </div>
+      <div class="ai-card">
+        <div class="ai-card-icon ai-cs-icon">🎧</div>
+        <div class="ai-card-title">AI 客服</div>
+        <div class="ai-card-desc">知识库管理、议价记录、会话追踪</div>
+        <span class="ai-card-badge">P2</span>
+      </div>
+      <div class="ai-card">
+        <div class="ai-card-icon ai-ops-icon">📈</div>
+        <div class="ai-card-title">AI 运营</div>
+        <div class="ai-card-desc">批量上品、运营周报、多账号同步</div>
+        <span class="ai-card-badge hot">热门</span>
+      </div>
+      <div class="ai-card">
+        <div class="ai-card-icon ai-models-icon">⚙️</div>
+        <div class="ai-card-title">厂商 / 模型</div>
+        <div class="ai-card-desc">配置 AI 提供商、切换模型参数</div>
+        <span class="ai-card-badge">P2</span>
+      </div>
+    </div>
+    <!-- Recent Activity -->
+    <div class="activity-section">
+      <div class="act-head">📋 最近活动</div>
+      <div class="act-item">
+        <div class="act-dot act-dot-green"></div>
+        <div class="act-info"><div class="act-title">AI 回复命中 "价格面议"</div><div class="act-desc">主动回复给买家：李四</div></div>
+        <div class="act-time">5 分钟前</div>
+      </div>
+      <div class="act-item">
+        <div class="act-dot act-dot-blue"></div>
+        <div class="act-info"><div class="act-title">批量生成商品标题完成</div><div class="act-desc">共处理 15 个商品，耗时 3.2s</div></div>
+        <div class="act-time">1 小时前</div>
+      </div>
+      <div class="act-item">
+        <div class="act-dot act-dot-amber"></div>
+        <div class="act-info"><div class="act-title">模型 API 响应超时</div><div class="act-desc">OpenAI gpt-4o-mini 连续 3 次重试</div></div>
+        <div class="act-time">3 小时前</div>
+      </div>
+    </div>
+  </div>
+  <div class="tab-bar safe-bottom">
+    <div class="tab-item"><span class="tab-icon">📊</span><span class="tab-label">首页</span></div>
+    <div class="tab-item"><span class="tab-icon">💬</span><span class="tab-label">消息</span></div>
+    <div class="tab-item"><span class="tab-icon">🛒</span><span class="tab-label">商品</span></div>
+    <div class="tab-item active"><span class="tab-icon">👤</span><span class="tab-label">我的</span></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>订单详情 - AI 鱼多宝</title>
+<style>
+@import url('../_design-system.css');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+.order-detail-hero{background:var(--gradient-brand);padding:24px 20px 28px;border-radius:0 0 28px 28px;position:relative;overflow:hidden}
+.order-detail-hero::before{content:'';position:absolute;top:-50%;right:-15%;width:200px;height:200px;background:radial-gradient(circle,rgba(34,211,238,.18),transparent 70%);border-radius:50%}
+.order-detail-nav{display:flex;align-items:center;gap:12px;position:relative;z-index:1}
+.back-btn{color:rgba(255,255,255,.9);font-size:20px;cursor:pointer;padding:4px 0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:none}
+.order-detail-title{color:#fff;font-size:18px;font-weight:700;flex:1}
+.order-detail-id{font-size:11px;color:rgba(255,255,255,.6);margin-top:2px}
+.order-status-badge{background:rgba(245,158,11,.25);color:#fcd34d;padding:6px 12px;border-radius:12px;font-size:12px;font-weight:700;backdrop-filter:blur(10px);border:1px solid rgba(245,158,11,.3)}
+.product-card{background:var(--bg-card);border-radius:var(--radius-md);margin:16px 16px 0;overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow-sm)}
+.product-image{height:180px;background:linear-gradient(135deg,#f3f4f6,#e5e7eb);display:flex;align-items:center;justify-content:center;font-size:72px}
+.product-info{padding:16px}
+.product-name{font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:8px}
+.product-price-tag{font-size:22px;font-weight:800;color:var(--danger)}.product-price-tag::before{content:'¥'}
+.buyer-info{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.buyer-chip{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--bg-page);border-radius:10px;font-size:12px;color:var(--text-secondary)}
+.buyer-chip b{color:var(--text-primary);font-weight:600}
+.info-section{background:var(--bg-card);border-radius:var(--radius-md);margin:16px 16px 0;padding:18px;border:1px solid var(--border);box-shadow:var(--shadow-sm)}
+.section-label{font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.section-label::before{content:'';width:4px;height:18px;border-radius:2px;background:var(--brand);flex-shrink:0}
+.info-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.info-item{display:flex;flex-direction:column;gap:3px}
+.info-label{font-size:11px;color:var(--text-tertiary)}
+.info-value{font-size:14px;color:var(--text-primary);font-weight:500}
+.info-full{grid-column:span 2}
+.delivery-form{background:var(--bg-card);border-radius:var(--radius-md);margin:16px 16px 0;padding:18px;border:1px solid var(--border);box-shadow:var(--shadow-sm)}
+.delivery-field{margin-bottom:12px}
+.delivery-field:last-child{margin-bottom:0}
+.delivery-label{font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:7px;display:block}
+.delivery-input{width:100%;height:44px;background:var(--bg-page);border:1px solid var(--border);border-radius:12px;padding:0 14px;font-size:14px;color:var(--text-primary);outline:none}
+.delivery-input:focus{border-color:var(--brand);box-shadow:0 0 0 3px rgba(79,70,229,.08)}
+.delivery-select{width:100%;height:44px;background:var(--bg-page);border:1px solid var(--border);border-radius:12px;padding:0 14px;font-size:14px;color:var(--text-primary);outline:none}
+.delivery-btn{width:100%;height:48px;background:var(--gradient-brand);border:none;border-radius:14px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;box-shadow:0 8px 32px rgba(79,70,229,.3);transition:all .3s}
+.delivery-btn:active{transform:scale(.97)}
+.timeline{background:var(--bg-card);border-radius:var(--radius-md);margin:16px 16px 0;padding:18px;border:1px solid var(--border);box-shadow:var(--shadow-sm)}
+.timeline-list{padding-left:8px}
+.timeline-item{display:flex;gap:12px;padding-bottom:16px;position:relative}
+.timeline-item:last-child{padding-bottom:0}
+.timeline-item::before{content:'';position:absolute;left:15px;top:30px;bottom:0;width:2px;background:var(--border-light)}
+.timeline-item:last-child::before{display:none}
+.t-dot{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;z-index:1}
+.t-dot-primary{background:rgba(79,70,229,.1);color:var(--brand)}.t-dot-warning{background:rgba(245,158,11,.1);color:var(--warning)}.t-dot-success{background:rgba(16,185,129,.1);color:var(--success)}.t-dot-gray{background:var(--bg-page);color:var(--text-tertiary)}
+.t-content{flex:1;padding-top:4px}
+.t-title{font-size:13px;font-weight:600;color:var(--text-primary)}
+.t-desc{font-size:12px;color:var(--text-tertiary);margin-top:2px}
+.t-time{font-size:11px;color:var(--text-tertiary);margin-top:3px}
+.bottom-bar{display:flex;gap:10px;padding:16px 16px;position:sticky;bottom:0;background:var(--bg-card);border-top:1px solid var(--border-light);z-index:50;padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px))}
+.b-btn{flex:1;height:46px;border-radius:14px;font-size:14px;font-weight:600;border:none;cursor:pointer}
+.b-primary{background:var(--brand);color:#fff}
+.b-secondary{background:var(--bg-page);color:var(--text-secondary);border:1px solid var(--border)}
+.b-danger{background:rgba(239,68,68,.1);color:var(--danger)}
+.empty-state{text-align:center;padding:60px 40px;color:var(--text-tertiary)}
+.empty-icon{font-size:48px;margin-bottom:16px;opacity:.5}
+</style>
+</head>
+<body>
+<div class="phone-frame safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="display:flex;gap:5px;align-items:center"><svg width="16" height="12" viewBox="0 0 16 12"><path d="M1 10.5a1 1 0 01-.5-1.86A8 8 0 018 2a8 8 0 018.5 6.64 1 1 0 01-1 1.86A6 6 0 008 4a6 6 0 00-7 6.5z"/><path d="M4 7.5a1 1 0 01-.5-1.86A4 4 0 018 2a4 4 0 014.5 3.64 1 1 0 01-1 1.86A2 2 0 008 4a2 2 0 00-4.5 3.5z" fill="#10b981"/></svg><svg width="16" height="12" viewBox="0 0 16 12"><rect x="1" y="4" width="3" height="8" rx=".5" fill-opacity=".3"/><rect x="5.5" y="2.5" width="3" height="9.5" rx=".5" fill-opacity=".5"/><rect x="10" y="0" width="3" height="12" rx=".5"/></svg><svg width="26" height="12" viewBox="0 0 28 12"><rect x=".5" y=".5" width="23" height="11" rx="3" stroke="#fff" fill="none"/><rect x="2" y="2" width="16" height="8" rx="1.5" fill="#10b981"/></svg></span></div>
+  <div class="page-content">
+    <div class="order-detail-hero">
+      <div class="order-detail-nav">
+        <button class="back-btn">‹</button>
+        <div style="flex:1"><div class="order-detail-title">订单详情</div><div class="order-detail-id">ORD-202607251432001</div></div>
+        <div class="order-status-badge">待发货</div>
+      </div>
+    </div>
+    <div class="product-card">
+      <div class="product-image">🎧</div>
+      <div class="product-info">
+        <div class="product-name">索尼WH-1000XM5 降噪耳机 黑色</div>
+        <div class="product-price-tag">1,899</div>
+        <div class="buyer-info">
+          <div class="buyer-chip"><span>👤</span><b>李四</b></div>
+          <div class="buyer-chip"><span>📍</span>广东深圳</div>
+          <div class="buyer-chip"><span>📱</span>138****8888</div>
+        </div>
+      </div>
+    </div>
+    <div class="info-section">
+      <div class="section-label">📋 订单信息</div>
+      <div class="info-grid">
+        <div class="info-item"><span class="info-label">下单时间</span><span class="info-value">2026-07-25 11:18</span></div>
+        <div class="info-item"><span class="info-label">支付状态</span><span class="info-value" style="color:var(--success)">已支付</span></div>
+        <div class="info-item"><span class="info-label">联系电话</span><span class="info-value">138****8888</span></div>
+        <div class="info-item"><span class="info-label">收货地址</span><span class="info-value">广东省深圳市南山区</span></div>
+        <div class="info-item info-full"><span class="info-label">备注</span><span class="info-value">请尽快发货，谢谢！</span></div>
+      </div>
+    </div>
+    <div class="delivery-form">
+      <div class="section-label">📦 发货</div>
+      <div class="delivery-field"><label class="delivery-label">快递公司</label><select class="delivery-select"><option>顺丰速运</option><option>圆通快递</option><option>中通快递</option><option>韵达快递</option></select></div>
+      <div class="delivery-field"><label class="delivery-label">物流单号</label><input class="delivery-input" placeholder="请输入快递单号"></div>
+      <button class="delivery-btn">确认发货</button>
+    </div>
+    <div class="timeline">
+      <div class="section-label">🕐 订单状态</div>
+      <div class="timeline-list">
+        <div class="timeline-item"><div class="t-dot t-dot-primary">📦</div><div class="t-content"><div class="t-title">卖家已发货</div><div class="t-desc">等待买家确认收货</div><div class="t-time">2026-07-25 14:32:00</div></div></div>
+        <div class="timeline-item"><div class="t-dot t-dot-warning">💳</div><div class="t-content"><div class="t-title">买家已付款</div><div class="t-desc">等待卖家发货</div><div class="t-time">2026-07-25 11:18:23</div></div></div>
+        <div class="timeline-item"><div class="t-dot t-dot-success">🛒</div><div class="t-content"><div class="t-title">买家已下单</div><div class="t-desc">订单创建成功</div><div class="t-time">2026-07-25 11:17:45</div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="bottom-bar">
+    <button class="b-btn b-secondary">取消订单</button>
+    <button class="b-btn b-primary">联系买家</button>
+  </div>
+</div>
+</body>
+</html>

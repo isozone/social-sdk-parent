@@ -1,46 +1,63 @@
 <template>
   <div class="page-root">
-    <el-card style="margin: 0;">
-      <template #header>
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span>钱包资产</span>
-          <el-button
-            type="primary"
-            size="small"
-            :loading="syncing"
-            :disabled="!selectedAccountId"
-            @click="syncWalletFn">同步钱包</el-button>
+    <el-card shadow="never">
+      <!-- ===== 卡片头部 + 筛选栏 ===== -->
+      <div class="card-head">
+        <div class="card-head-left">
+          <div class="card-chip chip-violet">
+            <el-icon><Money /></el-icon>
+          </div>
+          <div class="card-head-text">
+            <div class="card-title">钱包资产</div>
+            <div class="card-sub">闲鱼账号余额、交易记录与提现配置</div>
+          </div>
         </div>
-      </template>
-      <el-form inline>
-        <el-form-item label="账号">
+        <div class="toolbar-right">
           <el-select v-model="selectedAccountId" @change="loadWallet" placeholder="选择账号" style="width: 200px;">
             <el-option v-for="a in accounts" :key="a.id" :label="a.accountName" :value="a.id" />
           </el-select>
-        </el-form-item>
-      </el-form>
+          <el-button type="primary" size="small" :loading="syncing" :disabled="!selectedAccountId" @click="syncWalletFn">
+            <el-icon><Refresh /></el-icon> 同步钱包
+          </el-button>
+        </div>
+      </div>
+
       <el-alert
         v-if="syncMsg"
         :title="syncMsg"
         :type="syncOk ? 'success' : 'warning'"
         :closable="false"
-        style="margin-bottom: 12px;"
-        show-icon />
-      <el-descriptions v-if="wallet" :column="2" border style="margin-top: 16px;">
-        <el-descriptions-item label="余额">¥{{ wallet.balance }}</el-descriptions-item>
-        <el-descriptions-item label="冻结金额">¥{{ wallet.frozenAmount }}</el-descriptions-item>
-        <el-descriptions-item label="可用余额">¥{{ wallet.availableBalance != null ? wallet.availableBalance : '-' }}</el-descriptions-item>
-        <el-descriptions-item label="总资产">¥{{ wallet.totalAssets != null ? wallet.totalAssets : '-' }}</el-descriptions-item>
-        <el-descriptions-item label="可提现">¥{{ wallet.withdrawableAmount != null ? wallet.withdrawableAmount : '-' }}</el-descriptions-item>
-        <el-descriptions-item label="支付宝">{{ wallet.alipayAccount || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="支付宝实名">{{ wallet.alipayRealName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="银行卡">{{ wallet.bankCard || '-' }}</el-descriptions-item>
-      </el-descriptions>
-      <el-empty v-else description="请选择账号查看钱包信息" />
+        show-icon
+      />
+
+      <template v-if="wallet">
+        <el-descriptions :column="2" border class="wallet-desc">
+          <el-descriptions-item label="余额" class="amount-col">¥{{ wallet.balance }}</el-descriptions-item>
+          <el-descriptions-item label="冻结金额">¥{{ wallet.frozenAmount }}</el-descriptions-item>
+          <el-descriptions-item label="可用余额">¥{{ wallet.availableBalance != null ? wallet.availableBalance : '-' }}</el-descriptions-item>
+          <el-descriptions-item label="总资产">¥{{ wallet.totalAssets != null ? wallet.totalAssets : '-' }}</el-descriptions-item>
+          <el-descriptions-item label="可提现">¥{{ wallet.withdrawableAmount != null ? wallet.withdrawableAmount : '-' }}</el-descriptions-item>
+          <el-descriptions-item label="支付宝">{{ wallet.alipayAccount || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="支付宝实名">{{ wallet.alipayRealName || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="银行卡">{{ wallet.bankCard || '-' }}</el-descriptions-item>
+        </el-descriptions>
+      </template>
+      <el-empty v-else description="请选择账号查看钱包信息" class="mt-16" />
     </el-card>
 
-    <el-card style="margin-top: 16px;">
-      <template #header><span>交易记录</span></template>
+    <el-card shadow="never" class="mt-16">
+      <div class="card-head">
+        <div class="card-head-left">
+          <div class="card-chip chip-cyan">
+            <el-icon><List /></el-icon>
+          </div>
+          <div class="card-head-text">
+            <div class="card-title">交易记录</div>
+            <div class="card-sub">充值 / 扣费 / 提现流水</div>
+          </div>
+        </div>
+      </div>
+
       <el-table :data="transactions" stripe>
         <el-table-column prop="transactionId" label="交易ID" width="200" />
         <el-table-column prop="type" label="类型" width="100">
@@ -68,6 +85,7 @@
 import { ref, onMounted } from 'vue'
 import api from '@/api/request'
 import { ElMessage } from 'element-plus'
+import { Money, List, Refresh } from '@element-plus/icons-vue'
 import { getWallet, getRecentTransactions, syncWallet } from '@/api/wallet'
 
 const accounts = ref([])
@@ -136,3 +154,52 @@ async function syncWalletFn() {
 
 onMounted(() => { loadAccounts() })
 </script>
+
+<style scoped>
+.toolbar-right {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.card-head-left {
+  display: flex; align-items: center; gap: 14px; min-width: 0;
+}
+.card-chip {
+  width: 44px; height: 44px; border-radius: 13px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 20px; flex-shrink: 0;
+}
+.chip-violet {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.22);
+}
+.chip-cyan {
+  background: linear-gradient(135deg, #06b6d4, #22d3ee);
+  box-shadow: 0 8px 18px rgba(6, 182, 212, 0.25);
+}
+.card-head-text {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+}
+.card-title {
+  font-size: 16px; font-weight: 600; color: var(--text-1);
+}
+.card-sub {
+  font-size: 12px; color: var(--text-3);
+}
+.mt-16 { margin-top: 16px; }
+.wallet-desc .amount-col {
+  color: var(--color-danger); font-weight: 700;
+}
+.page-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: var(--space-4); flex-wrap: wrap;
+}
+.page-toolbar .toolbar-left {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.page-toolbar .toolbar-right {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+</style>

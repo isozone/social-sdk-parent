@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>账号详情 - AI 鱼多宝</title>
+<style>
+@import url('../_design-system.css');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'PingFang SC','SF Pro Display',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+
+/* Page-specific */
+.hero-overlay{background:var(--gradient-brand);padding:56px 20px 32px;border-radius:0 0 28px 28px;position:relative;overflow:hidden}
+.hero-overlay::before{content:'';position:absolute;top:-35%;right:-12%;width:200px;height:200px;background:radial-gradient(circle,rgba(34,211,238,.22),transparent 70%);border-radius:50%}
+.hero-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;position:relative;z-index:1}
+.hero-back{color:rgba(255,255,255,.9);font-size:20px;cursor:pointer;padding:4px 0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:none}
+.hero-more{color:rgba(255,255,255,.9);font-size:20px;cursor:pointer;padding:4px 0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:none}
+.hero-body{display:flex;align-items:center;gap:14px;position:relative;z-index:1}
+.hero-avatar{width:56px;height:56px;border-radius:18px;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;color:#fff;font-size:28px;flex-shrink:0;box-shadow:0 4px 16px rgba(0,0,0,.15)}
+.hero-info h2{font-size:20px;font-weight:700;color:#fff}.hero-info p{font-size:12px;color:rgba(255,255,255,.7);margin-top:2px}
+.hero-status{margin-left:auto;text-align:right}
+
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 16px;margin-top:-22px;position:relative;z-index:2}
+.kpi-card{background:var(--bg-card);border-radius:var(--radius-md);padding:14px 8px;text-align:center;border:1px solid var(--border-light);box-shadow:var(--shadow-md)}
+.kpi-icon{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 8px}
+.kpi-icon svg{width:16px;height:16px}
+.kpi-value{font-size:20px;font-weight:800;color:var(--text-primary);line-height:1}
+.kpi-label{font-size:11px;color:var(--text-tertiary);margin-top:4px}
+
+.info-section{margin:20px 16px;background:var(--bg-card);border-radius:var(--radius-lg);padding:20px;border:1px solid var(--border);box-shadow:var(--shadow-sm)}
+.section-label{font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.section-label::before{content:'';width:4px;height:18px;border-radius:2px;background:var(--brand);flex-shrink:0}
+
+.info-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border-light)}
+.info-row:last-child{border-bottom:none}
+.info-left{flex:1;min-width:0}
+.info-label{font-size:14px;color:var(--text-secondary)}.info-desc{font-size:11px;color:var(--text-tertiary);margin-top:2px}
+.info-value{font-size:14px;color:var(--text-primary);font-weight:500;text-align:right;white-space:nowrap}
+
+.toggle-wrap{display:flex;align-items:center}
+
+.action-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:0 16px 20px}
+.action-card{background:var(--bg-card);border-radius:var(--radius-md);padding:18px 14px;text-align:center;border:1px solid var(--border);box-shadow:var(--shadow-sm);cursor:pointer;transition:transform .15s}
+.action-card:active{transform:scale(.96)}
+.action-icon{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px}
+.action-icon svg{width:20px;height:20px}
+.action-label{font-size:14px;font-weight:600;color:var(--text-primary)}.action-desc{font-size:11px;color:var(--text-tertiary);margin-top:4px}
+
+.status-bar--white{color:#fff!important}
+</style>
+</head>
+<body>
+<div class="phone-frame safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar status-bar--white"><span style="color:#fff">9:41</span><span style="color:#fff;font-size:12px">●●●●●</span></div>
+  <div class="page-content">
+    <!-- Hero -->
+    <div class="hero-overlay">
+      <div class="hero-nav">
+        <button class="hero-back" onclick="history.back()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span style="font-size:16px;font-weight:600;color:#fff;position:relative;z-index:1">账号详情</span>
+        <button class="hero-more">&#8942;</button>
+      </div>
+      <div class="hero-body">
+        <div class="hero-avatar" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)">🐟</div>
+        <div class="hero-info"><h2>闲鱼-主力号</h2><p>ID: 10086 · 2025-03-15 加入</p></div>
+        <div class="hero-status"><span class="chip-green" style="padding:5px 12px;border-radius:10px;font-size:12px;font-weight:700;background:rgba(16,185,129,.2);color:#86efac">● 健康</span></div>
+      </div>
+    </div>
+
+    <!-- KPI cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(79,70,229,.08)"><svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L5 14.34a2 2 0 010-2.83L11.58 5a2 2 0 012.83 0l7.18 7.17a2 2 0 01-.01 2.84z"/></svg></div>
+        <div class="kpi-value">156</div>
+        <div class="kpi-label">商品数</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(16,185,129,.08)"><svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L2 12h4l3-9 3 9z"/></svg></div>
+        <div class="kpi-value" style="color:var(--success)">96</div>
+        <div class="kpi-label">健康分</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(245,158,11,.08)"><svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg></div>
+        <div class="kpi-value" style="color:var(--warning)">23</div>
+        <div class="kpi-label">今日订单</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-icon" style="background:rgba(34,211,238,.08)"><svg viewBox="0 0 24 24" fill="none" stroke="#0891b2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg></div>
+        <div class="kpi-value" style="color:#0891b2">128</div>
+        <div class="kpi-label">消息量</div>
+      </div>
+    </div>
+
+    <!-- Basic Info -->
+    <div class="info-section">
+      <div class="section-label">基础信息</div>
+      <div class="info-row">
+        <span class="info-label">店铺名称</span>
+        <span class="info-value">Vim的二手好物</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">芝麻信用</span>
+        <span class="info-value">680</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Cookie 状态</span>
+        <span class="info-value" style="color:var(--success)">有效 · 剩余 12 天</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">最后同步</span>
+        <span class="info-value">2 分钟前</span>
+      </div>
+    </div>
+
+    <!-- Auto Reply -->
+    <div class="info-section">
+      <div class="section-label">自动回复</div>
+      <div class="info-row">
+        <div class="info-left">
+          <div class="info-label">AI 自动回复</div>
+          <div class="info-desc">匹配后自动回复</div>
+        </div>
+        <div class="toggle-wrap">
+          <div class="toggle active"></div>
+        </div>
+      </div>
+      <div class="info-row">
+        <div class="info-left">
+          <div class="info-label">关键词匹配</div>
+          <div class="info-desc">12 条规则生效中</div>
+        </div>
+        <div class="toggle-wrap">
+          <div class="toggle active"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="action-grid">
+      <div class="action-card">
+        <div class="action-icon" style="background:rgba(79,70,229,.08)"><svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg></div>
+        <div class="action-label">同步数据</div>
+        <div class="action-desc">刷新商品/订单</div>
+      </div>
+      <div class="action-card">
+        <div class="action-icon" style="background:rgba(124,58,237,.08)"><svg viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg></div>
+        <div class="action-label">经营分析</div>
+        <div class="action-desc">详细数据报表</div>
+      </div>
+      <div class="action-card">
+        <div class="action-icon" style="background:rgba(156,163,175,.08)"><svg viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></div>
+        <div class="action-label">设置</div>
+        <div class="action-desc">编辑账号信息</div>
+      </div>
+      <div class="action-card">
+        <div class="action-icon" style="background:rgba(239,68,68,.08)"><svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></div>
+        <div class="action-label" style="color:var(--danger)">删除账号</div>
+        <div class="action-desc">谨慎操作</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

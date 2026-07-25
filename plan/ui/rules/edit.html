@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>规则编辑 - AI 鱼多宝</title>
+<style>
+@import url('../_design-system.css');
+body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+/* Custom additions */
+.rule-editor{padding:0 16px 100px}
+.section-card{background:#fff;border-radius:18px;padding:18px;margin-bottom:14px;border:1px solid var(--border);box-shadow:var(--shadow-sm)}
+.field-label{font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:7px;display:block}
+.field-hint{font-size:11px;color:var(--text-tertiary);margin-top:5px}
+.keyword-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.kw-tag{display:flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(79,70,229,.06);border:1px solid rgba(79,70,229,.15);border-radius:10px;font-size:13px;color:var(--brand);font-weight:500}
+.kw-remove{font-size:14px;color:var(--text-tertiary);cursor:pointer}
+.match-types{display:flex;gap:8px}
+.match-type{flex:1;padding:10px;background:var(--bg-page);border:2px solid transparent;border-radius:12px;text-align:center;font-size:12px;font-weight:500;color:var(--text-secondary);cursor:pointer;transition:all .2s}
+.match-type.active{border-color:var(--brand);background:rgba(79,70,229,.06);color:var(--brand);font-weight:700}
+.account-select{display:flex;gap:8px}
+.acc-opt{flex:1;padding:8px;background:var(--bg-page);border-radius:10px;text-align:center;font-size:12px;font-weight:500;color:var(--text-secondary);border:2px solid transparent;cursor:pointer}
+.acc-opt.active{border-color:var(--brand);background:rgba(79,70,229,.06);color:var(--brand)}
+.reply-preview{background:var(--bg-page);border-radius:14px;padding:14px;margin-top:12px}
+.reply-preview-title{font-size:11px;font-weight:600;color:var(--text-tertiary);margin-bottom:6px}
+.reply-preview-text{font-size:13px;color:var(--text-primary);line-height:1.6}
+.save-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;padding:12px 16px 28px;border-top:1px solid var(--border-light)}
+.save-row{display:flex;gap:10px}
+.save-btn{flex:1;height:50px;border-radius:16px;font-size:16px;font-weight:700;border:none;cursor:pointer;box-shadow:0 8px 32px rgba(79,70,229,.35);transition:all .3s}
+.save-btn:active{transform:scale(.97)}
+.cancel-btn{width:80px!important;background:var(--bg-page)!important;color:var(--text-secondary)!important;box-shadow:none!important;font-size:14px!important}
+.test-panel{margin-top:12px;padding:12px;background:rgba(16,185,129,.06);border-radius:12px;border:1px solid rgba(16,185,129,.15)}
+.test-result{font-size:13px;font-weight:600;color:var(--success);display:flex;align-items:center;gap:6px}
+.td-on{width:8px;height:8px;border-radius:50%;background:var(--success)}
+/* nav override for brand header */
+.nav-bar{height:auto;padding:20px 16px 22px;border-radius:0 0 28px 28px;background:var(--gradient-brand);border-bottom:none;backdrop-filter:none}
+.nav-back-text{color:#fff;font-size:22px;cursor:pointer}
+.nav-title-style{color:#fff;font-size:17px;font-weight:700;flex:1;text-align:center}
+.btn-test{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer}
+</style>
+</head>
+<body>
+<div class="phone-frame safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
+  <div class="page-content">
+    <div class="nav-bar">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="nav-back-text">‹</span>
+        <span class="nav-title-style">编辑规则</span>
+        <div style="flex:1"></div>
+        <button class="btn-test">🧪 测试匹配</button>
+      </div>
+    </div>
+    <div class="rule-editor">
+      <div class="section-card">
+        <div class="section-title-text" style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:14px">📝 基础信息</div>
+        <div style="margin-bottom:14px"><label class="field-label">规则名称</label><input class="input-field" value="价格议价"></div>
+        <div><label class="field-label">规则说明</label><input class="input-field" value="当买家询问价格优惠时自动回复"></div>
+      </div>
+      <div class="section-card">
+        <div class="section-title-text" style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:14px">🔍 关键词配置</div>
+        <div style="margin-bottom:14px"><label class="field-label">匹配类型</label>
+          <div class="match-types"><div class="match-type active">包含匹配</div><div class="match-type">精确匹配</div><div class="match-type">正则匹配</div></div>
+        </div>
+        <div><label class="field-label">关键词列表</label>
+          <div class="keyword-tags">
+            <span class="kw-tag">能便宜吗 <span class="kw-remove">×</span></span>
+            <span class="kw-tag">最低多少 <span class="kw-remove">×</span></span>
+            <span class="kw-tag">多少钱 <span class="kw-remove">×</span></span>
+            <span class="kw-tag">可以打折吗 <span class="kw-remove">×</span></span>
+          </div>
+          <div class="field-hint">点击 × 删除关键词，输入新词回车添加</div>
+          <input class="input-field" placeholder="输入新关键词后按回车添加" style="margin-top:8px">
+        </div>
+      </div>
+      <div class="section-card">
+        <div class="section-title-text" style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:14px">💬 回复内容</div>
+        <div style="margin-bottom:14px"><label class="field-label">自动回复内容</label><textarea class="input-field" style="height:100px;padding-top:10px;resize:none;line-height:1.6" placeholder="输入自动回复内容，支持 {price} {product} 等占位符">亲，这个价格已经很优惠了哦～如果您诚心想要，可以给您一点小折扣，私聊我哈 😊</textarea></div>
+        <div class="reply-preview"><div class="reply-preview-title">预览效果</div><div class="reply-preview-text">亲，这个价格已经很优惠了哦～如果您诚心想要，可以给您一点小折扣，私聊我哈 😊</div></div>
+      </div>
+      <div class="section-card">
+        <div class="section-title-text" style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:14px">⚙️ 高级设置</div>
+        <div style="margin-bottom:14px"><label class="field-label">适用账号</label>
+          <div class="account-select"><div class="acc-opt active">主力号</div><div class="acc-opt">副业号</div><div class="acc-opt">全部</div></div>
+        </div>
+        <div style="margin-bottom:14px"><label class="field-label">每日回复上限</label><input class="input-field" type="number" value="50" placeholder="留空不限"></div>
+        <div><label class="field-label">冷却时间</label><select class="input-field"><option>10 秒</option><option selected>30 秒</option><option>60 秒</option></select></div>
+      </div>
+      <div class="test-panel">
+        <div class="test-result"><span class="td-on"></span> 测试 "最低多少能便宜" → 匹配成功，将回复此内容</div>
+      </div>
+    </div>
+    <div class="save-bar">
+      <div class="save-row">
+        <button class="save-btn cancel-btn">取消</button>
+        <button class="save-btn" style="background:var(--gradient-brand)">保存规则</button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

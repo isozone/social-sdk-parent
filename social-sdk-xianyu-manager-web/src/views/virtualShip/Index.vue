@@ -1,32 +1,42 @@
 <template>
   <div class="page-root">
-    <el-tabs v-model="activeTab" type="border-card">
+    <el-tabs v-model="activeTab" type="border-card" class="ship-tabs">
       <!-- ===== Tab 1：全局配置 ===== -->
       <el-tab-pane label="全局配置" name="config">
-        <el-card style="margin: 0;">
-          <template #header>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span>⚙️ 虚拟发货配置</span>
-              <el-button type="primary" size="small" @click="saveConfig" :loading="configLoading">保存配置</el-button>
+        <el-card shadow="never" style="margin: 0;">
+          <div class="card-head">
+            <div class="card-head-left">
+              <div class="card-chip chip-violet"><el-icon><Setting /></el-icon></div>
+              <div class="card-head-text">
+                <div class="card-title">虚拟发货全局配置</div>
+                <div class="card-sub">控制自动发货、延迟策略、确认收货与通知规则</div>
+              </div>
             </div>
-          </template>
+            <div class="card-head-right">
+              <el-button type="primary" size="small" @click="saveConfig" :loading="configLoading">
+                <el-icon><Check /></el-icon>保存配置
+              </el-button>
+            </div>
+          </div>
 
-          <el-form :model="configForm" label-width="140px">
+          <el-form :model="configForm" label-width="160px" class="config-form">
             <el-form-item label="启用自动发货">
               <el-switch v-model="configForm.enabled" />
             </el-form-item>
             <el-form-item label="发货延迟(秒)">
               <el-input-number v-model="configForm.delaySeconds" :min="0" />
-              <span style="margin-left: 8px; color: #909399; font-size: 12px;">支付成功后延时发货（防风控）</span>
+              <span style="color: var(--text-3); font-size: 12px; margin-left: 8px;">支付成功后延时发货（防风控）</span>
             </el-form-item>
             <el-form-item label="自动确认收货">
-              <span style="color: #909399; font-size: 12px;">
-                订单在 <el-input-number v-model="configForm.autoConfirmDays" :min="1" :max="30" size="small" style="width: 80px; margin: 0 8px;" /> 天后自动确认收货
+              <span style="color: var(--text-3); font-size: 12px;">
+                订单在
+                <el-input-number v-model="configForm.autoConfirmDays" :min="1" :max="30" size="small" style="width: 90px; margin: 0 8px;" />
+                天后自动确认收货
               </span>
             </el-form-item>
             <el-form-item label="发货后通知">
               <el-switch v-model="configForm.notifyAfterShip" />
-              <span style="margin-left: 8px; color: #909399; font-size: 12px;">发货后站内通知运营</span>
+              <span style="color: var(--text-3); font-size: 12px; margin-left: 8px;">发货后站内通知运营</span>
             </el-form-item>
           </el-form>
         </el-card>
@@ -34,16 +44,24 @@
 
       <!-- ===== Tab 2：商品发货配置 ===== -->
       <el-tab-pane label="商品发货配置" name="product">
-        <el-card style="margin: 0;">
-          <template #header>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span>🛒 商品虚拟发货配置</span>
-              <el-button type="primary" size="small" @click="loadProductList" :loading="productLoading">刷新</el-button>
+        <el-card shadow="never" style="margin: 0;">
+          <div class="card-head">
+            <div class="card-head-left">
+              <div class="card-chip chip-cyan"><el-icon><ShoppingBag /></el-icon></div>
+              <div class="card-head-text">
+                <div class="card-title">商品虚拟发货配置</div>
+                <div class="card-sub">管理商品发货类型、内容模板与虚拟商品切换</div>
+              </div>
             </div>
-          </template>
-          <el-alert type="info" :closable="false" style="margin-bottom: 12px;">
-            列出全部商品。商品类型为"虚拟"的商品会进入虚拟发货链路。点击"配置"可修改商品类型和发货方式。
-            模板支持占位符：<b>${cardCode}</b> <b>${cardPassword}</b> <b>${link}</b> <b>${extractCode}</b> <b>${fileName}</b> <b>${itemTitle}</b> <b>${orderId}</b>
+            <div class="card-head-right">
+              <el-button size="small" @click="loadProductList" :loading="productLoading">
+                <el-icon><RefreshRight /></el-icon>刷新
+              </el-button>
+            </div>
+          </div>
+          <el-alert type="info" :closable="false" class="tip-alert">
+            列出全部商品。类型为「虚拟」的商品会进入虚拟发货链路，点击「配置」可修改发货方式。
+            模板占位符：<b>${cardCode}</b> <b>${cardPassword}</b> <b>${link}</b> <b>${extractCode}</b> <b>${fileName}</b> <b>${itemTitle}</b> <b>${orderId}</b>
           </el-alert>
           <el-table :data="products" stripe v-loading="productLoading">
             <el-table-column prop="id" label="ID" width="60" />
@@ -73,15 +91,21 @@
 
       <!-- ===== Tab 3：卡密池 ===== -->
       <el-tab-pane label="卡密池" name="card">
-        <el-card style="margin: 0;">
-          <template #header>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span>🔑 卡密池</span>
+        <el-card shadow="never" style="margin: 0;">
+          <div class="card-head">
+            <div class="card-head-left">
+              <div class="card-chip chip-amber"><el-icon><Key /></el-icon></div>
+              <div class="card-head-text">
+                <div class="card-title">卡密池</div>
+                <div class="card-sub">批量管理卡密/密码资源，用于虚拟商品自动发货</div>
+              </div>
+            </div>
+            <div class="card-head-right">
               <el-button type="primary" size="small" @click="showAddCardDialog = true">
-                <el-icon><Plus /></el-icon> 批量添加卡密
+                <el-icon><Plus /></el-icon>批量添加卡密
               </el-button>
             </div>
-          </template>
+          </div>
 
           <el-table :data="cards" stripe v-loading="cardLoading">
             <el-table-column prop="id" label="ID" width="60" />
@@ -107,21 +131,27 @@
 
       <!-- ===== Tab 4：网盘文件 ===== -->
       <el-tab-pane label="网盘文件" name="file">
-        <el-card style="margin: 0;">
-          <template #header>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span>📁 网盘文件（发货素材）</span>
+        <el-card shadow="never" style="margin: 0;">
+          <div class="card-head">
+            <div class="card-head-left">
+              <div class="card-chip chip-green"><el-icon><FolderOpened /></el-icon></div>
+              <div class="card-head-text">
+                <div class="card-title">网盘文件（发货素材）</div>
+                <div class="card-sub">上传本地素材，下单后自动创建分享链接发给买家</div>
+              </div>
+            </div>
+            <div class="card-head-right">
               <el-button type="primary" size="small" @click="showUploadDialog = true">
-                <el-icon><Upload /></el-icon> 上传文件
+                <el-icon><Upload /></el-icon>上传文件
               </el-button>
             </div>
-          </template>
+          </div>
 
-          <el-alert type="info" :closable="false" style="margin-bottom: 16px;">
+          <el-alert type="info" :closable="false" class="tip-alert">
             提示：买家下单后，系统自动从已上传文件中选择一个，创建网盘分享链接发给买家。
           </el-alert>
 
-          <el-select v-model="fileFilterAccountId" placeholder="选择网盘账号" clearable style="width: 200px; margin-bottom: 12px;" @change="loadFiles">
+          <el-select v-model="fileFilterAccountId" placeholder="选择网盘账号" clearable style="width: 220px; margin-bottom: 12px;" @change="loadFiles">
             <el-option v-for="acc in storageAccounts" :key="acc.id" :label="`${providerLabel(acc.provider)} (${acc.uid || '-'})`" :value="acc.id" />
           </el-select>
 
@@ -152,10 +182,16 @@
 
       <!-- ===== Tab 5：发货任务 ===== -->
       <el-tab-pane label="发货任务" name="task">
-        <el-card style="margin: 0;">
-          <template #header>
-            <span>📦 虚拟发货任务记录</span>
-          </template>
+        <el-card shadow="never" style="margin: 0;">
+          <div class="card-head">
+            <div class="card-head-left">
+              <div class="card-chip chip-slate"><el-icon><List /></el-icon></div>
+              <div class="card-head-text">
+                <div class="card-title">虚拟发货任务记录</div>
+                <div class="card-sub">查看所有卡密 / 网盘发货任务的状态与执行明细</div>
+              </div>
+            </div>
+          </div>
 
           <el-table :data="tasks" stripe v-loading="taskLoading">
             <el-table-column prop="id" label="ID" width="60" />
@@ -191,22 +227,22 @@
 
     <!-- 商品虚拟发货配置弹窗 -->
     <el-dialog v-model="showProductConfigDialog" title="商品虚拟发货配置" width="640px">
-      <el-form :model="productConfigForm" label-width="120px">
+      <el-form :model="productConfigForm" label-width="130px">
         <el-form-item label="商品">
-          <span>{{ productConfigForm.title }}</span>
+          <span style="font-weight: 600;">{{ productConfigForm.title }}</span>
         </el-form-item>
         <el-form-item label="商品类型">
           <el-radio-group v-model="productConfigForm.goodsType">
-            <el-radio label="VIRTUAL">虚拟商品</el-radio>
-            <el-radio label="PHYSICAL">实物商品</el-radio>
+            <el-radio-button value="VIRTUAL">虚拟商品</el-radio-button>
+            <el-radio-button value="PHYSICAL">实物商品</el-radio-button>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="发货类型">
           <el-radio-group v-model="productConfigForm.deliverType">
-            <el-radio label="CARD">卡密</el-radio>
-            <el-radio label="ACCOUNT">账号</el-radio>
-            <el-radio label="LINK">链接文本</el-radio>
-            <el-radio label="FILE">网盘文件</el-radio>
+            <el-radio-button value="CARD">卡密</el-radio-button>
+            <el-radio-button value="ACCOUNT">账号</el-radio-button>
+            <el-radio-button value="LINK">链接文本</el-radio-button>
+            <el-radio-button value="FILE">网盘文件</el-radio-button>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="发货内容模板">
@@ -216,9 +252,9 @@
             :rows="6"
             :placeholder="templatePlaceholder"
           />
-          <div style="color: #909399; font-size: 12px; margin-top: 6px; line-height: 1.6;">
+          <div style="color: var(--text-3); font-size: 12px; margin-top: 6px; line-height: 1.6;">
             <div v-if="productConfigForm.deliverType === 'CARD' || productConfigForm.deliverType === 'ACCOUNT'">
-              卡密发货。可用占位符：<b>${cardCode}</b> <b>${cardPassword}</b>。留空则走默认格式"卡号：xxx\n密码：xxx"。
+              卡密/账号发货。可用占位符：<b>${cardCode}</b> <b>${cardPassword}</b>。留空则走默认格式「卡号：xxx\n密码：xxx」。
             </div>
             <div v-else-if="productConfigForm.deliverType === 'LINK'">
               链接发货。模板即发给买家的文本，支持 <b>${itemTitle}</b> <b>${orderId}</b> 等通用占位符。
@@ -249,7 +285,7 @@
     <!-- 上传文件对话框 -->
     <el-dialog v-model="showUploadDialog" title="上传文件（网盘）" width="500px">
       <el-upload drag :auto-upload="false" :on-change="handleFileChange" :show-file-list="true" accept="*">
-        <el-icon class="el-icon--upload"><Upload-filled /></el-icon>
+        <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
         <div class="el-upload__text">拖拽文件到此处或点击上传</div>
       </el-upload>
       <template #footer>
@@ -263,7 +299,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Upload, UploadFilled } from '@element-plus/icons-vue'
+import {
+  Plus, Upload, UploadFilled, Setting, Check, ShoppingBag, Key, FolderOpened, List, RefreshRight
+} from '@element-plus/icons-vue'
 import api from '@/api/request'
 import {
   listVirtualShipTasks, getVirtualShipConfig, saveVirtualShipConfig,
@@ -272,7 +310,6 @@ import {
   listForVirtualShip, saveProductVirtualShipConfig
 } from '@/api/virtualShip'
 
-// 配置（字段与后端 VirtualShipConfig 对齐）
 const configForm = ref({
   accountId: null,
   enabled: true,
@@ -280,11 +317,9 @@ const configForm = ref({
   autoConfirmDays: 7,
   notifyAfterShip: true
 })
-// 当前 tab
 const activeTab = ref('config')
 const configLoading = ref(false)
 
-// 账号
 const accounts = ref([])
 const loadAccounts = async () => {
   try { const r = await api.get('/accounts'); accounts.value = r.data || [] } catch {}
@@ -294,7 +329,6 @@ const loadConfig = async () => {
   try {
     const r = await getVirtualShipConfig(accounts.value[0].id)
     if (r.data) {
-      // 只回写后端存在的字段，避免覆盖前端独有状态
       configForm.value = {
         ...configForm.value,
         accountId: r.data.accountId,
@@ -307,12 +341,9 @@ const loadConfig = async () => {
   } catch {}
 }
 const saveConfig = async () => {
-  if (!accounts.value.length) {
-    return ElMessage.warning('请先添加账号')
-  }
+  if (!accounts.value.length) return ElMessage.warning('请先添加账号')
   configLoading.value = true
   try {
-    // 提交时带上当前账号 id，字段名与后端一致
     const payload = {
       accountId: accounts.value[0].id,
       enabled: configForm.value.enabled,
@@ -328,7 +359,6 @@ const saveConfig = async () => {
   } finally { configLoading.value = false }
 }
 
-// 卡密
 const cards = ref([])
 const cardLoading = ref(false)
 const showAddCardDialog = ref(false)
@@ -354,7 +384,6 @@ const deleteCard = async (id) => {
   loadCards()
 }
 
-// 网盘文件
 const storageAccounts = ref([])
 const files = ref([])
 const fileLoading = ref(false)
@@ -366,7 +395,6 @@ const loadStorageAccounts = async () => {
   try { const r = await listStorageAccounts(); storageAccounts.value = r.data || [] } catch {}
 }
 
-// 商品虚拟发货配置
 const products = ref([])
 const productLoading = ref(false)
 const loadProductList = async () => {
@@ -379,7 +407,6 @@ const loadProductList = async () => {
   } finally { productLoading.value = false }
 }
 
-// 商品配置弹窗
 const showProductConfigDialog = ref(false)
 const productConfigSaving = ref(false)
 const productConfigForm = ref({
@@ -415,7 +442,6 @@ const openProductConfig = (row) => {
 const saveProductConfig = async () => {
   productConfigSaving.value = true
   try {
-    // 实物商品不保留虚拟发货配置
     const isVirtual = productConfigForm.value.goodsType === 'VIRTUAL'
     await saveProductVirtualShipConfig(productConfigForm.value.id, {
       goodsType: productConfigForm.value.goodsType,
@@ -453,7 +479,6 @@ const testShare = async (row) => {
   loadFiles()
 }
 
-// 发货任务
 const tasks = ref([])
 const taskLoading = ref(false)
 const loadTasks = async () => {
@@ -488,3 +513,15 @@ onMounted(() => {
   loadProductList()
 })
 </script>
+
+<style scoped>
+.ship-tabs {
+  padding: 0;
+}
+.config-form :deep(.el-form-item) {
+  margin-bottom: 20px;
+}
+.tip-alert {
+  margin-bottom: 16px;
+}
+</style>

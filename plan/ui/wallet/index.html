@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>钱包资产 - AI 鱼多宝</title>
+<style>
+@import url('../_design-system.css');
+body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+/* Wallet custom */
+.wallet-hero{background:var(--gradient-brand);padding:40px 20px 30px;border-radius:0 0 28px 28px;position:relative;overflow:hidden}
+.wallet-hero::before{content:'';position:absolute;top:-30%;right:-10%;width:200px;height:200px;background:radial-gradient(circle,rgba(34,211,238,.2),transparent 70%);border-radius:50%}
+.wallet-hero::after{content:'';position:absolute;bottom:-20%;left:-10%;width:150px;height:150px;background:radial-gradient(circle,rgba(124,58,237,.2),transparent 70%);border-radius:50%}
+.wh-top{display:flex;justify-content:space-between;align-items:center;position:relative;z-index:1}
+.wh-title{color:rgba(255,255,255,.8);font-size:14px;font-weight:500}.wh-balance{color:#fff;font-size:32px;font-weight:800;margin-top:4px;text-shadow:0 2px 12px rgba(0,0,0,.2)}
+.wh-note{color:rgba(255,255,255,.5);font-size:11px;margin-top:6px}
+.account-select{display:flex;gap:8px;margin-top:16px;position:relative;z-index:1}
+.acc-opt{flex:1;padding:8px 12px;border-radius:12px;background:rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:500;text-align:center;border:1px solid rgba(255,255,255,.15)}
+.acc-opt.active{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.3)}
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 16px;margin-top:-18px;position:relative;z-index:2}
+.s-num{font-size:16px;font-weight:800;color:var(--text-primary)}.s-label{font-size:10px;color:var(--text-tertiary);margin-top:3px}
+.s-suffix{font-size:11px;font-weight:500;color:var(--text-tertiary)}
+.txn-list{padding:0 16px 20px;display:flex;flex-direction:column;gap:10px}
+.txn-card{background:#fff;border-radius:16px;padding:14px 16px;border:1px solid var(--border);box-shadow:var(--shadow-sm);display:flex;align-items:center;gap:12px}
+.txn-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.ti-green{background:rgba(16,185,129,.1);color:var(--success)}.ti-red{background:rgba(239,68,68,.1);color:var(--danger)}.ti-violet{background:var(--purple-light);color:var(--violet)}
+.txn-info{flex:1;min-width:0}.txn-title{font-size:14px;font-weight:600;color:var(--text-primary)}.txn-desc{font-size:11px;color:var(--text-tertiary);margin-top:2px}
+.txn-amount{font-size:16px;font-weight:800;text-align:right}
+.txn-positive{color:var(--success)}.txn-negative{color:var(--danger)}.txn-neutral{color:var(--text-primary)}
+.sync-card{margin:0 16px 14px;background:#fff;border-radius:16px;padding:14px;border:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.sync-info{flex:1}.sync-title{font-size:13px;font-weight:600;color:var(--text-primary)}.sync-desc{font-size:11px;color:var(--text-tertiary);margin-top:2px}
+.sync-btn{padding:8px 16px;border-radius:10px;background:var(--bg-page);border:1px solid var(--border);font-size:12px;font-weight:600;color:var(--brand);cursor:pointer}
+</style>
+</head>
+<body>
+<div class="phone-frame safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
+  <div class="page-content">
+    <div class="wallet-hero">
+      <div class="wh-top"><span class="wh-title">当前账号：主力号</span><span style="color:rgba(255,255,255,.7);font-size:20px">⚙️</span></div>
+      <div class="wh-balance">¥ 12,680.50</div>
+      <div class="wh-note">最后同步：2026-07-25 14:30</div>
+      <div class="account-select"><div class="acc-opt active">主力号</div><div class="acc-opt">副业号</div><div class="acc-opt">测试号</div></div>
+    </div>
+    <div class="stat-row">
+      <div class="stat-card"><div class="s-num">¥3,200<span class="s-suffix">.00</span></div><div class="s-label">冻结余额</div></div>
+      <div class="stat-card"><div class="s-num">¥9,480<span class="s-suffix">.50</span></div><div class="s-label">可提现</div></div>
+      <div class="stat-card"><div class="s-num">¥46.8k</div><div class="s-label">本月收入</div></div>
+    </div>
+    <div class="sync-card"><div class="sync-info"><div class="sync-title">数据可能不是最新</div><div class="sync-desc">点击上方按钮同步最新余额</div></div><button class="sync-btn">🔄 同步钱包</button></div>
+    <div class="section-header"><div><div class="section-title">交易记录</div></div><a href="#" class="section-link">全部 ></a></div>
+    <div class="txn-list">
+      <div class="txn-card"><div class="txn-icon ti-green">💰</div><div class="txn-info"><div class="txn-title">订单收款</div><div class="txn-desc">Sony WH-1000XM5 · 订单号 20260725001</div></div><div class="txn-amount txn-positive">+¥1,899</div></div>
+      <div class="txn-card"><div class="txn-icon ti-green">💰</div><div class="txn-info"><div class="txn-title">订单收款</div><div class="txn-desc">Nike AF1 · 订单号 20260724003</div></div><div class="txn-amount txn-positive">+¥299</div></div>
+      <div class="txn-card"><div class="txn-icon ti-red">📤</div><div class="txn-info"><div class="txn-title">提现</div><div class="txn-desc">提现至支付宝 ****8888</div></div><div class="txn-amount txn-negative">-¥5,000</div></div>
+      <div class="txn-card"><div class="txn-icon ti-green">💰</div><div class="txn-info"><div class="txn-title">订单收款</div><div class="txn-desc">iPhone 15 Pro Max · 订单号 20260724001</div></div><div class="txn-amount txn-positive">+¥7,999</div></div>
+      <div class="txn-card"><div class="txn-icon ti-violet">🔒</div><div class="txn-info"><div class="txn-title">平台冻结</div><div class="txn-desc">退款争议冻结</div></div><div class="txn-amount txn-neutral">-¥3,200</div></div>
+    </div>
+  </div>
+  <div class="tab-bar safe-bottom">
+    <div class="tab-item"><span class="tab-icon">📊</span><span class="tab-label">首页</span></div>
+    <div class="tab-item"><span class="tab-icon">💬</span><span class="tab-label">消息</span></div>
+    <div class="tab-item"><span class="tab-icon">🛒</span><span class="tab-label">商品</span></div>
+    <div class="tab-item active"><span class="tab-icon">👤</span><span class="tab-label">我的</span></div>
+  </div>
+</div>
+</body>
+</html>

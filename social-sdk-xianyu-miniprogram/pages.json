@@ -1,0 +1,123 @@
+{
+  "pages": [
+    { "path": "pages/login/index", "style": { "navigationStyle": "custom", "disableScroll": false } },
+    { "path": "pages/index/index", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/orders/list", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/products/list", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/messages/list", "style": { "navigationStyle": "custom" } },
+    { "path": "pages/profile/index", "style": { "navigationStyle": "custom" } }
+  ],
+  "subPackages": [
+    {
+      "root": "packages/accounts",
+      "pages": [
+        { "path": "list/index", "style": { "navigationStyle": "custom" } },
+        { "path": "detail/index", "style": { "navigationStyle": "custom" } },
+        { "path": "add/index", "style": { "navigationStyle": "custom" } }
+      ]
+    },
+    {
+      "root": "packages/products",
+      "pages": [
+        { "path": "detail/index", "style": { "navigationStyle": "custom" } },
+        { "path": "publish/index", "style": { "navigationStyle": "custom" } }
+      ]
+    },
+    {
+      "root": "packages/messages",
+      "pages": [
+        { "path": "chat/index", "style": { "navigationStyle": "custom" } }
+      ]
+    },
+    {
+      "root": "packages/rules",
+      "pages": [
+        { "path": "list/index", "style": { "navigationStyle": "custom" } },
+        { "path": "edit/index", "style": { "navigationStyle": "custom" } }
+      ]
+    },
+    {
+      "root": "packages/wallet",
+      "pages": [
+        { "path": "index/index", "style": { "navigationStyle": "custom" } }
+      ]
+    },
+    {
+      "root": "packages/notify",
+      "pages": [
+        { "path": "index/index", "style": { "navigationStyle": "custom" } }
+      ]
+    },
+    {
+      "root": "packages/reviews",
+      "pages": [
+        { "path": "index/index", "style": { "navigationStyle": "custom" } },
+        { "path": "detail/index", "style": { "navigationStyle": "custom" } }
+      ]
+    },
+    {
+      "root": "packages/collect",
+      "pages": [
+        { "path": "list/index", "style": { "navigationStyle": "custom" } }
+      ]
+    },
+    {
+      "root": "packages/ai",
+      "pages": [
+        { "path": "providers/index", "style": { "navigationStyle": "custom" } },
+        { "path": "chat/index", "style": { "navigationStyle": "custom" } },
+        { "path": "cs/index", "style": { "navigationStyle": "custom" } },
+        { "path": "ops/index", "style": { "navigationStyle": "custom" } }
+      ]
+    },
+    {
+      "root": "packages/report",
+      "pages": [
+        { "path": "replyLogs/index", "style": { "navigationStyle": "custom" } }
+      ]
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "AI鱼多宝",
+    "navigationBarBackgroundColor": "#F8F8F9",
+    "backgroundColor": "#F5F5F7",
+    "backgroundExtractStyle": "frostedGlass"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#4f46e5",
+    "borderStyle": "white",
+    "backgroundColor": "#ffffff",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "static/tab/home.png",
+        "selectedIconPath": "static/tab/home-active.png"
+      },
+      {
+        "pagePath": "pages/messages/list",
+        "text": "消息",
+        "iconPath": "static/tab/message.png",
+        "selectedIconPath": "static/tab/message-active.png"
+      },
+      {
+        "pagePath": "pages/products/list",
+        "text": "商品",
+        "iconPath": "static/tab/product.png",
+        "selectedIconPath": "static/tab/product-active.png"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的",
+        "iconPath": "static/tab/user.png",
+        "selectedIconPath": "static/tab/user-active.png"
+      }
+    ]
+  },
+  "condition": {
+    "current": 0,
+    "list": []
+  }
+}

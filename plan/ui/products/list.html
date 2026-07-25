@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>商品列表 - AI 鱼多宝</title>
+<style>
+@import url('_design-system.css');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+
+.product-list{padding:0 16px 100px;display:flex;flex-direction:column;gap:14px}
+
+.product-card{background:var(--bg-card);border-radius:var(--radius-md);border:1px solid var(--border-light);box-shadow:var(--shadow-sm);overflow:hidden}
+.product-card:active{transform:scale(.98)}
+
+.product-img{height:160px;display:flex;align-items:center;justify-content:center;font-size:56px;position:relative}
+
+.product-body{padding:14px}
+
+.product-title{font-size:15px;font-weight:600;color:var(--text-primary);line-height:1.4;margin-bottom:10px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+.product-meta{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.product-price{font-size:20px;font-weight:800;color:var(--danger)}
+.product-stock{font-size:12px;color:var(--text-tertiary)}
+
+.product-tags{display:flex;gap:6px;margin-bottom:10px}
+
+.action-row{display:flex;gap:8px}
+.action-btn{flex:1;height:38px;border-radius:10px;font-size:13px;font-weight:600;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;transition:all .2s}
+.action-btn:active{transform:scale(.95)}
+.action-btn--primary{background:var(--brand);color:#fff;box-shadow:0 4px 12px rgba(79,70,229,.2)}
+.action-btn--secondary{background:var(--bg-page);color:var(--text-secondary)}
+</style>
+</head>
+<body>
+<div class="phone-frame safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span>●●●●●</span></div>
+
+  <div class="page-content">
+    <div class="nav-bar" style="top:58px">
+      <span class="nav-title">商品</span>
+      <div class="nav-actions">
+        <button class="nav-icon-btn" aria-label="搜索">🔍</button>
+        <button class="nav-icon-btn" aria-label="设置">⚙️</button>
+      </div>
+    </div>
+
+    <div class="scroll-tabs">
+      <span class="scroll-tab active">主力号</span>
+      <span class="scroll-tab">副业号</span>
+      <span class="scroll-tab">本地商品</span>
+    </div>
+
+    <div class="scroll-tabs" style="padding-top:0">
+      <span class="scroll-tab active">全部 <span style="opacity:.7">(156)</span></span>
+      <span class="scroll-tab">在售 <span style="opacity:.7">(128)</span></span>
+      <span class="scroll-tab">已下架 <span style="opacity:.7">(21)</span></span>
+      <span class="scroll-tab">草稿 <span style="opacity:.7">(7)</span></span>
+    </div>
+
+    <div class="product-list">
+      <!-- Card 1 -->
+      <div class="product-card">
+        <div class="product-img hero-section--compact">
+          👟
+          <span class="chip chip-green">在售</span>
+        </div>
+        <div class="product-body">
+          <div class="product-title">全新Nike Air Force 1 空军一号白色板鞋</div>
+          <div class="product-meta">
+            <span class="product-price">¥299</span>
+            <span class="product-stock">库存 12</span>
+          </div>
+          <div class="product-tags">
+            <span class="chip chip-violet">新品</span>
+            <span class="chip chip-slate">浏览量 1.2k</span>
+          </div>
+          <div class="action-row">
+            <button class="action-btn action-btn--secondary">✨ 擦亮</button>
+            <button class="action-btn action-btn--primary">编辑</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="product-card">
+        <div class="product-img" style="background:linear-gradient(135deg,#e0e7ff,#c7d2fe)">
+          🎧
+          <span class="chip chip-green">在售</span>
+        </div>
+        <div class="product-body">
+          <div class="product-title">索尼WH-1000XM5 降噪耳机 黑色 头戴式</div>
+          <div class="product-meta">
+            <span class="product-price">¥1899</span>
+            <span class="product-stock">库存 5</span>
+          </div>
+          <div class="product-tags">
+            <span class="chip chip-violet">热门</span>
+            <span class="chip chip-slate">浏览量 3.5k</span>
+          </div>
+          <div class="action-row">
+            <button class="action-btn action-btn--secondary">✨ 擦亮</button>
+            <button class="action-btn action-btn--primary">编辑</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="product-card">
+        <div class="product-img" style="background:linear-gradient(135deg,#fef3c7,#fde68a)">
+          ⌚
+          <span class="chip chip-slate">已下架</span>
+        </div>
+        <div class="product-body">
+          <div class="product-title">Apple Watch Series 9 GPS 45mm</div>
+          <div class="product-meta">
+            <span class="product-price" style="color:var(--text-secondary)">¥2499</span>
+            <span class="product-stock">已售罄</span>
+          </div>
+          <div class="product-tags">
+            <span class="chip chip-slate">浏览量 890</span>
+          </div>
+          <div class="action-row">
+            <button class="action-btn action-btn--secondary">重新上架</button>
+            <button class="action-btn action-btn--primary">编辑</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="fab" aria-label="新增商品">+</button>
+
+  <div class="tab-bar safe-bottom">
+    <div class="tab-item"><span class="tab-icon">📊</span><span class="tab-label">首页</span></div>
+    <div class="tab-item"><span class="tab-icon">💬</span><span class="tab-label">消息</span></div>
+    <div class="tab-item active"><span class="tab-icon">🛒</span><span class="tab-label">商品</span></div>
+    <div class="tab-item"><span class="tab-icon">👤</span><span class="tab-label">我的</span></div>
+  </div>
+</div>
+</body>
+</html>

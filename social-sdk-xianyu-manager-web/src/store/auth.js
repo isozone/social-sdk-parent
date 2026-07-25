@@ -2,6 +2,8 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { login as loginApi, getProfile } from '@/api/auth'
 
+export const POST_LOGIN_REDIRECT = '/app/dashboard'
+
 export const useAuthStore = defineStore('auth', () => {
   const token = ref('')
   const user = ref(null)

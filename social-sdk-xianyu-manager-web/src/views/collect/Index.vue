@@ -1,9 +1,16 @@
 <template>
   <div class="page-root">
     <el-card shadow="never" style="margin: 0;">
-      <template #header>
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span style="font-size:16px; font-weight:600;">收藏关注</span>
+      <!-- 卡片头 -->
+      <div class="card-head">
+        <div class="card-head-left">
+          <div class="card-chip chip-green"><el-icon><Star /></el-icon></div>
+          <div class="card-head-text">
+            <div class="card-title">收藏关注</div>
+            <div class="card-sub">同步、管理与维护闲鱼商品 / 用户 / 店铺收藏列表</div>
+          </div>
+        </div>
+        <div class="card-head-right">
           <el-button
             type="primary"
             size="small"
@@ -11,29 +18,35 @@
             :disabled="!selectedAccountId"
             @click="handleSync"
           >
-            <el-icon style="margin-right:4px;"><Refresh /></el-icon>
+            <el-icon><Refresh /></el-icon>
             {{ syncing ? '同步中...' : '同步闲鱼收藏' }}
           </el-button>
         </div>
-      </template>
-      <el-form inline style="margin-bottom: 16px;">
-        <el-form-item label="账号">
-          <el-select v-model="selectedAccountId" @change="loadCollects" placeholder="选择账号" style="width: 200px;">
-            <el-option v-for="a in accounts" :key="a.id" :label="a.accountName" :value="a.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="类型">
-          <el-select v-model="selectedType" @change="loadCollects" placeholder="全部" style="width: 120px;" clearable>
-            <el-option label="全部" value="" />
-            <el-option label="商品" value="ITEM" />
-            <el-option label="用户" value="USER" />
-            <el-option label="店铺" value="SHOP" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleOpenAddDialog">添加收藏</el-button>
-        </el-form-item>
-      </el-form>
+      </div>
+
+      <!-- 筛选工具栏 -->
+      <div class="page-toolbar">
+        <div class="toolbar-left">
+          <el-form :inline="true" :model="filterState" class="filter-bar">
+            <el-form-item label="账号">
+              <el-select v-model="selectedAccountId" @change="loadCollects" placeholder="选择账号" style="width: 200px;">
+                <el-option v-for="a in accounts" :key="a.id" :label="a.accountName" :value="a.id" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="类型">
+              <el-select v-model="selectedType" @change="loadCollects" placeholder="全部" style="width: 120px;" clearable>
+                <el-option label="全部" value="" />
+                <el-option label="商品" value="ITEM" />
+                <el-option label="用户" value="USER" />
+                <el-option label="店铺" value="SHOP" />
+              </el-select>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="handleOpenAddDialog">添加收藏</el-button>
+            </el-form-item>
+          </el-form>
+        </div>
+      </div>
 
       <el-table :data="collects" stripe v-loading="loading">
         <el-table-column prop="id" label="ID" width="60" />
@@ -59,7 +72,6 @@
 
     <!-- 添加收藏弹窗 -->
     <el-dialog v-model="showAddDialog" title="添加收藏" width="640px">
-      <!-- 类型 + 账号 -->
       <el-form :model="addForm" label-width="80px">
         <el-form-item label="类别">
           <el-radio-group v-model="addForm.targetType" @change="onTypeChange">
@@ -75,7 +87,6 @@
         </el-form-item>
       </el-form>
 
-      <!-- 快速输入：粘贴链接或输入ID -->
       <el-divider>快速输入</el-divider>
       <el-form :model="addForm" label-width="80px">
         <el-form-item label="链接/ID">
@@ -99,7 +110,6 @@
         </el-form-item>
       </el-form>
 
-      <!-- 识别结果预览 -->
       <div v-if="addForm.targetId" class="selected-preview">
         <el-descriptions :column="2" size="small" border>
           <el-descriptions-item label="类型">{{ typeLabel(addForm.targetType) }}</el-descriptions-item>
@@ -110,7 +120,6 @@
         </el-descriptions>
       </div>
 
-      <!-- 商品类：关键词搜索（备选方式） -->
       <template v-if="addForm.targetType === 'ITEM' && !addForm.targetId">
         <el-divider>或 关键词搜索</el-divider>
         <el-form :model="addForm" label-width="80px">
@@ -130,9 +139,8 @@
           </el-form-item>
         </el-form>
 
-        <!-- 搜索结果 -->
         <div v-if="searchResults.length > 0" class="search-results">
-          <div style="font-size:13px; color:#909399; margin-bottom:8px;">搜索结果：点击选中</div>
+          <div style="font-size:13px; color: var(--text-3); margin-bottom:8px;">搜索结果：点击选中</div>
           <el-table
             :data="searchResults"
             max-height="280"
@@ -143,14 +151,14 @@
             <el-table-column label="商品" min-width="300">
               <template #default="{ row }">
                 <div class="item-cell">
-                  <el-image v-if="row.pic" :src="row.pic" style="width:40px;height:40px;border-radius:4px;flex-shrink:0;" fit="cover" />
+                  <el-image v-if="row.pic" :src="row.pic" style="width:40px;height:40px;border-radius:8px;flex-shrink:0;" fit="cover" />
                   <span class="item-title">{{ row.title }}</span>
                 </div>
               </template>
             </el-table-column>
             <el-table-column label="价格" width="100">
               <template #default="{ row }">
-                <span style="color:#f56c6c; font-weight:600;">¥{{ row.price }}</span>
+                <span style="color: var(--danger); font-weight:600;">¥{{ row.price }}</span>
               </template>
             </el-table-column>
           </el-table>
@@ -172,7 +180,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, Search } from '@element-plus/icons-vue'
+import { Refresh, Search, Star } from '@element-plus/icons-vue'
 import api from '@/api/request'
 import { listCollects, addCollect, removeCollect, syncCollects, searchCollectItems, lookupCollectTarget } from '@/api/collect'
 
@@ -196,7 +204,8 @@ const searchResults = ref([])
 const searching = ref(false)
 const searched = ref(false)
 
-// 根据类型动态切换输入框提示
+const filterState = {}
+
 const quickInputPlaceholder = computed(() => {
   if (addForm.value.targetType === 'ITEM') return '粘贴商品链接，如 https://www.goofish.com/item?id=xxx'
   if (addForm.value.targetType === 'USER') return '粘贴用户主页链接，如 https://www.goofish.com/user?id=xxx'
@@ -264,40 +273,24 @@ function onQuickInputClear() {
   quickInput.value = ''
 }
 
-/**
- * 从闲鱼链接中解析出目标ID
- * 支持格式：
- *   https://www.goofish.com/item?id=xxx
- *   https://www.goofish.com/user?id=xxx
- *   https://www.goofish.com/shop?id=xxx
- *   https://m.goofish.com/xxx?id=xxx
- *   纯数字ID
- */
 function parseXianyuUrl(input, targetType) {
   if (!input) return null
   input = input.trim()
-  // 纯数字ID
   if (/^\d+$/.test(input)) return input
   try {
     const url = new URL(input)
     const params = url.searchParams
-    // 优先从 query 参数取 id
     let id = params.get('id')
     if (id) return id
-    // 从路径解析 /item/xxx 或 /user/xxx
     const pathMatch = url.pathname.match(/\/(item|user|shop)\/(\d+)/)
     if (pathMatch) return pathMatch[2]
   } catch (e) {
-    // 不是合法URL，尝试从字符串中提取数字
     const numMatch = input.match(/(\d{6,})/)
     if (numMatch) return numMatch[1]
   }
   return null
 }
 
-/**
- * 快速输入确认：解析链接/ID → 自动查询名称
- */
 async function onQuickInputConfirm() {
   if (!quickInput.value.trim()) {
     ElMessage.warning('请输入链接或目标ID')
@@ -320,7 +313,6 @@ async function onQuickInputConfirm() {
       addForm.value.targetName = res.data.targetName || ''
       ElMessage.success('识别成功')
     } else {
-      // 查询失败也允许继续（用户可手填名称）
       addForm.value.targetId = targetId
       addForm.value.targetName = ''
       ElMessage.warning(res.message || '自动查询名称失败，可手填名称后继续')
@@ -378,7 +370,6 @@ async function handleAdd() {
   }
 
   if (addForm.value.targetType !== 'ITEM') {
-    // 非商品类型只落库
     try {
       adding.value = true
       const res = await addCollect({
@@ -399,7 +390,6 @@ async function handleAdd() {
     return
   }
 
-  // 商品类型：同步到闲鱼
   adding.value = true
   try {
     const res = await addCollect({
@@ -476,13 +466,17 @@ onMounted(loadAccounts)
 </script>
 
 <style scoped>
+.filter-bar :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
 .page-root {
   padding: 0;
 }
 
 .search-results {
-  border: 1px solid #ebeef5;
-  border-radius: 4px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
   overflow: hidden;
   margin-bottom: 12px;
 }
@@ -492,13 +486,13 @@ onMounted(loadAccounts)
 }
 
 .search-results :deep(.el-table__row:hover) {
-  background-color: #f5f7fa !important;
+  background-color: var(--hover-1) !important;
 }
 
 .item-cell {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .item-title {
@@ -511,7 +505,7 @@ onMounted(loadAccounts)
 
 .no-result {
   text-align: center;
-  color: #909399;
+  color: var(--text-3);
   padding: 24px 0;
   font-size: 13px;
 }
@@ -519,19 +513,20 @@ onMounted(loadAccounts)
 .selected-preview {
   margin-top: 12px;
   padding: 12px;
-  background-color: #f0f9eb;
-  border-radius: 4px;
+  background-color: var(--brand-light-9);
+  border-radius: 8px;
+  border: 1px solid var(--line-2);
 }
 
 .input-tip {
   font-size: 12px;
-  color: #909399;
+  color: var(--text-3);
   margin-top: 4px;
   line-height: 1.5;
 }
 
 .input-tip a {
-  color: #7c3aed;
+  color: var(--brand-2);
   text-decoration: none;
 }
 

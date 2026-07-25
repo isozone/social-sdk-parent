@@ -3,8 +3,14 @@
     <el-card style="margin: 0;">
       <template #header>
         <div class="card-head">
-          <span class="card-title">监控面板</span>
-          <el-button size="small" @click="handleRefresh">刷新</el-button>
+          <div class="card-head-left">
+            <div class="card-chip chip-violet"><el-icon><Monitor /></el-icon></div>
+            <div class="card-head-text">
+              <div class="card-title">监控面板</div>
+              <div class="card-sub">实时概况、账号状态与异常追踪</div>
+            </div>
+          </div>
+          <el-button size="small" @click="handleRefresh"><el-icon><Refresh /></el-icon> 刷新</el-button>
         </div>
       </template>
       <el-row :gutter="16">
@@ -25,7 +31,17 @@
     </el-card>
 
     <el-card style="margin-top: 16px;">
-      <template #header><span>账号维度统计</span></template>
+      <template #header>
+        <div class="card-head">
+          <div class="card-head-left">
+            <div class="card-chip chip-cyan"><el-icon><User /></el-icon></div>
+            <div class="card-head-text">
+              <div class="card-title">账号维度统计</div>
+              <div class="card-sub">商品数、在售数、浏览量与收藏数</div>
+            </div>
+          </div>
+        </div>
+      </template>
       <el-table :data="accounts" stripe>
         <el-table-column prop="displayName" label="账号名称" width="180">
           <template #default="{ row }">
@@ -54,22 +70,21 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { getDashboard, clearCache } from '@/api/monitor'
-// 修复 Bug：statCards 之前用字符串 icon 名（'User' 等），但 <component :is="..."> 需要组件引用而非字符串名，
-// 导致统计卡片的图标渲染不出来。改为直接导入 Element Plus 图标组件作为 icon 值。
-import { User, CircleCheck, Goods, Shop, ChatLineRound, View, Star, Warning } from '@element-plus/icons-vue'
+import { User, CircleCheck, Goods, Shop, ChatLineRound, View, Star, Warning, Monitor, Refresh } from '@element-plus/icons-vue'
+import { COLORS, EL_COLORS, BRAND } from '@/styles/color-palette'
 
 const overview = ref({})
 const accounts = ref([])
 
 const statCards = computed(() => [
-  { title: '总账号数', value: overview.value.totalAccounts || 0, icon: User, color: '#7c3aed' },
-  { title: '在线账号', value: overview.value.onlineAccounts || 0, icon: CircleCheck, color: '#67C23A' },
-  { title: '总商品数', value: overview.value.totalProducts || 0, icon: Goods, color: '#E6A23C' },
-  { title: '在售商品', value: overview.value.onSaleProducts || 0, icon: Shop, color: '#F56C6C' },
-  { title: '今日回复', value: overview.value.todayReplies || 0, icon: ChatLineRound, color: '#909399' },
-  { title: '总浏览量', value: overview.value.totalViews || 0, icon: View, color: '#73C0DE' },
-  { title: '总收藏', value: overview.value.totalFavorites || 0, icon: Star, color: '#FC8452' },
-  { title: '异常账号', value: overview.value.cookieExpiredAccounts || 0, icon: Warning, color: '#EE6666' }
+  { title: '总账号数', value: overview.value.totalAccounts || 0, icon: User, color: BRAND.primary2 },
+  { title: '在线账号', value: overview.value.onlineAccounts || 0, icon: CircleCheck, color: COLORS.success },
+  { title: '总商品数', value: overview.value.totalProducts || 0, icon: Goods, color: COLORS.warning },
+  { title: '在售商品', value: overview.value.onSaleProducts || 0, icon: Shop, color: COLORS.danger },
+  { title: '今日回复', value: overview.value.todayReplies || 0, icon: ChatLineRound, color: COLORS.info },
+  { title: '总浏览量', value: overview.value.totalViews || 0, icon: View, color: BRAND.accent },
+  { title: '总收藏', value: overview.value.totalFavorites || 0, icon: Star, color: COLORS.warning },
+  { title: '异常账号', value: overview.value.cookieExpiredAccounts || 0, icon: Warning, color: EL_COLORS.danger }
 ])
 
 function statusType(status) {
@@ -102,6 +117,6 @@ onMounted(loadDashboard)
 .stat-content { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .stat-text { min-width: 0; }
 .stat-value { font-size: 26px; font-weight: 700; line-height: 1.2; }
-.stat-label { font-size: 13px; color: #909399; margin-top: 6px; }
+.stat-label { font-size: 13px; color: var(--text-3); margin-top: 6px; }
 .stat-icon { width: 44px; height: 44px; border-radius: 13px; display: flex; align-items: center; justify-content: center; color: #fff; flex-shrink: 0; box-shadow: 0 8px 18px -6px rgba(0,0,0,0.25); }
 </style>

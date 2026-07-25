@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>发布商品 - AI 鱼多宝</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--brand:#4f46e5;--brand-2:#7c3aed;--accent:#22d3ee;--bg:#f5f5f7;--text-1:#111827;--text-2:#6b7280;--text-3:#9ca3af;--border:#e5e7eb;--danger:#ef4444}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+.phone{width:393px;height:852px;border-radius:48px;background:var(--bg);position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.2)}
+.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}
+.status-bar{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:14px;font-weight:600;color:#111827}
+.content{position:absolute;top:58px;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}.content::-webkit-scrollbar{display:none}
+/* Top Nav */
+.pub-head{padding:10px 16px 8px;background:rgba(255,255,255,.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:20}
+.back{font-size:22px;color:var(--text-2);cursor:pointer;padding:4px}
+.pub-title{flex:1;text-align:center;font-size:16px;font-weight:600;color:var(--text-1);margin-right:28px}
+.cancel-btn{font-size:14px;color:var(--text-3);cursor:pointer}
+.submit-btn{font-size:14px;font-weight:600;color:var(--brand);background:linear-gradient(135deg,var(--brand),var(--brand-2));padding:6px 16px;border-radius:20px;border:none;cursor:pointer;box-shadow:0 2px 8px rgba(79,70,229,.2)}
+/* Sections */
+.section{background:#fff;margin-top:10px;padding:20px 16px;border-bottom:1px solid var(--border)}
+.section-label{font-size:15px;font-weight:700;color:var(--text-1);margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.section-label span{font-size:12px;font-weight:500;color:var(--text-3);margin-left:auto}
+/* Upload Area */
+.upload-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.upload-item{aspect-ratio:1;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:32px;border:2px dashed #d1d5db;background:#fafafa;cursor:pointer;transition:all .2s}
+.upload-item:hover{border-color:var(--brand);background:rgba(79,70,229,.03)}
+.upload-item.filled{border-style:solid;border-color:#e5e7eb}
+.upload-item.remove{opacity:.5}
+.upload-item.add{color:var(--text-3);font-size:28px}
+.upload-hint{font-size:11px;color:var(--text-3);margin-top:10px;text-align:center}
+/* Fields */
+.field-row{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.field-label{width:56px;font-size:14px;color:var(--text-2);font-weight:500;flex-shrink:0}
+.field-input{flex:1;height:44px;border:1px solid #e8e8e8;border-radius:12px;padding:0 14px;font-size:14px;color:var(--text-1);outline:none;background:#fafafa;transition:all .2s}
+.field-input:focus{border-color:var(--brand);background:#fff;box-shadow:0 0 0 3px rgba(79,70,229,.08)}
+.field-input::placeholder{color:#c0c4cc}
+textarea.field-input{height:120px;padding:12px 14px;resize:none;line-height:1.6}
+.price-row{display:flex;align-items:center;gap:8px}
+.price-symbol{font-size:20px;font-weight:700;color:var(--danger)}.price-input{flex:1}
+.category-row{display:flex;gap:10px}
+.category-chip{flex:1;padding:10px;border-radius:12px;border:1px solid #e8e8e8;background:#fafafa;font-size:14px;color:var(--text-2);text-align:center;cursor:pointer;transition:all .2s}
+.category-chip.active{border-color:var(--brand);background:rgba(79,70,229,.08);color:var(--brand);font-weight:600}
+.desc-count{text-align:right;font-size:11px;color:var(--text-3);margin-top:6px}
+/* Tags */
+.tag-row{display:flex;flex-wrap:wrap;gap:8px}
+.tag-chip{padding:7px 16px;border-radius:20px;font-size:13px;background:#f3f4f6;color:var(--text-2);border:1px solid transparent;cursor:pointer;transition:all .2s;font-weight:500}
+.tag-chip.selected{color:var(--brand);background:rgba(79,70,229,.08);border-color:rgba(79,70,229,.15);font-weight:600}
+.tag-chip:active{transform:scale(.95)}
+/* AI Suggest */
+.ai-suggest{display:flex;align-items:center;gap:10px;padding:14px;background:rgba(79,70,229,.04);border-radius:14px;border:1px solid rgba(79,70,229,.1)}
+.ai-badge{background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;font-size:10px;padding:4px 10px;border-radius:8px;font-weight:700;letter-spacing:.5px;flex-shrink:0}
+.ai-text{flex:1;font-size:13px;color:var(--brand);font-weight:500;line-height:1.4}
+.ai-use-btn{padding:6px 14px;border-radius:10px;background:rgba(79,70,229,.1);color:var(--brand);font-size:12px;font-weight:600;border:none;cursor:pointer;white-space:nowrap;transition:all .2s}
+.ai-use-btn:active{transform:scale(.95)}
+/* Bottom Actions */
+.bottom-actions{padding:16px;display:flex;gap:10px;position:sticky;bottom:0;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--border)}
+.btn-primary{flex:1;padding:14px;background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(79,70,229,.3);transition:transform .15s}
+.btn-primary:active{transform:scale(.98)}
+.btn-outline{padding:14px 20px;background:#fff;color:var(--brand);border:1px solid var(--brand);border-radius:14px;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-outline:active{background:rgba(79,70,229,.04)}
+.safe-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}
+</style>
+</head>
+<body>
+<div class="phone safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
+  <div class="content">
+    <div class="pub-head">
+      <div class="back">&#8592;</div>
+      <div class="pub-title">发布商品</div>
+      <button class="submit-btn">发布</button>
+    </div>
+    <!-- Images -->
+    <div class="section">
+      <div class="section-label">商品图片 <span>最多 9 张 · 建议 800×800</span></div>
+      <div class="upload-grid">
+        <div class="upload-item filled">📱</div>
+        <div class="upload-item filled">🔍</div>
+        <div class="upload-item filled">✨</div>
+        <div class="upload-item add">+</div>
+      </div>
+      <div class="upload-hint">点击添加图片 · 第一张为封面图</div>
+    </div>
+    <!-- Info -->
+    <div class="section">
+      <div class="section-label">商品信息</div>
+      <div class="field-row">
+        <label class="field-label">标题</label>
+        <input class="field-input" placeholder="请输入商品标题，不超过 30 字">
+      </div>
+      <div class="field-row">
+        <label class="field-label">价格</label>
+        <div class="price-row"><span class="price-symbol">¥</span><input class="field-input price-input" type="number" placeholder="0.00"></div>
+      </div>
+      <div class="category-row">
+        <div class="category-chip active">二手数码</div>
+        <div class="category-chip">服饰鞋包</div>
+        <div class="category-chip">家居生活</div>
+        <div class="category-chip">更多 &#8594;</div>
+      </div>
+      <div class="field-row" style="margin-top:14px">
+        <label class="field-label">成色</label>
+        <select class="field-input"><option>9 成新</option><option>全新</option><option>8 成新</option><option>7 成新</option></select>
+      </div>
+      <div class="field-row" style="margin-top:14px">
+        <label class="field-label">数量</label>
+        <input class="field-input" type="number" value="1" min="1">
+      </div>
+      <div class="field-row" style="margin-top:14px">
+        <label class="field-label">描述</label>
+        <textarea class="field-input" placeholder="详细描述商品的使用情况、配件、售后等..."></textarea>
+        <div class="desc-count">0 / 500</div>
+      </div>
+    </div>
+    <!-- Tags -->
+    <div class="section">
+      <div class="section-label">热门标签</div>
+      <div class="tag-row">
+        <div class="tag-chip selected">#包邮</div>
+        <div class="tag-chip">#当天发货</div>
+        <div class="tag-chip">#正品保障</div>
+        <div class="tag-chip">#全新</div>
+        <div class="tag-chip">#可小刀</div>
+        <div class="tag-chip">#急出</div>
+      </div>
+    </div>
+    <!-- AI Suggest -->
+    <div class="section">
+      <div class="ai-suggest">
+        <div class="ai-badge">AI</div>
+        <div class="ai-text">用 AI 智能优化标题和描述，提升曝光率</div>
+        <button class="ai-use-btn">立即优化</button>
+      </div>
+    </div>
+    <div class="bottom-actions">
+      <button class="btn-outline">保存草稿</button>
+      <button class="btn-primary">发布商品</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

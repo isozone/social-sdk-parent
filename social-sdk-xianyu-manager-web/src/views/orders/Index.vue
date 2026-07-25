@@ -1,43 +1,51 @@
 <template>
   <div class="page-root">
-    <el-card style="margin: 0;">
-      <template #header>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span>订单管理</span>
-          <div style="display: flex; gap: 12px; align-items: center;">
-            <el-select
-              v-model="selectedAccountId"
-              placeholder="选择账号"
-              style="width: 200px"
-              :loading="accountsLoading"
-              clearable
-            >
-              <el-option
-                v-for="acc in accounts"
-                :key="acc.id"
-                :label="acc.displayName || acc.accountName"
-                :value="acc.id"
-              />
-            </el-select>
-            <el-button
-              type="primary"
-              :loading="syncing"
-              :disabled="!selectedAccountId"
-              @click="syncOrders"
-            >
-              <el-icon><Refresh /></el-icon> 同步订单
-            </el-button>
+    <el-card shadow="never">
+      <!-- ===== 卡片头部 + 工具栏 ===== -->
+      <div class="card-head">
+        <div class="card-head-left">
+          <div class="card-chip chip-violet">
+            <el-icon><List /></el-icon>
+          </div>
+          <div class="card-head-text">
+            <div class="card-title">订单管理</div>
+            <div class="card-sub">同步闲鱼订单、虚拟发货、物流追踪</div>
           </div>
         </div>
-      </template>
+        <div class="toolbar-right">
+          <el-select
+            v-model="selectedAccountId"
+            placeholder="选择账号"
+            style="width: 200px"
+            :loading="accountsLoading"
+            clearable
+          >
+            <el-option
+              v-for="acc in accounts"
+              :key="acc.id"
+              :label="acc.displayName || acc.accountName"
+              :value="acc.id"
+            />
+          </el-select>
+          <el-button
+            type="primary"
+            :loading="syncing"
+            :disabled="!selectedAccountId"
+            @click="syncOrders"
+          >
+            <el-icon><Refresh /></el-icon> 同步订单
+          </el-button>
+        </div>
+      </div>
 
-      <el-tabs v-model="activeTab" @tab-change="onTabChange">
+      <!-- Tabs + 表格 -->
+      <el-tabs v-model="activeTab" class="order-tabs" @tab-change="onTabChange">
         <el-tab-pane label="我卖出的" name="SOLD" />
         <el-tab-pane label="我买到的" name="BOUGHT" />
         <el-tab-pane label="全部" name="ALL" />
       </el-tabs>
 
-      <el-table :data="orders" stripe v-loading="loading">
+      <el-table :data="orders" stripe v-loading="loading" class="orders-table">
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column prop="orderId" label="订单号" width="180" />
         <el-table-column prop="itemId" label="商品ID" width="150" show-overflow-tooltip />
@@ -342,3 +350,57 @@ onMounted(async () => {
   await loadOrders()
 })
 </script>
+
+<style scoped>
+.order-tabs :deep(.el-tabs__item) {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-2);
+  transition: all 0.2s ease;
+}
+.order-tabs :deep(.el-tabs__item.is-active) {
+  color: var(--brand);
+}
+.orders-table {
+  margin-top: 16px;
+}
+.toolbar-right {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.page-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-bottom: 16px; flex-wrap: wrap;
+}
+.page-toolbar .toolbar-left {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.page-toolbar .toolbar-right {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.card-head-left {
+  display: flex; align-items: center; gap: 14px; min-width: 0;
+}
+.card-chip {
+  width: 44px; height: 44px; border-radius: 13px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 20px; flex-shrink: 0;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.22);
+}
+.card-head-text {
+  display: flex; flex-direction: column; gap: 3px; min-width: 0;
+}
+.card-title {
+  font-size: 16px; font-weight: 600; color: var(--text-1);
+}
+.card-sub {
+  font-size: 12px; color: var(--text-3);
+}
+.order-tabs :deep(.el-tabs__nav) {
+  display: inline-flex;
+}
+</style>

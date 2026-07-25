@@ -328,7 +328,7 @@ import { Plus, Search, Edit, Delete, ChatDotRound, Promotion, Cpu, Refresh } fro
 import api from '@/api/request'
 
 // ===== 厂商类型映射 =====
-const TYPE_COLOR = { OPENAI_COMPATIBLE: '#7c3aed', CLAUDE: '#d97706', CUSTOM: '#909399' }
+const TYPE_COLOR = { OPENAI_COMPATIBLE: 'var(--brand-2)', CLAUDE: 'var(--color-warning)', CUSTOM: 'var(--text-3)' }
 const TYPE_TAG = { OPENAI_COMPATIBLE: 'primary', CLAUDE: 'warning', CUSTOM: 'info' }
 const TYPE_LABEL = { OPENAI_COMPATIBLE: 'OpenAI 兼容', CLAUDE: 'Claude', CUSTOM: '自定义' }
 const typeColor = (t) => TYPE_COLOR[t] || '#909399'

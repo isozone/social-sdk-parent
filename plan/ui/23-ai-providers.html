@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>AI 厂商/模型管理 - AI 鱼多宝</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--brand:#4f46e5;--brand-2:#7c3aed;--accent:#22d3ee;--bg:#f5f5f7;--text-1:#111827;--text-2:#6b7280;--text-3:#9ca3af;--border:#e5e7eb;--success:#10b981;--warning:#f59e0b;--danger:#ef4444}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+.phone{width:393px;height:852px;border-radius:48px;background:var(--bg);position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.2)}
+.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}
+.status-bar{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:14px;font-weight:600;color:#111827}
+.content{position:absolute;top:58px;left:0;right:0;bottom:0;overflow-y:auto;-webkit-overflow-scrolling:touch}.content::-webkit-scrollbar{display:none}
+/* Header */
+.ai-head{background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);padding:16px 20px 28px;color:#fff;position:relative;overflow:hidden}
+.ai-head::before{content:'';position:absolute;top:-40%;right:-20%;width:180px;height:180px;background:radial-gradient(circle,rgba(34,211,238,.25),transparent 70%);border-radius:50%}
+.ai-back{width:36px;height:36px;border-radius:12px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;cursor:pointer;backdrop-filter:blur(4px);border:1px solid rgba(255,255,255,.2)}
+.ai-title-row{display:flex;align-items:center;gap:10px;margin-top:12px;position:relative;z-index:1}
+.ai-title-row h2{font-size:20px;font-weight:700;text-shadow:0 1px 4px rgba(0,0,0,.15)}
+.ai-title-row .ai-version{padding:3px 10px;border-radius:8px;background:rgba(255,255,255,.18);font-size:11px;font-weight:600;backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.2)}
+/* Provider Cards */
+.provider-list{padding:0 16px;margin-top:-20px;position:relative;z-index:2}
+.provider-card{background:#fff;border-radius:18px;padding:16px;margin-bottom:12px;border:1px solid var(--border);box-shadow:0 4px 16px rgba(0,0,0,.06)}
+.provider-top{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.provider-logo{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff;flex-shrink:0}
+.logo-qwen{background:linear-gradient(135deg,#6366f1,#8b5cf6)}.logo-deepseek{background:linear-gradient(135deg,#06b6d4,#0891b2)}.logo-kimi{background:linear-gradient(135deg,#f59e0b,#d97706)}.logo-glm{background:linear-gradient(135deg,#10b981,#059669)}
+.provider-info{flex:1}.provider-name{font-size:16px;font-weight:700;color:var(--text-1)}.provider-desc{font-size:12px;color:var(--text-3);margin-top:2px}
+.provider-switch{position:relative;width:48px;height:28px;border-radius:14px;background:#e5e7eb;cursor:pointer;transition:background .2s}
+.provider-switch.on{background:var(--brand)}
+.provider-switch::after{content:'';position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15);transition:left .2s}
+.provider-switch.on::after{left:23px}
+/* Model Grid */
+.model-section-title{font-size:13px;font-weight:600;color:var(--text-2);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.model-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.model-item{padding:12px;border-radius:14px;background:#f9fafb;border:1.5px solid transparent;cursor:pointer;transition:all .15s}
+.model-item.active{border-color:var(--brand);background:rgba(79,70,229,.06)}
+.model-item:active{transform:scale(.97)}
+.model-name{font-size:14px;font-weight:600;color:var(--text-1)}.model-tags{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap}
+.model-tag{padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600}
+.tag-purple{background:rgba(124,58,237,.1);color:var(--brand-2)}.tag-cyan{background:rgba(34,211,238,.12);color:#0891b2}.tag-green{background:rgba(16,185,129,.1);color:#059669}
+.add-model{padding:12px;border-radius:14px;border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;font-weight:600;color:var(--text-3);cursor:pointer;min-height:70px}
+.add-model:active{background:#f9fafb;border-color:var(--brand)}
+.safe-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}
+</style>
+</head>
+<body>
+<div class="phone safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
+  <div class="content">
+    <!-- Header -->
+    <div class="ai-head">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div class="ai-back">&#8592;</div>
+        <div class="ai-version">P2</div>
+      </div>
+      <div class="ai-title-row"><h2>AI 厂商 / 模型管理</h2></div>
+    </div>
+    <!-- Providers -->
+    <div class="provider-list">
+      <div class="provider-card">
+        <div class="provider-top">
+          <div class="provider-logo logo-qwen">Q</div>
+          <div class="provider-info"><div class="provider-name">通义千问 (Qwen)</div><div class="provider-desc">阿里云 · 已配置 API Key</div></div>
+          <div class="provider-switch on"></div>
+        </div>
+        <div class="model-section-title">&#128274; 可用模型</div>
+        <div class="model-grid">
+          <div class="model-item active"><div class="model-name">Qwen-Max</div><div class="model-tags"><span class="model-tag tag-purple">推荐</span><span class="model-tag tag-cyan">推理强</span></div></div>
+          <div class="model-item"><div class="model-name">Qwen-Plus</div><div class="model-tags"><span class="model-tag tag-green">性价比</span></div></div>
+          <div class="model-item"><div class="model-name">Qwen-Turbo</div><div class="model-tags"><span class="model-tag tag-green">极速</span></div></div>
+          <div class="add-model">+ 添加远程模型</div>
+        </div>
+      </div>
+      <div class="provider-card">
+        <div class="provider-top">
+          <div class="provider-logo logo-deepseek">D</div>
+          <div class="provider-info"><div class="provider-name">DeepSeek</div><div class="provider-desc">深度求索 · API Key 未配置</div></div>
+          <div class="provider-switch"></div>
+        </div>
+        <div class="model-section-title">&#128274; 可用模型</div>
+        <div class="model-grid">
+          <div class="model-item"><div class="model-name">DeepSeek-V3</div><div class="model-tags"><span class="model-tag tag-purple">长文本</span></div></div>
+          <div class="model-item"><div class="model-name">DeepSeek-R1</div><div class="model-tags"><span class="model-tag tag-cyan">推理</span><span class="model-tag tag-purple">推理强</span></div></div>
+          <div class="add-model" style="grid-column:1/-1">+ 添加远程模型</div>
+        </div>
+      </div>
+      <div class="provider-card">
+        <div class="provider-top">
+          <div class="provider-logo logo-kimi">K</div>
+          <div class="provider-info"><div class="provider-name">Moonshot (Kimi)</div><div class="provider-desc">月之暗面 · API Key 未配置</div></div>
+          <div class="provider-switch"></div>
+        </div>
+        <div class="model-section-title">&#128274; 可用模型</div>
+        <div class="model-grid">
+          <div class="model-item"><div class="model-name">Kimi-K2</div><div class="model-tags"><span class="model-tag tag-green">多模态</span></div></div>
+          <div class="add-model" style="grid-column:1/-1">+ 添加远程模型</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

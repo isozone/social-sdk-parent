@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>聊天窗口 - AI 鱼多宝</title>
+<style>
+@import url('../_design-system.css');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+/* Chat layout — no bottom TabBar (detail page) */
+.phone-frame{border-radius:54px;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.18)}
+.phone-frame .page-content{bottom:0;}
+/* Custom chat styles */
+.chat-hero{background:var(--gradient-brand);padding:48px 20px 24px;border-radius:0 0 28px 28px;position:relative;overflow:hidden}
+.chat-hero::before{content:'';position:absolute;top:-50%;right:-15%;width:200px;height:200px;background:radial-gradient(circle,rgba(34,211,238,.18),transparent 70%);border-radius:50%}
+.chat-hero-inner{display:flex;align-items:center;gap:14px;position:relative;z-index:1;color:#fff}
+.chat-hero-back{font-size:20px;cursor:pointer;display:flex;align-items:center;gap:4px;color:rgba(255,255,255,.8);transition:color .2s}
+.chat-hero-back:hover{color:#fff}
+.chat-hero-info{flex:1;min-width:0}
+.chat-hero-name{font-size:18px;font-weight:700;text-shadow:0 1px 6px rgba(0,0,0,.12)}
+.chat-hero-status{display:flex;align-items:center;gap:5px;font-size:11px;color:rgba(255,255,255,.65);margin-top:2px}
+.chat-hero-dot{width:6px;height:6px;border-radius:50%;background:#10b981;box-shadow:0 0 4px rgba(16,185,129,.6)}
+.chat-hero-actions{display:flex;gap:6px}
+.chat-hero-action-btn{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.15);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;transition:all .2s}
+.chat-hero-action-btn:active{transform:scale(.9);background:rgba(255,255,255,.2)}
+.chat-area{background:var(--bg-page);padding:16px 12px;min-height:calc(100% - 120px)}
+.time-divider{display:flex;align-items:center;gap:12px;color:var(--text-tertiary);font-size:10px;margin:10px 0 16px}
+.time-divider::before,.time-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.msg-row{display:flex;gap:8px;align-items:end;margin-bottom:14px}
+.msg-row.self{flex-direction:row-reverse}
+.msg-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0;color:#fff}
+.msg-avatar.other{background:var(--gradient-brand)}
+.msg-avatar.me{background:var(--gradient-cold)}
+.msg-bubble{max-width:230px;padding:10px 14px;border-radius:16px;font-size:14px;line-height:1.55;word-break:break-word}
+.msg-bubble.other{background:#fff;color:var(--text-primary);border-bottom-left-radius:4px;box-shadow:var(--shadow-sm)}
+.msg-bubble.self{background:var(--brand);color:#fff;border-bottom-right-radius:4px;box-shadow:0 2px 8px rgba(79,70,229,.25)}
+.msg-bubble.self.msg-auto-reply{background:linear-gradient(135deg,#eef2ff,#f0f9ff);color:var(--text-primary);border:1.5px dashed var(--brand-light)}
+.msg-bubble.self.msg-auto-reply::before{content:'AI';font-size:9px;color:var(--violet);font-weight:700;background:rgba(124,58,237,.1);padding:2px 6px;border-radius:4px;display:inline-block;margin-bottom:4px}
+.msg-time{text-align:center;font-size:10px;color:var(--text-tertiary);margin:4px 0 10px}
+.msg-system{font-size:11px;color:var(--text-tertiary);text-align:center;padding:4px 0;margin-bottom:12px}
+.chat-input-bar{position:absolute;bottom:0;left:0;right:0;background:rgba(255,255,255,.95);backdrop-filter:blur(12px);border-top:1px solid var(--border-light);padding:10px 12px 12px;display:flex;align-items:end;gap:8px}
+.input-area{flex:1;background:var(--bg-input);border:1px solid var(--border);border-radius:20px;display:flex;align-items:center;min-height:40px;padding:0 12px;transition:border-color .2s}
+.input-field{flex:1;border:none;background:none;font-size:14px;color:var(--text-primary);outline:none;padding:8px 0;width:100%}
+.input-field::placeholder{color:var(--text-tertiary)}
+.input-btns{display:flex;gap:4px;flex-shrink:0}
+.input-btn{width:28px;height:28px;border-radius:50%;background:transparent;border:none;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;transition:background .2s}
+.input-btn:active{background:var(--bg-page)}
+.send-btn{width:40px;height:40px;border-radius:50%;background:var(--gradient-brand);border:none;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;box-shadow:0 4px 12px rgba(79,70,229,.3);cursor:pointer;transition:all .2s;flex-shrink:0}
+.send-btn:active{transform:scale(.9)}
+</style>
+</head>
+<body>
+<div class="phone-frame safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="display:flex;gap:5px;align-items:center"><svg width="16" height="12" viewBox="0 0 16 12"><path d="M1 10.5a1 1 0 01-.5-1.86A8 8 0 018 2a8 8 0 018.5 6.64 1 1 0 01-1 1.86A6 6 0 008 4a6 6 0 00-7 6.5z"/><path d="M4 7.5a1 1 0 01-.5-1.86A4 4 0 018 2a4 4 0 014.5 3.64 1 1 0 01-1 1.86A2 2 0 008 4a2 2 0 00-4.5 3.5z" fill="#10b981"/></svg><svg width="16" height="12" viewBox="0 0 16 12"><rect x="1" y="4" width="3" height="8" rx=".5" fill-opacity=".3"/><rect x="5.5" y="2.5" width="3" height="9.5" rx=".5" fill-opacity=".5"/><rect x="10" y="0" width="3" height="12" rx=".5"/></svg><svg width="26" height="12" viewBox="0 0 28 12"><rect x=".5" y=".5" width="23" height="11" rx="3" stroke="#fff" fill="none"/><rect x="2" y="2" width="16" height="8" rx="1.5" fill="#10b981"/></svg></span></div>
+  <!-- Chat hero header -->
+  <div class="chat-hero">
+    <div class="chat-hero-inner">
+      <button class="chat-hero-back" aria-label="返回">‹ 返回</button>
+      <div class="chat-hero-info">
+        <div class="chat-hero-name">张三</div>
+        <div class="chat-hero-status"><span class="chat-hero-dot"></span>在线</div>
+      </div>
+      <div class="chat-hero-actions">
+        <button class="chat-hero-action-btn" aria-label="更多">⋮</button>
+      </div>
+    </div>
+  </div>
+  <!-- Chat messages -->
+  <div class="page-content">
+    <div class="chat-area">
+      <div class="time-divider">今天 09:30</div>
+      <div class="msg-row other">
+        <div class="msg-avatar other">张</div>
+        <div class="msg-bubble">你好，这个还有货吗？</div>
+      </div>
+      <div class="msg-system">· — — — · 系统自动回复 · — — ·</div>
+      <div class="msg-row self">
+        <div class="msg-avatar me">我</div>
+        <div class="msg-bubble msg-auto-reply">有的亲，现在拍下还能包邮发货哦～</div>
+      </div>
+      <div class="msg-time">09:31</div>
+      <div class="msg-row other">
+        <div class="msg-avatar other">张</div>
+        <div class="msg-bubble">能便宜点吗？最低多少呀</div>
+      </div>
+      <div class="msg-row self">
+        <div class="msg-avatar me">我</div>
+        <div class="msg-bubble">可以的，您直接拍第二个链接，给您优惠了 😊</div>
+      </div>
+      <div class="msg-time">09:33</div>
+      <div class="msg-row other">
+        <div class="msg-avatar other">张</div>
+        <div class="msg-bubble">已下单，麻烦尽快发货哈</div>
+      </div>
+      <div class="msg-row self">
+        <div class="msg-avatar me">我</div>
+        <div class="msg-bubble">好的，今天内发出！注意查收快递 📦</div>
+      </div>
+      <div class="msg-time">09:35</div>
+    </div>
+  </div>
+  <!-- Input bar (no TabBar on detail page) -->
+  <div class="chat-input-bar">
+    <div class="input-area">
+      <input class="input-field" placeholder="输入消息..." autocomplete="off">
+      <div class="input-btns">
+        <button class="input-btn" aria-label="表情">😊</button>
+        <button class="input-btn" aria-label="图片">📷</button>
+      </div>
+    </div>
+    <button class="send-btn" aria-label="发送">↑</button>
+  </div>
+</div>
+</body>
+</html>

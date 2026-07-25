@@ -7,8 +7,12 @@
     <!-- 顶部标题栏 -->
     <header class="board-header">
       <div class="header-left">
-        <div class="logo-icon">📊</div>
-        <h1>闲鱼多账号管理 · 实时数据大屏</h1>
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:28px;height:28px;">
+            <path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L3 14.4"/>
+          </svg>
+        </div>
+        <h1>闲鱼多账号管理 &middot; 实时数据大屏</h1>
       </div>
       <div class="header-center">
         <div class="status-dot" :class="connected ? 'online' : 'offline'"></div>
@@ -25,7 +29,7 @@
     <main class="board-body">
       <!-- 第一行：核心指标卡 -->
       <section class="kpi-row">
-        <div class="kpi-card" v-for="(kpi, i) in kpis" :key="kpi.title" :style="{ animationDelay: i * 0.1 + 's' }">
+        <div class="kpi-card" v-for="(kpi, i) in kpis" :key="kpi.title" :style="{ animationDelay: i * 0.06 + 's' }">
           <div class="kpi-icon" :style="{ background: kpi.gradient }">
             <el-icon :size="28" color="#fff"><component :is="kpi.icon" /></el-icon>
           </div>
@@ -34,7 +38,7 @@
             <div class="kpi-title">{{ kpi.title }}</div>
             <div class="kpi-trend" v-if="kpi.trend !== null">
               <span :class="kpi.trend >= 0 ? 'up' : 'down'">
-                {{ kpi.trend >= 0 ? '↑' : '↓' }} {{ Math.abs(kpi.trend) }}%
+                {{ kpi.trend >= 0 ? '\u2191' : '\u2193' }} {{ Math.abs(kpi.trend) }}%
               </span>
               <span class="trend-label">较上轮</span>
             </div>
@@ -85,7 +89,8 @@
           账号实时状态
           <span class="panel-sub">共 {{ accounts.length }} 个账号</span>
         </div>
-        <div class="account-grid">
+        <div v-if="accounts.length === 0" class="empty-empty" style="padding:24px;text-align:center;color:#546E7A;">暂无账号数据</div>
+        <div v-else class="account-grid">
           <div class="account-card" v-for="acc in accounts" :key="acc.id" :class="'status-' + (acc.status || 'UNKNOWN').toLowerCase()">
             <div class="acc-header">
               <el-avatar :size="36" :src="acc.avatar" />
@@ -141,11 +146,11 @@ let pieChart = null
 let barChart = null
 let lineChart = null
 
-// ===== 趋势历史（用于回复趋势图） =====
+// ===== 趋势历史（用于回复趋势图） —— 初始化为全零，等待真实数据填充 =====
 const trendHistory = ref(
   Array.from({ length: 24 }, (_, i) => ({
     hour: `${String(i).padStart(2, '0')}:00`,
-    value: Math.floor(Math.random() * 50 + 10)
+    value: 0
   }))
 )
 
@@ -168,7 +173,7 @@ const kpis = computed(() => {
     if (!prevVal || prevVal === 0) return null
     return Math.round(((curr - prevVal) / prevVal) * 100)
   }
-  const genSpark = () => Array.from({ length: 12 }, () => Math.floor(Math.random() * 40 + 10))
+  const genSpark = () => Array.from({ length: 12 }, () => 0)
 
   return [
     { title: '总账号数', value: o.totalAccounts || 0, icon: 'User', color: '#00D4FF', gradient: 'linear-gradient(135deg, #00D4FF, #0066FF)', trend: calcTrend(o.totalAccounts || 0, prev.totalAccounts), spark: genSpark() },
@@ -192,9 +197,13 @@ function statusColor(status) {
 
 // ===== 数字格式化 =====
 function formatNumber(n) {
-  if (n >= 10000) return (n / 10000).toFixed(1) + 'w'
-  if (n >= 1000) return (n / 1000).toFixed(1) + 'k'
-  return n?.toString() || '0'
+  if (n == null || n === undefined) return '0'
+  if (typeof n !== 'number' && typeof n !== 'string') return '0'
+  const num = Number(n)
+  if (!num && num !== 0) return '0'
+  if (num >= 10000) return (num / 10000).toFixed(1) + 'w'
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'k'
+  return String(num)
 }
 
 // ===== 数据加载 =====
@@ -379,7 +388,7 @@ onBeforeUnmount(() => {
   gap: 14px;
 }
 .logo-icon {
-  font-size: 28px;
+  color: #00D4FF;
   filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.6));
 }
 .header-left h1 {

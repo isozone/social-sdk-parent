@@ -163,7 +163,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '@/store/auth'
+import { POST_LOGIN_REDIRECT, useAuthStore } from '@/store/auth'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()

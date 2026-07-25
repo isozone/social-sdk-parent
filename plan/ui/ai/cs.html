@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>AI 客服 - AI 鱼多宝</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+:root{--brand:#4f46e5;--violet:#7c3aed;--cyan:#22d3ee;--bg-page:#f5f5f7;--text-primary:#111827;--text-secondary:#6b7280;--text-tertiary:#9ca3af;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--border:#e5e7eb}
+.phone{width:393px;height:852px;border-radius:54px;background:var(--bg-page);position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.18)}
+.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}
+.status-bar{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:14px;font-weight:600;color:var(--text-primary)}
+.page-content{position:absolute;top:58px;left:0;right:0;bottom:84px;overflow-y:auto}
+.page-content::-webkit-scrollbar{display:none}
+.ai-hero{background:linear-gradient(135deg,#4f46e5,#7c3aed,#22d3ee);padding:48px 20px 24px;border-radius:0 0 28px 28px;text-align:center;position:relative;overflow:hidden}
+.ai-hero::before{content:'';position:absolute;top:-30%;right:-15%;width:180px;height:180px;background:radial-gradient(circle,rgba(255,255,255,.08),transparent 70%);border-radius:50%}
+.ai-icon{font-size:44px;margin-bottom:8px}.ai-title{font-size:20px;font-weight:800;color:#fff}.ai-sub{font-size:12px;color:rgba(255,255,255,.7);margin-top:4px}
+.knowledge-section{margin:16px 16px 0;background:#fff;border-radius:20px;padding:18px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.03)}
+.section-head-line{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.knowledge-list{display:flex;flex-direction:column;gap:10px}
+.knowledge-item{padding:12px;background:var(--bg-page);border-radius:14px;border:1px solid var(--border-light)}
+.knowledge-q{font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:4px;display:flex;align-items:center;gap:6px}
+.knowledge-a{font-size:12px;color:var(--text-secondary);line-height:1.5}
+.knowledge-meta{display:flex;gap:10px;margin-top:6px}
+.km-stat{font-size:10px;color:var(--text-tertiary);display:flex;align-items:center;gap:3px}
+/* Chat with AI CS */
+.cs-chat{background:#fff;border-radius:20px;margin:14px 16px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.03)}
+.cs-chat-header{padding:14px 16px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px}
+.cs-avatar{width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px}
+.cs-name{font-size:14px;font-weight:700;color:var(--text-primary)}.cs-solution{font-size:11px;color:var(--success);margin-top:1px}
+.cs-messages{padding:14px 16px;display:flex;flex-direction:column;gap:10px;max-height:280px;overflow-y:auto}
+.cs-msg{display:flex;gap:8px;max-width:80%}
+.cs-msg.user{align-self:flex-end;flex-direction:row-reverse}
+.cs-msg .bubble{padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.5}
+.cs-msg.bot .bubble{background:var(--bg-page);border-bottom-left-radius:4px;color:var(--text-primary)}
+.cs-msg.user .bubble{background:var(--gradient-brand);color:#fff;border-bottom-right-radius:4px}
+.cs-typing{display:flex;gap:4px;padding:4px 0}
+.cs-typing-dot{width:5px;height:5px;border-radius:50%;background:#9ca3af;animation:bounce .6s ease-in-out infinite}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+.cs-input{padding:10px 16px;border-top:1px solid var(--border-light);display:flex;gap:8px;align-items:center}
+.cs-input input{flex:1;height:38px;background:var(--bg-page);border:1px solid var(--border);border-radius:19px;padding:0 14px;font-size:13px;outline:none}
+.cs-input button{width:38px;height:38px;border-radius:50%;background:var(--gradient-brand);border:none;color:#fff;font-size:16px;cursor:pointer}
+/* Negotiation records */
+.negotiation{margin:0 16px 16px;background:#fff;border-radius:20px;padding:18px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.03)}
+.neg-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border-light)}
+.neg-item:last-child{border-bottom:none}
+.neg-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;flex-shrink:0}
+.neg-info{flex:1}.neg-title{font-size:13px;font-weight:600;color:var(--text-primary)}.neg-desc{font-size:11px;color:var(--text-tertiary);margin-top:2px}
+.neg-price{font-size:14px;font-weight:800;color:var(--brand)}
+.add-kb-btn{width:100%;height:44px;border-radius:14px;border:2px dashed var(--border);background:none;font-size:14px;font-weight:600;color:var(--text-tertiary);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .2s}
+.add-kb-btn:hover{border-color:var(--brand);color:var(--brand)}
+.tab-bar{position:absolute;bottom:0;left:0;right:0;height:84px;background:rgba(255,255,255,.94);backdrop-filter:blur(20px);border-top:1px solid var(--border-light);display:flex;z-index:80;padding-bottom:8px}
+.tab-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}.tab-item:active{transform:scale(.92)}.tab-icon{font-size:20px}.tab-label{font-size:10px;color:var(--text-tertiary);font-weight:400}
+.tab-item.active .tab-icon{color:var(--brand)}.tab-item.active .tab-label{color:var(--brand);font-weight:600}
+.safe-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}
+</style>
+</head>
+<body>
+<div class="phone safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
+  <div class="page-content">
+    <div class="ai-hero">
+      <div class="ai-icon">🎧</div>
+      <div class="ai-title">AI 智能客服</div>
+      <div class="ai-sub">知识库 · 议价追踪 · 会话管理</div>
+    </div>
+    <!-- Knowledge Base -->
+    <div class="knowledge-section">
+      <div class="section-head-line">
+        <div><div style="font-size:15px;font-weight:700;color:var(--text-primary)">知识库</div><div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">自动回复知识条目</div></div>
+        <button class="add-kb-btn" style="width:auto;height:32px;padding:0 12px;font-size:12px">+ 添加</button>
+      </div>
+      <div class="knowledge-list">
+        <div class="knowledge-item">
+          <div class="knowledge-q">❓ 运费怎么算？</div>
+          <div class="knowledge-a">默认中通/圆通包邮发货，偏远地区需补差价。</div>
+          <div class="knowledge-meta"><span class="km-stat">👁 命中 48 次</span><span class="km-stat">⭐ 有用率 92%</span></div>
+        </div>
+        <div class="knowledge-item">
+          <div class="knowledge-q">❓ 支持退换货吗？</div>
+          <div class="knowledge-a">二手商品非质量问题不支持退换，下单前请确认。</div>
+          <div class="knowledge-meta"><span class="km-stat">👁 命中 23 次</span><span class="km-stat">⭐ 有用率 85%</span></div>
+        </div>
+        <div class="knowledge-item">
+          <div class="knowledge-q">❓ 商品成色说明</div>
+          <div class="knowledge-a">所有商品均为二手，使用痕迹如实描述。全新未使用会特别标注。</div>
+          <div class="knowledge-meta"><span class="km-stat">👁 命中 67 次</span><span class="km-stat">⭐ 有用率 97%</span></div>
+        </div>
+      </div>
+    </div>
+    <!-- Active Chat -->
+    <div class="cs-chat">
+      <div class="cs-chat-header">
+        <div class="cs-avatar">🤖</div>
+        <div style="flex:1"><div class="cs-name">AI 客服会话</div><div class="cs-solution">正在生成回答...</div></div>
+      </div>
+      <div class="cs-messages">
+        <div class="cs-msg"><div class="bubble">你好，这个还能便宜吗？</div></div>
+        <div class="cs-msg user"><div class="bubble">可以的亲，原价 ¥299，给您 ¥250 怎么样？</div></div>
+        <div class="cs-msg"><div class="bubble">那行吧，马上拍</div></div>
+        <div class="cs-msg"><div class="cs-typing"><div class="cs-typing-dot"></div><div class="cs-typing-dot"></div><div class="cs-typing-dot"></div></div></div>
+      </div>
+      <div class="cs-input"><input placeholder="发送消息..." /><button>↑</button></div>
+    </div>
+    <!-- Negotiation Records -->
+    <div class="negotiation">
+      <div style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:12px">议价记录</div>
+      <div class="neg-item"><div class="neg-avatar" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)">张</div><div class="neg-info"><div class="neg-title">张三 · Nike AF1</div><div class="neg-desc">原价 ¥299 → 议价中</div></div><div class="neg-price">¥250</div></div>
+      <div class="neg-item"><div class="neg-avatar" style="background:linear-gradient(135deg,#10b981,#22c55e)">李</div><div class="neg-info"><div class="neg-title">李四 · AirPods Pro</div><div class="neg-desc">已成交，议价完成</div></div><div class="neg-price" style="color:var(--success)">¥750 ✓</div></div>
+      <div class="neg-item"><div class="neg-avatar" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">王</div><div class="neg-info"><div class="neg-title">王五 · Apple Watch</div><div class="neg-desc">议价中...</div></div><div class="neg-price">¥3,800</div></div>
+    </div>
+  </div>
+  <div class="tab-bar safe-bottom">
+    <div class="tab-item"><span class="tab-icon">📊</span><span class="tab-label">首页</span></div>
+    <div class="tab-item"><span class="tab-icon">💬</span><span class="tab-label">消息</span></div>
+    <div class="tab-item"><span class="tab-icon">🛒</span><span class="tab-label">商品</span></div>
+    <div class="tab-item active"><span class="tab-icon">👤</span><span class="tab-label">我的</span></div>
+  </div>
+</div>
+</body>
+</html>

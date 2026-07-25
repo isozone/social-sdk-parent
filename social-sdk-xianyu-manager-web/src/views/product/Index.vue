@@ -1,22 +1,34 @@
 <template>
-  <div>
+  <div class="page-root">
     <!-- 头部操作栏 -->
-    <el-card style="margin-bottom: 16px;">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-size: 16px; font-weight: 600;">商品管理</span>
-        <div style="display: flex; gap: 12px; align-items: center;">
-          <el-select v-model="selectedAccountId" placeholder="选择账号" style="width: 200px;" :loading="accountsLoading" clearable>
+    <el-card shadow="never" style="margin-bottom: 16px;">
+      <div class="card-head">
+        <div class="card-head-left">
+          <div class="card-chip chip-cyan"><el-icon><ShoppingBag /></el-icon></div>
+          <div class="card-head-text">
+            <div class="card-title">商品管理</div>
+            <div class="card-sub">同步闲鱼商品、切换在售/全部，管理虚拟发货配置</div>
+          </div>
+        </div>
+        <div class="card-head-right">
+          <el-select
+            v-model="selectedAccountId"
+            placeholder="选择账号"
+            style="width: 220px;"
+            :loading="accountsLoading"
+            clearable
+          >
             <el-option v-for="a in accounts" :key="a.id" :label="a.displayName || a.accountName" :value="a.id" />
           </el-select>
           <el-button type="primary" :loading="syncing" :disabled="!selectedAccountId" @click="syncProducts">
-            <el-icon><Refresh /></el-icon> 同步商品
+            <el-icon><RefreshRight /></el-icon>同步商品
           </el-button>
         </div>
       </div>
     </el-card>
 
     <!-- 主内容区 -->
-    <el-card>
+    <el-card shadow="never" style="margin: 0;">
       <el-tabs v-model="activeTab" @tab-change="loadProducts">
         <el-tab-pane label="在售" name="ON_SALE" />
         <el-tab-pane label="全部" name="ALL" />
@@ -26,7 +38,7 @@
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column label="图片" width="80">
           <template #default="{ row }">
-            <el-image :src="row.imageUrl" style="width: 50px; height: 50px;" fit="cover" />
+            <el-image :src="row.imageUrl" style="width: 50px; height: 50px; border-radius: 8px;" fit="cover" />
           </template>
         </el-table-column>
         <el-table-column prop="title" label="商品标题" min-width="200" show-overflow-tooltip />
@@ -52,7 +64,7 @@
         </el-table-column>
       </el-table>
 
-      <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+      <div class="pagination-wrap">
         <el-pagination v-model:current-page="page" v-model:page-size="size" :total="total" layout="total, prev, pager, next" @current-change="loadProducts" />
       </div>
     </el-card>
@@ -61,13 +73,13 @@
     <el-dialog v-model="syncProgressVisible" title="同步商品" width="420px" :close-on-click-modal="false" :show-close="false">
       <div style="text-align: center; padding: 12px 0;">
         <el-progress :percentage="syncProgress && syncProgress.total ? Math.round((syncProgress.current / syncProgress.total) * 100) : 0" :stroke-width="16" style="margin-bottom: 16px;" />
-        <div v-if="syncProgress" style="font-size: 14px; color: #606266;">
+        <div v-if="syncProgress" style="font-size: 14px; color: var(--text-1);">
           <div style="margin-bottom: 6px;">{{ syncProgress.message || '正在同步...' }}</div>
-          <div v-if="syncProgress.phase === 'DETAILING'" style="font-size: 12px; color: #909399;">
+          <div v-if="syncProgress.phase === 'DETAILING'" style="font-size: 12px; color: var(--text-3);">
             已处理 {{ syncProgress.current }} / {{ syncProgress.total }} 件
           </div>
         </div>
-        <div v-else style="font-size: 14px; color: #909399;">正在启动同步任务...</div>
+        <div v-else style="font-size: 14px; color: var(--text-3);">正在启动同步任务...</div>
       </div>
     </el-dialog>
 
@@ -75,25 +87,25 @@
     <el-dialog v-model="vsConfigVisible" title="商品虚拟发货配置" width="640px">
       <el-form :model="vsConfigForm" label-width="120px">
         <el-form-item label="商品">
-          <span>{{ vsConfigForm.title }}</span>
+          <span style="font-weight: 600;">{{ vsConfigForm.title }}</span>
         </el-form-item>
         <el-form-item label="商品类型">
           <el-radio-group v-model="vsConfigForm.goodsType">
-            <el-radio label="VIRTUAL">虚拟商品</el-radio>
-            <el-radio label="PHYSICAL">实物商品</el-radio>
+            <el-radio-button value="VIRTUAL">虚拟商品</el-radio-button>
+            <el-radio-button value="PHYSICAL">实物商品</el-radio-button>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="发货类型" v-if="vsConfigForm.goodsType === 'VIRTUAL'">
           <el-radio-group v-model="vsConfigForm.deliverType">
-            <el-radio label="CARD">卡密</el-radio>
-            <el-radio label="ACCOUNT">账号</el-radio>
-            <el-radio label="LINK">链接文本</el-radio>
-            <el-radio label="FILE">网盘文件</el-radio>
+            <el-radio-button value="CARD">卡密</el-radio-button>
+            <el-radio-button value="ACCOUNT">账号</el-radio-button>
+            <el-radio-button value="LINK">链接文本</el-radio-button>
+            <el-radio-button value="FILE">网盘文件</el-radio-button>
           </el-radio-group>
         </el-form-item>
         <el-form-item label="发货内容模板" v-if="vsConfigForm.goodsType === 'VIRTUAL'">
           <el-input v-model="vsConfigForm.deliverContentTemplate" type="textarea" :rows="6" :placeholder="vsTemplatePlaceholder" />
-          <div style="color: #909399; font-size: 12px; margin-top: 6px; line-height: 1.6;">
+          <div style="color: var(--text-3); font-size: 12px; margin-top: 6px; line-height: 1.6;">
             <div v-if="vsConfigForm.deliverType === 'CARD' || vsConfigForm.deliverType === 'ACCOUNT'">
               卡密发货。可用占位符：<b>${cardCode}</b> <b>${cardPassword}</b>。留空走默认格式。
             </div>
@@ -116,9 +128,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh } from '@element-plus/icons-vue'
+import { RefreshRight, ShoppingBag } from '@element-plus/icons-vue'
 import api from '@/api/request'
 import { saveProductVirtualShipConfig } from '@/api/virtualShip'
 
@@ -132,9 +144,9 @@ const page = ref(1)
 const size = ref(20)
 const total = ref(0)
 const syncing = ref(false)
-const syncProgress = ref(null) // 当前同步进度
-const syncProgressVisible = ref(false) // 进度弹窗是否显示
-let syncTimer = null // 轮询定时器
+const syncProgress = ref(null)
+const syncProgressVisible = ref(false)
+let syncTimer = null
 
 async function loadAccounts() {
   accountsLoading.value = true
@@ -173,7 +185,6 @@ async function syncProducts() {
     const res = await api.post('/products/sync', null, { params: { accountId: selectedAccountId.value } })
     if (res.success) {
       const syncId = res.data.syncId
-      // 启动轮询
       syncTimer = setInterval(async () => {
         try {
           const prog = await api.get('/products/sync/progress', { params: { syncId } })
@@ -221,7 +232,6 @@ async function offShelf(row) {
   } catch (e) {}
 }
 
-// ============== 虚拟发货配置弹窗 ==============
 const vsConfigVisible = ref(false)
 const vsConfigSaving = ref(false)
 const vsConfigForm = ref({
@@ -270,3 +280,7 @@ const saveVirtualShipConfig = async () => {
 
 onMounted(async () => { await loadAccounts(); await loadProducts() })
 </script>
+
+<style scoped>
+.pagination-wrap { display: flex; justify-content: flex-end; margin-top: 16px; }
+</style>

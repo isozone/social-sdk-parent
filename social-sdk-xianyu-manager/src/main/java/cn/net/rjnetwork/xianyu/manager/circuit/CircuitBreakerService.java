@@ -1,5 +1,6 @@
 package cn.net.rjnetwork.xianyu.manager.circuit;
 
+import cn.net.rjnetwork.xianyu.manager.circuit.service.RiskControlLogService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -11,6 +12,7 @@ import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -22,6 +24,7 @@ public class CircuitBreakerService {
     private static final Logger logger = LoggerFactory.getLogger(CircuitBreakerService.class);
 
     private final JdbcTemplate jdbc;
+    private final RiskControlLogService riskControlLogService;
     private final Map<String, CircuitBreaker> cache = new ConcurrentHashMap<>();
 
     private static final RowMapper<CircuitBreaker> MAPPER = (rs, rowNum) -> {
@@ -46,8 +49,9 @@ public class CircuitBreakerService {
         return cb;
     };
 
-    public CircuitBreakerService(JdbcTemplate jdbc) {
+    public CircuitBreakerService(JdbcTemplate jdbc, RiskControlLogService riskControlLogService) {
         this.jdbc = jdbc;
+        this.riskControlLogService = riskControlLogService;
     }
 
     /**
@@ -89,7 +93,35 @@ public class CircuitBreakerService {
         if (cb.isOpen()) {
             logger.warn("Circuit breaker OPENED for account={} service={} after {} failures",
                     accountId, serviceName, cb.getFailureCount());
+            // A5 风控日志持久化：OPEN 时写一行 risk_control_log，便于管理端检索诊断
+            // 触发类型按serviceName推断（COOKIE_RENEW/TOKEN_RENEWAL/LOGIN_RENEW/MESSAGE_SEND/MTOP_CALL）
+            String triggerType = inferTriggerType(serviceName);
+            String riskCode = extractRiskCode(message);
+            int cooldown = Optional.ofNullable(cb.getCooldownSeconds()).orElse(300);
+            riskControlLogService.log(accountId, triggerType, serviceName, riskCode,
+                    message, cooldown, null);
         }
+    }
+
+    /** 按 serviceName 推断触发类型。 */
+    private String inferTriggerType(String serviceName) {
+        if (serviceName == null) return "UNKNOWN";
+        if (serviceName.contains("TOKEN")) return "TOKEN_EXPIRED";
+        if (serviceName.contains("LOGIN")) return "LOGIN_FAILED";
+        if (serviceName.contains("MESSAGE")) return "USER_VALIDATE";
+        if (serviceName.contains("RATE")) return "RATE_LIMIT";
+        return "CAPTCHA"; // 默认归为滑块风控
+    }
+
+    /** 从失败消息里抽风控原始标识（RGV587_ERROR::SM / FAIL_SYS_USER_VALIDATE 等）。 */
+    private String extractRiskCode(String message) {
+        if (message == null) return null;
+        String[] markers = {"RGV587_ERROR", "FAIL_SYS_USER_VALIDATE", "FAIL_SYS_RATE_LIMIT",
+                "FAIL_SYS_TOKEN_EXOIRED", "FAIL_SYS_TOKEN_EMPTY", "x5sec", "punish"};
+        for (String m : markers) {
+            if (message.contains(m)) return m;
+        }
+        return null;
     }
 
     /**

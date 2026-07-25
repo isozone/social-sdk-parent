@@ -250,6 +250,8 @@ function parseJsonCard(content) {
 }
 const syncMsg = ref('')
 
+let syncMsgTimer = null
+
 const selectedSessionData = ref({ counterpartyName: '', lastContent: '' })
 
 // 会话最后消息时间缓存（用于检测新消息到达 -> 未读标红）
@@ -454,8 +456,8 @@ async function handleSyncNow() {
     ElMessage.error('同步失败：' + syncMsg.value)
   } finally {
     syncing.value = false
-    // 3 秒后清同步状态提示
-    setTimeout(() => { syncMsg.value = '' }, 3000)
+    if (syncMsgTimer) clearTimeout(syncMsgTimer)
+    syncMsgTimer = setTimeout(() => { syncMsg.value = '' }, 3000)
   }
 }
 
@@ -537,11 +539,12 @@ watch(() => selectedSession.value, () => { if (selectedSession.value) loadHistor
 
 onUnmounted(() => {
   stopPolling()
+  if (syncMsgTimer) clearTimeout(syncMsgTimer)
 })
 </script>
 
 <style scoped>
-/* ==================== 单屏根容器：占满 el-main，自身不滚动，内部区域滚动 ==================== */
+/* ==================== 单屏根容器 ==================== */
 .page-root {
   display: flex;
   flex-direction: column;
@@ -555,17 +558,32 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 20px;
-  background: #fcfcfc;
-  border-bottom: 1px solid #e5e5e5;
+  padding: 10px 20px;
+  background: var(--surface-0);
+  border-bottom: 1px solid var(--line-2);
 }
 .countdown-tag {
   display: flex;
   align-items: center;
   gap: 4px;
+  background: var(--brand-gradient);
+  color: #fff;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(79,70,229,0.25);
+}
+.countdown-tag :deep(.el-icon) {
+  animation: spin 2s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-/* ==================== 主区域撑满剩余高度 ==================== */
+/* ==================== 主区域 ==================== */
 .message-container {
   flex: 1;
   overflow: hidden;
@@ -580,22 +598,23 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #f7f7f7;
-  border-right: 1px solid #e5e5e5;
+  background: var(--surface-1);
+  border-right: 1px solid var(--line-2);
 }
 .session-list-header {
-  padding: 16px;
+  padding: 14px 18px;
   font-weight: 600;
-  font-size: 16px;
-  border-bottom: 1px solid #e5e5e5;
+  font-size: 15px;
+  color: var(--text-1);
+  border-bottom: 1px solid var(--line-2);
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 .session-search {
-  padding: 8px 12px;
-  background: #f7f7f7;
-  border-bottom: 1px solid #e5e5e5;
+  padding: 10px 16px;
+  background: transparent;
+  border-bottom: 1px solid var(--line-2);
 }
 .session-list-body {
   flex: 1;
@@ -603,7 +622,7 @@ onUnmounted(() => {
 }
 .empty-tip {
   text-align: center;
-  color: #999;
+  color: var(--text-3);
   padding: 40px 0;
   font-size: 13px;
 }
@@ -611,15 +630,15 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 12px 18px;
   cursor: pointer;
-  border-bottom: 1px solid #ececec;
-  transition: background 0.1s;
+  border-bottom: 1px solid var(--line-3);
+  transition: background 0.15s ease;
 }
-.session-item:hover { background: #ebebeb; }
-.session-item.active { background: #e0e0e0; }
-.unread .name { color: #e74c3c; font-weight: 600; }
-.unread .last-msg { color: #e74c3c; }
+.session-item:hover { background: var(--hover-1); }
+.session-item.active { background: var(--brand-light-8); }
+.unread .name { color: var(--danger); font-weight: 600; }
+.unread .last-msg { color: var(--danger); }
 .session-info {
   flex: 1;
   min-width: 0;
@@ -632,20 +651,20 @@ onUnmounted(() => {
 }
 .name {
   font-size: 14px;
-  color: #333;
+  color: var(--text-1);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .session-row-1 .time {
   font-size: 11px;
-  color: #b0b0b0;
+  color: var(--text-3);
   flex-shrink: 0;
   margin-left: 8px;
 }
 .session-row-2 .last-msg {
   font-size: 12px;
-  color: #999;
+  color: var(--text-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -654,8 +673,8 @@ onUnmounted(() => {
 /* 底部账号选择 */
 .session-list-footer {
   padding: 12px;
-  border-top: 1px solid #e5e5e5;
-  background: #f3f3f3;
+  border-top: 1px solid var(--line-2);
+  background: var(--surface-1);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -671,28 +690,29 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #f5f5f5;
+  background: var(--surface-1);
 }
 .chat-header {
   padding: 14px 20px;
-  background: #fcfcfc;
-  border-bottom: 1px solid #e5e5e5;
+  background: var(--surface-0);
+  border-bottom: 1px solid var(--line-2);
 }
 .chat-header.empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #999;
+  color: var(--text-3);
   font-size: 14px;
   flex: 1;
 }
 .chat-title .name {
   font-weight: 600;
   font-size: 15px;
+  color: var(--text-1);
 }
 .chat-title .status {
   font-size: 12px;
-  color: #999;
+  color: var(--text-3);
   margin-left: 12px;
 }
 
@@ -720,7 +740,7 @@ onUnmounted(() => {
 .msg-time {
   text-align: center;
   font-size: 11px;
-  color: #b0b0b0;
+  color: var(--text-3);
   margin-bottom: 8px;
 }
 .msg-row {
@@ -741,12 +761,13 @@ onUnmounted(() => {
 }
 .msg-wrapper:not(.mine) .bubble {
   background: #fff;
-  color: #333;
+  color: var(--text-1);
   border-top-left-radius: 0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 .msg-wrapper.mine .bubble {
-  background: #95ec69;
-  color: #333;
+  background: #d9fdd0;
+  color: var(--text-1);
   border-top-right-radius: 0;
 }
 .bubble-text {
@@ -766,24 +787,24 @@ onUnmounted(() => {
   padding: 12px 16px;
   background: #fff;
   border-radius: 8px;
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--line-2);
   min-width: 200px;
   max-width: 280px;
 }
 .card-title {
   font-weight: 600;
   font-size: 15px;
-  color: #333;
+  color: var(--text-1);
   margin-bottom: 4px;
 }
 .card-subtitle {
   font-size: 13px;
-  color: #666;
+  color: var(--text-2);
   margin-bottom: 8px;
 }
 .card-desc {
   font-size: 12px;
-  color: #999;
+  color: var(--text-3);
   margin-bottom: 8px;
 }
 .card-left-img {
@@ -800,10 +821,10 @@ onUnmounted(() => {
 .card-raw {
   margin-top: 8px;
   padding: 8px;
-  background: #f5f5f5;
+  background: var(--surface-1);
   border-radius: 4px;
   font-size: 11px;
-  color: #666;
+  color: var(--text-2);
   white-space: pre-wrap;
   word-break: break-all;
   max-height: 120px;
@@ -813,8 +834,8 @@ onUnmounted(() => {
 /* 输入框 */
 .chat-input {
   padding: 12px 16px;
-  border-top: 1px solid #e5e5e5;
-  background: #fcfcfc;
+  border-top: 1px solid var(--line-2);
+  background: var(--surface-0);
 }
 .input-footer {
   display: flex;
@@ -824,6 +845,6 @@ onUnmounted(() => {
 }
 .input-footer .tip {
   font-size: 11px;
-  color: #b0b0b0;
+  color: var(--text-3);
 }
 </style>

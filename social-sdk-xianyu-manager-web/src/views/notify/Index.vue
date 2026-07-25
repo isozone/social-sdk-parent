@@ -38,7 +38,6 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="type" label="通道种类" width="120" v-if="false" />
           <el-table-column label="启用" width="90">
             <template #default="{ row }">
               <el-switch :model-value="row.enabled" @change="(v) => toggleChannel(row, v)" />

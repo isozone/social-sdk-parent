@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>消息 - AI 鱼多宝</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--brand:#4f46e5;--brand-2:#7c3aed;--accent:#22d3ee;--bg:#f5f5f7;--text-1:#111827;--text-2:#6b7280;--text-3:#9ca3af;--border:#e5e7eb;--danger:#ef4444}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+.phone{width:393px;height:852px;border-radius:48px;background:var(--bg);position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.2)}
+.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}
+.status-bar{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:14px;font-weight:600;color:#111827}
+.content{position:absolute;top:58px;left:0;right:0;bottom:84px;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}.content::-webkit-scrollbar{display:none}
+.tabbar{position:absolute;bottom:0;left:0;right:0;height:84px;background:rgba(255,255,255,.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid #f0f0f0;display:flex;z-index:80;padding-bottom:8px}
+.tab-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;transition:all .2s}
+.tab-icon{width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#9ca3af;transition:color .2s}
+.tab-item.active .tab-icon{color:var(--brand)}
+.tab-label{font-size:10px;color:#9ca3af;font-weight:500;transition:color .2s}.tab-item.active .tab-label{color:var(--brand);font-weight:600}
+/* Header */
+.msg-head{padding:14px 20px 10px;background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.msg-title{font-size:22px;font-weight:700;color:var(--text-1)}.msg-actions{display:flex;gap:10px}
+.unread-badge{background:rgba(239,68,68,.08);color:var(--danger);font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px}
+.sync-btn{width:32px;height:32px;border-radius:10px;background:rgba(79,70,229,.08);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--brand);transition:transform .3s}
+.sync-btn:active{transform:rotate(180deg)}
+/* Filter Tabs */
+.filter-tabs{display:flex;background:#fff;border-bottom:1px solid var(--border);padding:0 12px;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch}.filter-tabs::-webkit-scrollbar{display:none}
+.filter-tab{flex-shrink:0;text-align:center;padding:12px 0;font-size:13px;color:var(--text-2);border-bottom:2px solid transparent;transition:.2s;min-width:max-content}
+.filter-tab.active{color:var(--brand);border-bottom-color:var(--brand);font-weight:600}
+/* Search */
+.search-row{padding:12px 16px;background:#fff}
+.search-box{display:flex;align-items:center;gap:8px;padding:10px 16px;background:#f3f4f6;border-radius:14px;font-size:14px;color:var(--text-3)}
+.search-box input{flex:1;border:none;background:transparent;outline:none;color:var(--text-1);font-size:14px}
+.search-box input::placeholder{color:var(--text-3)}
+/* Session List */
+.session-list{padding:8px 12px 16px}
+.session{display:flex;align-items:center;gap:12px;padding:14px 12px;border-radius:16px;cursor:pointer;transition:background .15s;margin-bottom:4px}
+.session:active{background:#f3f4f6}
+.session.unread{background:rgba(79,70,229,.02)}
+.s-icon{width:48px;height:48px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.s-info{flex:1;min-width:0}
+.s-name{font-size:15px;font-weight:600;color:var(--text-1)}
+.s-time{font-size:11px;color:var(--text-3);margin-top:2px}
+.s-msg{font-size:13px;color:var(--text-2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.s-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.s-badge{min-width:22px;height:22px;border-radius:11px;background:var(--danger);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(239,68,68,.3)}
+.s-badge.zero{background:#d1d5db;box-shadow:none}
+.ai-indicator{font-size:10px;color:var(--brand);font-weight:600;background:rgba(79,70,229,.08);padding:2px 6px;border-radius:6px}
+.empty-state{padding:60px 40px;text-align:center;color:var(--text-3)}
+.empty-icon{font-size:48px;margin-bottom:12px;opacity:.4}
+.safe-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}
+</style>
+</head>
+<body>
+<div class="phone safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
+  <div class="content">
+    <div class="msg-head"><div class="msg-title">消息</div><div class="msg-actions">
+      <span class="unread-badge">3 条未读</span>
+      <div class="sync-btn" title="同步消息">🔄</div>
+    </div></div>
+    <div class="filter-tabs">
+      <div class="filter-tab active">客户消息</div>
+      <div class="filter-tab">即时通知</div>
+      <div class="filter-tab">系统信息</div>
+      <div class="filter-tab">AI 客服</div>
+    </div>
+    <div class="search-row"><div class="search-box">
+      <span>🔍</span>
+      <input type="text" placeholder="搜索会话、关键词...">
+    </div></div>
+    <div class="session-list">
+      <div class="session unread">
+        <div class="s-icon" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)">张</div>
+        <div class="s-info"><div class="s-name">张小明 <span class="ai-indicator">AI 回复中</span></div><div class="s-time">刚刚</div><div class="s-msg">你好，这个商品还有吗？价格是实价的吗？</div></div>
+        <div class="s-right"><div class="s-badge">2</div></div>
+      </div>
+      <div class="session unread">
+        <div class="s-icon" style="background:linear-gradient(135deg,#06b6d4,#22d3ee)">李</div>
+        <div class="s-info"><div class="s-name">李先生</div><div class="s-time">09:45</div><div class="s-msg">包邮吗？当天能发货吗？</div></div>
+        <div class="s-right"><div class="s-badge">1</div></div>
+      </div>
+      <div class="session">
+        <div class="s-icon" style="background:linear-gradient(135deg,#10b981,#34d399)">王</div>
+        <div class="s-info"><div class="s-name">王姐姐</div><div class="s-time">昨天 22:15</div><div class="s-msg">谢谢，收到了！很满意～</div></div>
+        <div class="s-right"><div class="s-badge zero">—</div></div>
+      </div>
+      <div class="session">
+        <div class="s-icon" style="background:linear-gradient(135deg,#f59e0b,#fbbf24)">刘</div>
+        <div class="s-info"><div class="s-name">刘先生</div><div class="s-time">昨天 18:30</div><div class="s-msg">可以换一个颜色吗？黑色的有货吗</div></div>
+        <div class="s-right"><div class="s-badge zero">—</div></div>
+      </div>
+      <div class="session">
+        <div class="s-icon" style="background:linear-gradient(135deg,#ef4444,#f87171)">陈</div>
+        <div class="s-info"><div class="s-name">陈太太</div><div class="s-time">6月28日 14:20</div><div class="s-msg">这个有点小，能换大一号的吗</div></div>
+        <div class="s-right"><div class="s-badge zero">—</div></div>
+      </div>
+      <div class="session">
+        <div class="s-icon" style="background:linear-gradient(135deg,#8b5cf6,#a78bfa)">赵</div>
+        <div class="s-info"><div class="s-name">赵小姐</div><div class="s-time">6月27日 09:00</div><div class="s-msg">这是新品吗？有没有保修</div></div>
+        <div class="s-right"><div class="s-badge zero">—</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="tabbar">
+    <div class="tab-item"><div class="tab-icon">📊</div><div class="tab-label">首页</div></div>
+    <div class="tab-item active"><div class="tab-icon">💬</div><div class="tab-label">消息</div></div>
+    <div class="tab-item"><div class="tab-icon">🛒</div><div class="tab-label">商品</div></div>
+    <div class="tab-item"><div class="tab-icon">👤</div><div class="tab-label">我的</div></div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>通知中心 - AI 鱼多宝</title>
+<style>
+@import url('_design-system.css');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+.notif-hero{background:var(--gradient-brand);padding:24px 20px 32px;border-radius:0 0 28px 28px;position:relative;overflow:hidden}
+.notif-hero::before{content:'';position:absolute;top:-50%;right:-15%;width:200px;height:200px;background:radial-gradient(circle,rgba(34,211,238,.18),transparent 70%);border-radius:50%}
+.notif-title-bar{display:flex;align-items:center;justify-content:space-between;position:relative;z-index:1}
+.notif-page-title{font-size:20px;font-weight:800;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.1)}
+.notif-action-link{color:rgba(255,255,255,.7);font-size:13px;font-weight:500;text-decoration:none}
+.filter-tabs{display:flex;gap:8px;padding:16px 16px 0;overflow-x:auto}
+.filter-tab{white-space:nowrap;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:500;background:var(--bg-card);border:1px solid var(--border);color:var(--text-secondary);transition:all .2s}
+.filter-tab.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+.notify-list{padding:0 16px 20px;display:flex;flex-direction:column;gap:12px}
+.notify-card{background:var(--bg-card);border-radius:var(--radius-md);padding:14px 16px;border:1px solid var(--border);box-shadow:var(--shadow-sm);display:flex;gap:12px;transition:transform .2s}
+.notify-card:active{transform:scale(.98)}
+.notify-card.unread{background:linear-gradient(135deg,#faf5ff,#f0f9ff);border-color:rgba(79,70,229,.15);box-shadow:0 4px 16px rgba(79,70,229,.08)}
+.notify-icon{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.ni-danger{background:rgba(239,68,68,.1);color:var(--danger)}.ni-warning{background:rgba(245,158,11,.1);color:var(--warning)}.ni-system{background:rgba(79,70,229,.1);color:var(--brand)}.ni-success{background:rgba(16,185,129,.1);color:var(--success)}.ni-info{background:rgba(59,130,246,.1);color:var(--info)}
+.notify-body{flex:1;min-width:0}
+.notify-head{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+.notify-name{font-size:14px;font-weight:700;color:var(--text-primary)}
+.notify-card.unread .notify-name::after{content:'新';display:inline-flex;font-size:9px;background:var(--brand);color:#fff;border-radius:4px;padding:1px 5px;font-weight:700;vertical-align:middle}
+.notify-desc{font-size:12px;color:var(--text-tertiary);line-height:1.5}
+.notify-time{font-size:11px;color:var(--text-tertiary);white-space:nowrap;margin-top:4px}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;text-align:center}
+.empty-icon{font-size:48px;margin-bottom:16px;opacity:.5}.empty-text{font-size:15px;color:var(--text-tertiary);line-height:1.6}
+</style>
+</head>
+<body>
+<div class="phone-frame safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="display:flex;gap:5px;align-items:center"><svg width="16" height="12" viewBox="0 0 16 12"><path d="M1 10.5a1 1 0 01-.5-1.86A8 8 0 018 2a8 8 0 018.5 6.64 1 1 0 01-1 1.86A6 6 0 008 4a6 6 0 00-7 6.5z"/><path d="M4 7.5a1 1 0 01-.5-1.86A4 4 0 018 2a4 4 0 014.5 3.64 1 1 0 01-1 1.86A2 2 0 008 4a2 2 0 00-4.5 3.5z" fill="#10b981"/></svg><svg width="16" height="12" viewBox="0 0 16 12"><rect x="1" y="4" width="3" height="8" rx=".5" fill-opacity=".3"/><rect x="5.5" y="2.5" width="3" height="9.5" rx=".5" fill-opacity=".5"/><rect x="10" y="0" width="3" height="12" rx=".5"/></svg><svg width="26" height="12" viewBox="0 0 28 12"><rect x=".5" y=".5" width="23" height="11" rx="3" stroke="#fff" fill="none"/><rect x="2" y="2" width="16" height="8" rx="1.5" fill="#10b981"/></svg></span></div>
+  <div class="page-content">
+    <div class="notif-hero">
+      <div class="notif-title-bar">
+        <div class="notif-page-title">通知中心</div>
+        <a href="#" class="notif-action-link">管理通道 ›</a>
+      </div>
+    </div>
+    <div class="filter-tabs">
+      <div class="filter-tab active">全部 (7)</div>
+      <div class="filter-tab">系统</div>
+      <div class="filter-tab">告警</div>
+      <div class="filter-tab">业务</div>
+    </div>
+    <div class="notify-list">
+      <div class="notify-card unread"><div class="notify-icon ni-danger">🔴</div><div class="notify-body"><div class="notify-head"><span class="notify-name">Cookie 即将过期</span></div><div class="notify-desc">副业号的 Cookie 将于 7 天后过期，请及时更新。</div><div class="notify-time">10 分钟前</div></div></div>
+      <div class="notify-card unread"><div class="notify-icon ni-warning">⚠️</div><div class="notify-body"><div class="notify-head"><span class="notify-name">API 响应超时</span></div><div class="notify-desc">闲鱼接口 MTOP 连续超时 3 次，已触发熔断保护。</div><div class="notify-time">30 分钟前</div></div></div>
+      <div class="notify-card unread"><div class="notify-icon ni-system">🤖</div><div class="notify-body"><div class="notify-head"><span class="notify-name">AI 自动回复异常</span></div><div class="notify-desc">规则「价格议价」匹配率低于 60%，建议优化关键词。</div><div class="notify-time">1 小时前</div></div></div>
+      <div class="notify-card"><div class="notify-icon ni-success">✅</div><div class="notify-body"><div class="notify-head"><span class="notify-name">商品同步完成</span></div><div class="notify-desc">主力号 156 件商品已同步至本地数据库。</div><div class="notify-time">2 小时前</div></div></div>
+      <div class="notify-card"><div class="notify-icon ni-info">📦</div><div class="notify-body"><div class="notify-head"><span class="notify-name">新订单提醒</span></div><div class="notify-desc">收到一笔新订单，金额为 ¥2,499。</div><div class="notify-time">3 小时前</div></div></div>
+      <div class="notify-card"><div class="notify-icon ni-system">⚙️</div><div class="notify-body"><div class="notify-head"><span class="notify-name">系统更新</span></div><div class="notify-desc">版本号 v1.0.3，已优化 WebSocket 连接稳定性。</div><div class="notify-time">昨天 18:00</div></div></div>
+      <div class="notify-card"><div class="notify-icon ni-success">💰</div><div class="notify-body"><div class="notify-head"><span class="notify-name">提现成功</span></div><div class="notify-desc">¥5,000.00 已到达支付宝账户。</div><div class="notify-time">昨天 14:30</div></div></div>
+    </div>
+  </div>
+  <div class="tab-bar safe-bottom">
+    <div class="tab-item"><span class="tab-icon">📊</span><span class="tab-label">首页</span></div>
+    <div class="tab-item"><span class="tab-icon">💬</span><span class="tab-label">消息</span></div>
+    <div class="tab-item"><span class="tab-icon">🛒</span><span class="tab-label">商品</span></div>
+    <div class="tab-item active"><span class="tab-icon">👤</span><span class="tab-label">我的</span></div>
+  </div>
+</div>
+</body>
+</html>

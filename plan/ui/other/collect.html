@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>收藏关注 - AI 鱼多宝</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+:root{--brand:#4f46e5;--violet:#7c3aed;--cyan:#22d3ee;--bg-page:#f5f5f7;--text-primary:#111827;--text-secondary:#6b7280;--text-tertiary:#9ca3af;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--border:#e5e7eb}
+.phone{width:393px;height:852px;border-radius:54px;background:var(--bg-page);position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.18)}
+.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}
+.status-bar{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:14px;font-weight:600;color:var(--text-primary)}
+.page-content{position:absolute;top:58px;left:0;right:0;bottom:84px;overflow-y:auto}
+.page-content::-webkit-scrollbar{display:none}
+.header{background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:18px 16px 18px;border-radius:0 0 22px 22px;display:flex;align-items:center;justify-content:space-between}
+.h-title{color:#fff;font-size:17px;font-weight:700}.h-sync{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer}
+.collect-tabs{display:flex;gap:4px;padding:10px 16px}
+.collect-tab{flex:1;text-align:center;padding:8px;border-radius:10px;background:#fff;border:1px solid transparent;font-size:12px;font-weight:500;color:var(--text-secondary);transition:all .2s}
+.collect-tab.active{background:var(--brand);color:#fff;border-color:var(--brand);font-weight:700}
+.item-grid{padding:0 16px 20px;display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.collect-card{background:#fff;border-radius:18px;overflow:hidden;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.03);transition:all .2s}
+.collect-card:active{transform:scale(.96)}
+.cc-img{width:100%;aspect-ratio:1;background:linear-gradient(135deg,#f3f4f6,#e5e7eb);display:flex;align-items:center;justify-content:center;font-size:44px;position:relative}
+.cc-fav{position:absolute;top:8px;right:8px;color:var(--danger);font-size:14px}
+.cc-body{padding:12px}
+.cc-title{font-size:13px;font-weight:600;color:var(--text-primary);line-height:1.4;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.cc-price{font-size:16px;font-weight:800;color:var(--danger)}.cc-price::before{content:'¥'}
+.cc-meta{font-size:11px;color:var(--text-tertiary);margin-top:4px;display:flex;justify-content:space-between}
+.empty-state{text-align:center;padding:80px 40px;color:var(--text-tertiary)}
+.empty-icon{font-size:56px;margin-bottom:16px;opacity:.5}
+.empty-text{font-size:14px;line-height:1.6}
+.sync-tip{margin:0 16px 12px;background:#fff;border-radius:16px;padding:14px;border:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.sync-tip-icon{font-size:24px}.sync-tip-text{font-size:12px;color:var(--text-secondary);flex:1}.sync-tip-btn{padding:6px 14px;border-radius:10px;background:var(--brand);color:#fff;font-size:11px;font-weight:600;cursor:pointer}
+.tab-bar{position:absolute;bottom:0;left:0;right:0;height:84px;background:rgba(255,255,255,.94);backdrop-filter:blur(20px);border-top:1px solid var(--border-light);display:flex;z-index:80;padding-bottom:8px}
+.tab-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}.tab-item:active{transform:scale(.92)}.tab-icon{font-size:20px}.tab-label{font-size:10px;color:var(--text-tertiary);font-weight:400}
+.tab-item.active .tab-icon{color:var(--brand)}.tab-item.active .tab-label{color:var(--brand);font-weight:600}
+.safe-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}
+</style>
+</head>
+<body>
+<div class="phone safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
+  <div class="page-content">
+    <div class="header"><span class="h-title">收藏关注</span><button class="h-sync">🔄 同步闲鱼</button></div>
+    <div class="collect-tabs">
+      <div class="collect-tab active">商品 (28)</div>
+      <div class="collect-tab">用户 (15)</div>
+      <div class="collect-tab">店铺 (6)</div>
+    </div>
+    <div class="item-grid">
+      <div class="collect-card"><div class="cc-img">👟<div class="cc-fav">♥</div></div><div class="cc-body"><div class="cc-title">Adidas Yeezy Boost 350 V2 Zebra</div><div class="cc-price">1,299</div><div class="cc-meta"><span>卖家：潮流数码城</span><span>昨天收藏</span></div></div></div>
+      <div class="collect-card"><div class="cc-img">🎧<div class="cc-fav">♥</div></div><div class="cc-body"><div class="cc-title">AirPods Pro 2 代 USB-C 充电版</div><div class="cc-price">899</div><div class="cc-meta"><span>低于市场 ¥200</span><span>3 天前</span></div></div></div>
+      <div class="collect-card"><div class="cc-img">⌚<div class="cc-fav">♥</div></div><div class="cc-body"><div class="cc-title">Apple Watch Ultra 2 GPS+Cellular</div><div class="cc-price">4,599</div><div class="cc-meta"><span>卖家：二手好物铺</span><span>本周</span></div></div></div>
+      <div class="collect-card"><div class="cc-img">📱<div class="cc-fav">♥</div></div><div class="cc-body"><div class="cc-title">iPhone 15 Pro Max 256GB 原色钛金属</div><div class="cc-price">6,800</div><div class="cc-meta"><span>卖家：苹果之家</span><span>上周</span></div></div></div>
+    </div>
+  </div>
+  <div class="tab-bar safe-bottom">
+    <div class="tab-item"><span class="tab-icon">📊</span><span class="tab-label">首页</span></div>
+    <div class="tab-item"><span class="tab-icon">💬</span><span class="tab-label">消息</span></div>
+    <div class="tab-item"><span class="tab-icon">🛒</span><span class="tab-label">商品</span></div>
+    <div class="tab-item active"><span class="tab-icon">👤</span><span class="tab-label">我的</span></div>
+  </div>
+</div>
+</body>
+</html>

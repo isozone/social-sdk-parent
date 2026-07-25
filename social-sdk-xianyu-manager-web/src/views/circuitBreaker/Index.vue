@@ -2,16 +2,22 @@
   <div class="page-root">
     <!-- 全局重置 -->
     <el-card>
-      <template #header>
-        <div class="card-header">
-          <span>熔断器管理</span>
+      <div class="card-head">
+        <div class="card-head-left">
+          <div class="card-chip chip-slate"><el-icon><WarningFilled /></el-icon></div>
+          <div class="card-head-text">
+            <div class="card-title">熔断器管理</div>
+            <div class="card-sub">按账号+服务维度自动降级，防止雪崩</div>
+          </div>
+        </div>
+        <div class="card-head-right">
           <el-button size="small" @click="loadBreakers">
             <el-icon><Refresh /></el-icon> 刷新
           </el-button>
         </div>
-      </template>
+      </div>
 
-      <el-alert type="info" :closable="false" show-icon>
+      <el-alert type="info" :closable="false" show-icon class="alert-box">
         熔断器用于按账号+服务维度自动降级，防止雪崩。状态：关闭(正常) → 打开(拒绝请求) → 半开(探测中) → 关闭(恢复)。
       </el-alert>
 

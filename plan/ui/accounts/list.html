@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>账号列表 - AI 鱼多宝</title>
+<style>
+@import url('../_design-system.css');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'PingFang SC','SF Pro Display',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+
+/* Page-specific */
+.search-wrap{padding:12px 16px 0}
+.search-input{width:100%;height:44px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-md);padding:0 16px;font-size:14px;color:var(--text-primary);outline:none;transition:all .25s}
+.search-input:focus{border-color:var(--brand);background:#fff;box-shadow:0 0 0 3px rgba(79,70,229,.08)}
+.search-input::placeholder{color:var(--text-tertiary)}
+.search-input{display:flex;align-items:center;gap:10px}
+.search-input svg{flex-shrink:0}
+
+.account-list{padding:0 16px 12px;display:flex;flex-direction:column;gap:12px}
+
+.acc-card{background:var(--bg-card);border-radius:var(--radius-md);padding:16px;border:1px solid var(--border);box-shadow:var(--shadow-sm);transition:transform .15s ease}
+.acc-card:active{transform:scale(.98)}
+
+.acc-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.acc-gradient-icon{width:48px;height:48px;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 3px 10px rgba(0,0,0,.1)}
+.acc-info{flex:1;min-width:0}.acc-name{font-size:16px;font-weight:700;color:var(--text-primary)}.acc-meta{font-size:12px;color:var(--text-tertiary);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acc-more{font-size:18px;color:var(--text-tertiary);cursor:pointer;padding:4px}
+
+.acc-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.acc-stat{background:var(--bg-page);border-radius:var(--radius-sm);padding:12px 8px;text-align:center}
+.acc-stat-icon{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin:0 auto 8px}
+.acc-stat-icon svg{width:16px;height:16px}
+.acc-stat-value{font-size:20px;font-weight:800;color:var(--text-primary);line-height:1}
+.acc-stat-label{font-size:11px;color:var(--text-tertiary);margin-top:4px}
+
+.acc-footer{display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border-light);padding-top:12px}
+.acc-time{font-size:11px;color:var(--text-tertiary)}
+
+.fab{position:absolute;bottom:100px;right:24px;width:56px;height:56px;border-radius:50%;background:var(--gradient-brand);color:#fff;font-size:28px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(79,70,229,.35);z-index:50;cursor:pointer;transition:all .25s}
+.fab:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(79,70,229,.45)}
+.fab:active{transform:scale(.92)}
+
+/* Hero color override for inner page nav */
+.inner-nav{background:rgba(255,255,255,.94);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.inner-nav a{color:var(--brand)!important;text-decoration:none;font-weight:600;font-size:14px}
+</style>
+</head>
+<body>
+<div class="phone-frame safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="font-size:12px;color:var(--text-primary)">●●●●●</span></div>
+  <div class="page-content inner-nav">
+    <!-- Nav -->
+    <div style="padding:32px 16px 0;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:20px;font-weight:700;color:var(--text-primary)">账号管理</div>
+      <a href="add.html">+ 添加</a>
+    </div>
+
+    <!-- Search -->
+    <div class="search-wrap">
+      <div class="search-input">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span style="flex:1;font-size:14px;color:var(--text-tertiary)">搜索账号名称...</span>
+      </div>
+    </div>
+
+    <!-- Filter chips -->
+    <div class="scroll-tabs">
+      <div class="scroll-tab active">全部 (3)</div>
+      <div class="scroll-tab">运行中</div>
+      <div class="scroll-tab">已暂停</div>
+      <div class="scroll-tab">异常</div>
+    </div>
+
+    <!-- Accounts -->
+    <div class="account-list">
+      <!-- Card 1 -->
+      <div class="acc-card">
+        <div class="acc-header">
+          <div class="acc-gradient-icon" style="background:linear-gradient(135deg,#4f46e5,#7c3aed)">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18c0-4 4-6 4-10s-2-6-4-6"/><path d="M18 18c0-4-4-6-4-10s2-6 4-6"/><path d="M12 2v6"/><path d="M8 2h8"/><path d="M12 8v10"/><path d="M12 16l4-2"/><path d="M12 16l-4-2"/></svg>
+          </div>
+          <div class="acc-info"><div class="acc-name">闲鱼-主力号</div><div class="acc-meta">ID: 10086 · 更新于 2 分钟前</div></div>
+          <div class="acc-more">&#8942;</div>
+        </div>
+        <div class="acc-stats">
+          <div class="acc-stat">
+            <div class="acc-stat-icon" style="background:rgba(79,70,229,.08)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L5 14.34a2 2 0 010-2.83L11.58 5a2 2 0 012.83 0l7.18 7.17a2 2 0 01-.01 2.84z"/></svg></div>
+            <div class="acc-stat-value">156</div>
+            <div class="acc-stat-label">商品</div>
+          </div>
+          <div class="acc-stat">
+            <div class="acc-stat-icon" style="background:rgba(16,185,129,.08)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L2 12h4l3-9 3 9z"/></svg></div>
+            <div class="acc-stat-value" style="color:var(--success)">96</div>
+            <div class="acc-stat-label">健康分</div>
+          </div>
+          <div class="acc-stat">
+            <div class="acc-stat-icon" style="background:rgba(245,158,11,.08)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg></div>
+            <div class="acc-stat-value" style="color:var(--warning)">23</div>
+            <div class="acc-stat-label">今日订单</div>
+          </div>
+        </div>
+        <div class="acc-footer">
+          <span class="chip-green chip">● 运行中</span>
+          <span class="acc-time">昨天 23:56</span>
+        </div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="acc-card">
+        <div class="acc-header">
+          <div class="acc-gradient-icon" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18c0-4 4-6 4-10s-2-6-4-6"/><path d="M18 18c0-4-4-6-4-10s2-6 4-6"/><path d="M12 2v6"/><path d="M8 2h8"/><path d="M12 8v10"/><path d="M12 16l4-2"/><path d="M12 16l-4-2"/></svg>
+          </div>
+          <div class="acc-info"><div class="acc-name">闲鱼-副业号</div><div class="acc-meta">ID: 10087 · Cookie 即将过期</div></div>
+          <div class="acc-more">&#8942;</div>
+        </div>
+        <div class="acc-stats">
+          <div class="acc-stat">
+            <div class="acc-stat-icon" style="background:rgba(79,70,229,.08)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L5 14.34a2 2 0 010-2.83L11.58 5a2 2 0 012.83 0l7.18 7.17a2 2 0 01-.01 2.84z"/></svg></div>
+            <div class="acc-stat-value">89</div>
+            <div class="acc-stat-label">商品</div>
+          </div>
+          <div class="acc-stat">
+            <div class="acc-stat-icon" style="background:rgba(16,185,129,.08)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L2 12h4l3-9 3 9z"/></svg></div>
+            <div class="acc-stat-value" style="color:var(--warning)">72</div>
+            <div class="acc-stat-label">健康分</div>
+          </div>
+          <div class="acc-stat">
+            <div class="acc-stat-icon" style="background:rgba(245,158,11,.08)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg></div>
+            <div class="acc-stat-value">8</div>
+            <div class="acc-stat-label">今日订单</div>
+          </div>
+        </div>
+        <div class="acc-footer">
+          <span class="chip-amber chip">⚠ Cookie 7天过期</span>
+          <span class="acc-time">今天 14:22</span>
+        </div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="acc-card">
+        <div class="acc-header">
+          <div class="acc-gradient-icon" style="background:linear-gradient(135deg,#64748b,#94a3b8)">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18c0-4 4-6 4-10s-2-6-4-6"/><path d="M18 18c0-4-4-6-4-10s2-6 4-6"/><path d="M12 2v6"/><path d="M8 2h8"/><path d="M12 8v10"/><path d="M12 16l4-2"/><path d="M12 16l-4-2"/></svg>
+          </div>
+          <div class="acc-info"><div class="acc-name">闲鱼-测试号</div><div class="acc-meta">ID: 10088 · 已暂停</div></div>
+          <div class="acc-more">&#8942;</div>
+        </div>
+        <div class="acc-stats">
+          <div class="acc-stat">
+            <div class="acc-stat-icon" style="background:rgba(79,70,229,.08)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L5 14.34a2 2 0 010-2.83L11.58 5a2 2 0 012.83 0l7.18 7.17a2 2 0 01-.01 2.84z"/></svg></div>
+            <div class="acc-stat-value">12</div>
+            <div class="acc-stat-label">商品</div>
+          </div>
+          <div class="acc-stat">
+            <div class="acc-stat-icon" style="background:rgba(16,185,129,.08)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L2 12h4l3-9 3 9z"/></svg></div>
+            <div class="acc-stat-value" style="color:var(--text-tertiary)">—</div>
+            <div class="acc-stat-label">健康分</div>
+          </div>
+          <div class="acc-stat">
+            <div class="acc-stat-icon" style="background:rgba(245,158,11,.08)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg></div>
+            <div class="acc-stat-value">0</div>
+            <div class="acc-stat-label">今日订单</div>
+          </div>
+        </div>
+        <div class="acc-footer">
+          <span class="chip-slate chip">○ 已暂停</span>
+          <span class="acc-time">3 天前</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAB -->
+  <div class="fab" onclick="location.href='add.html'">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </div>
+
+  <!-- TabBar -->
+  <div class="tab-bar safe-bottom">
+    <div class="tab-item"><span class="tab-icon">📊</span><span class="tab-label">首页</span></div>
+    <div class="tab-item active"><span class="tab-icon">💬</span><span class="tab-label">消息</span></div>
+    <div class="tab-item"><span class="tab-icon">🛒</span><span class="tab-label">商品</span></div>
+    <div class="tab-item"><span class="tab-icon">👤</span><span class="tab-label">我的</span></div>
+  </div>
+</div>
+</body>
+</html>

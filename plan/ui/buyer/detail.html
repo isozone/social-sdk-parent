@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>买家画像 - AI 鱼多宝</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}:root{--brand:#4f46e5;--cyan:#22d3ee;--bg-page:#f5f5f7;--text-primary:#111827;--text-secondary:#6b7280;--text-tertiary:#9ca3af;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--info:#3b82f6;--border:#e5e7eb;--radius-md:16px;--gradient-brand:linear-gradient(135deg,#4f46e5,#7c3aed)}.phone{width:393px;height:852px;border-radius:54px;background:var(--bg-page);position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.18)}.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}.status-bar{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:14px;font-weight:600;color:var(--text-primary)}.page-content{position:absolute;top:58px;left:0;right:0;bottom:84px;overflow-y:auto;-webkit-overflow-scrolling:touch}.page-content::-webkit-scrollbar{display:none}.nav{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}.back{font-size:22px;color:var(--text-primary)}.h-title{font-size:17px;font-weight:700;color:var(--text-primary);flex:1;text-align:center}.buyer-header{background:var(--gradient-brand);padding:40px 20px 30px;border-radius:0 0 24px 24px;text-align:center;position:relative;overflow:hidden}.buyer-header::before{content:'';position:absolute;top:-40%;right:-15%;width:200px;height:200px;background:radial-gradient(circle,rgba(34,211,238,.2),transparent 70%);border-radius:50%}.buyer-avatar{width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.18);border:3px solid rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 10px}.buyer-name{color:#fff;font-size:20px;font-weight:800;position:relative;z-index:1}.buyer-id{color:rgba(255,255,255,.6);font-size:11px;margin-top:3px;position:relative;z-index:1}.tag-list{display:flex;gap:6px;justify-content:center;margin-top:12px;position:relative;z-index:1}.tag{padding:4px 12px;border-radius:20px;font-size:10px;font-weight:600;background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.2)}.card{background:#fff;border-radius:var(--radius-md);padding:16px;border:1px solid var(--border);margin:0 16px 12px;box-shadow:0 1px 4px rgba(0,0,0,.03)}.card-title{font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:12px;display:flex;align-items:center;gap:8px}.progress-item{display:flex;align-items:center;gap:10px;margin-bottom:10px}.progress-label{font-size:12px;color:var(--text-secondary);width:50px;text-align:right}.progress-bar{flex:1;height:8px;background:var(--bg-page);border-radius:4px;overflow:hidden}.progress-fill{height:100%;border-radius:4px;background:var(--gradient-brand)}.progress-val{font-size:11px;font-weight:700;color:var(--text-primary);width:35px}.info-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.info-item{padding:10px;background:var(--bg-page);border-radius:10px}.info-label{font-size:10px;color:var(--text-tertiary)}.info-val{font-size:13px;font-weight:700;color:var(--text-primary);margin-top:2px}.note-input{width:100%;min-height:80px;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--bg-page);font-size:13px;color:var(--text-primary);outline:none;resize:none}.note-input:focus{border-color:var(--brand);background:#fff}.btn-row{display:flex;gap:8px;margin-top:12px}.btn{flex:1;height:40px;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;border:none}.btn-primary{background:var(--gradient-brand);color:#fff}.btn-secondary{background:var(--bg-page);color:var(--text-secondary);border:1px solid var(--border)}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
+  <div class="page-content">
+    <div class="nav"><span class="back">‹</span><span class="h-title">买家画像</span><span style="font-size:13px;color:var(--brand);font-weight:600">编辑</span></div>
+    <div class="buyer-header">
+      <div class="buyer-avatar">👤</div>
+      <div class="buyer-name">用户_8F3A2K</div>
+      <div class="buyer-id">ID: BYR-20260725001 · 近 30 天活跃</div>
+      <div class="tag-list"><span class="tag">🔥 高频买家</span><span class="tag">💰 高客单价</span><span class="tag">⭐ 信用良好</span></div>
+    </div>
+    <!-- Behavior Analysis -->
+    <div class="section-head" style="padding-top:20px"><div class="section-title">行为分析</div></div>
+    <div class="card">
+      <div class="progress-item"><span class="progress-label">浏览</span><div class="progress-bar"><div class="progress-fill" style="width:78%"></div></div><span class="progress-val">78%</span></div>
+      <div class="progress-item"><span class="progress-label">咨询</span><div class="progress-bar"><div class="progress-fill" style="width:65%"></div></div><span class="progress-val">65%</span></div>
+      <div class="progress-item"><span class="progress-label">下单</span><div class="progress-bar"><div class="progress-fill" style="width:82%"></div></div><span class="progress-val">82%</span></div>
+      <div class="progress-item"><span class="progress-label">复购</span><div class="progress-bar"><div class="progress-fill" style="width:56%"></div></div><span class="progress-val">56%</span></div>
+    </div>
+    <!-- Profile Info -->
+    <div class="card">
+      <div class="card-title">📋 基础信息</div>
+      <div class="info-grid">
+        <div class="info-item"><div class="info-label">累计订单</div><div class="info-val">12 笔</div></div>
+        <div class="info-item"><div class="info-label">总消费</div><div class="info-val">¥8,960</div></div>
+        <div class="info-item"><div class="info-label">平均客单价</div><div class="info-val">¥747</div></div>
+        <div class="info-item"><div class="info-label">退款率</div><div class="info-val" style="color:var(--success)">2%</div></div>
+        <div class="info-item"><div class="info-label">偏好品类</div><div class="info-val">数码配件</div></div>
+        <div class="info-item"><div class="info-label">首次购买</div><div class="info-val">2026-03-15</div></div>
+      </div>
+    </div>
+    <!-- Buyer Notes -->
+    <div class="card">
+      <div class="card-title">📝 自定义标签 & 备注</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+        <span style="padding:4px 10px;border-radius:8px;font-size:11px;background:rgba(79,70,229,.08);color:var(--brand);font-weight:500">#高频买家</span>
+        <span style="padding:4px 10px;border-radius:8px;font-size:11px;background:rgba(16,185,129,.1);color:var(--success);font-weight:500">#信用好</span>
+        <span style="padding:4px 10px;border-radius:8px;font-size:11px;background:rgba(245,158,11,.1);color:var(--warning);font-weight:500">#议价倾向</span>
+      </div>
+      <textarea class="note-input" placeholder="添加买家备注...">偏好数码配件，经常批量购买。议价能力较强但成交率高。适合推送新品通知。</textarea>
+      <div class="btn-row"><button class="btn btn-secondary">➕ 添加标签</button><button class="btn btn-primary">保存备注</button></div>
+    </div>
+    <!-- Recent Orders -->
+    <div class="section-head"><div class="section-title">最近交易</div><a href="#" style="font-size:12px;color:var(--brand);font-weight:600;text-decoration:none">全部 ></a></div>
+    <div style="padding:0 16px 20px;display:flex;flex-direction:column;gap:10px">
+      <div class="card" style="margin:0;display:flex;align-items:center;gap:12px">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(59,130,246,.1);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🎧</div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:600;color:var(--text-primary)">Sony WH-1000XM5</div><div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">2026-07-20 · ¥1,899</div></div>
+        <span style="padding:3px 8px;border-radius:6px;font-size:10px;font-weight:600;background:rgba(16,185,129,.1);color:var(--success)">已完成</span>
+      </div>
+      <div class="card" style="margin:0;display:flex;align-items:center;gap:12px">
+        <div style="width:44px;height:44px;border-radius:12px;background:rgba(124,58,237,.1);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">⌚</div>
+        <div style="flex:1"><div style="font-size:14px;font-weight:600;color:var(--text-primary)">Apple Watch SE</div><div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">2026-06-18 · ¥1,599</div></div>
+        <span style="padding:3px 8px;border-radius:6px;font-size:10px;font-weight:600;background:rgba(16,185,129,.1);color:var(--success)">已完成</span>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

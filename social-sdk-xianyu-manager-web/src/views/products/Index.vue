@@ -1,38 +1,39 @@
 <template>
   <div class="page-root noflex">
-    <el-card>
-      <template #header>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span>商品管理</span>
-          <el-button v-if="activeTab === 'xianyu'" type="primary" @click="showCreateDialog = true">
-            <el-icon><Plus /></el-icon> 创建商品
-          </el-button>
-          <el-button v-else type="primary" @click="showLocalCreateDialog = true">
-            <el-icon><Plus /></el-icon> 新建本地商品
-          </el-button>
+    <el-card shadow="never">
+      <!-- ===== 卡片头部：图标 Chip + 标题 + 创建按钮 ===== -->
+      <div class="card-head">
+        <div class="card-head-left">
+          <div class="card-chip chip-violet">
+            <el-icon><Goods /></el-icon>
+          </div>
+          <div class="card-head-text">
+            <div class="card-title">商品管理</div>
+            <div class="card-sub">闲鱼商品与本地商品统一管控，支持 AI 文案优化、CSV 批量导入</div>
+          </div>
         </div>
-      </template>
+        <el-button type="primary" @click="activeTab === 'xianyu' ? (showCreateDialog = true) : (showLocalCreateDialog = true)">
+          <el-icon><Plus /></el-icon> {{ activeTab === 'xianyu' ? '创建商品' : '新建本地商品' }}
+        </el-button>
+      </div>
 
-      <el-tabs v-model="activeTab" style="margin-bottom: 16px;">
+      <!-- ===== Tabs + 工具栏 ===== -->
+      <el-tabs v-model="activeTab" class="prod-tabs">
         <el-tab-pane label="闲鱼商品" name="xianyu">
-          <el-tag type="info" size="small" style="margin-bottom: 12px;">从闲鱼同步的在线商品，可编辑/改价/上下架</el-tag>
+          <el-tag type="info" size="small" style="margin-bottom: 12px;">从闲鱼同步的在线商品，可编辑 / 改价 / 上下架</el-tag>
         </el-tab-pane>
         <el-tab-pane label="本地商品" name="local">
-          <el-tag type="warning" size="small" style="margin-bottom: 12px;">自建商品（草稿/待发布），发布成功后自动清理</el-tag>
+          <el-tag type="warning" size="small" style="margin-bottom: 12px;">自建商品（草稿 / 待发布），发布成功后自动清理</el-tag>
         </el-tab-pane>
       </el-tabs>
 
-      <el-form inline style="margin-bottom: 16px;">
-        <el-form-item label="账号">
-          <el-select v-model="filters.accountId" placeholder="全部" clearable style="width: 150px;">
+      <div class="page-toolbar">
+        <div class="toolbar-left">
+          <el-select v-model="filters.accountId" placeholder="全部账号" clearable style="width: 160px;">
             <el-option v-for="a in accounts" :key="a.id" :label="a.accountName" :value="a.id" />
           </el-select>
-        </el-form-item>
-        <el-form-item label="关键词">
-          <el-input v-model="filters.keyword" placeholder="搜索标题" clearable />
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="filters.status" placeholder="全部" clearable style="width: 120px;">
+          <el-input v-model="filters.keyword" placeholder="搜索标题关键词" clearable style="width: 200px;" prefix-icon="Search" />
+          <el-select v-model="filters.status" placeholder="全部状态" clearable style="width: 130px;">
             <template v-if="activeTab === 'xianyu'">
               <el-option label="在售" value="ON_SALE" />
               <el-option label="下架" value="OFF_SALE" />
@@ -45,38 +46,25 @@
               <el-option label="失败" value="FAILED" />
             </template>
           </el-select>
-        </el-form-item>
-        <el-form-item v-if="activeTab === 'xianyu'">
-          <el-button
-            type="primary"
-            :disabled="!filters.accountId"
-            :loading="syncing"
-            @click="handleSyncFromXianyu"
-          >
+        </div>
+        <div class="toolbar-right">
+          <el-button v-if="activeTab === 'xianyu'" type="primary" :disabled="!filters.accountId" :loading="syncing" @click="handleSyncFromXianyu">
             <el-icon><Refresh /></el-icon> 同步闲鱼
           </el-button>
-        </el-form-item>
-        <el-form-item v-if="activeTab === 'xianyu'">
-          <el-button type="success" @click="showAiOptimizeDialog = true">
+          <el-button v-if="activeTab === 'xianyu'" type="success" @click="showAiOptimizeDialog = true">
             <el-icon><MagicStick /></el-icon> AI 优化文案
           </el-button>
-        </el-form-item>
-        <el-form-item v-if="activeTab === 'local'">
-          <el-button type="success" :loading="batchPublishing" @click="handleBatchPublish">
+          <el-button v-if="activeTab === 'local'" type="success" :loading="batchPublishing" @click="handleBatchPublish">
             <el-icon><UploadFilled /></el-icon> 批量发布
           </el-button>
-        </el-form-item>
-        <el-form-item v-if="activeTab === 'local'">
-          <el-button type="warning" @click="showImportDialog = true">
+          <el-button v-if="activeTab === 'local'" type="warning" @click="showImportDialog = true">
             <el-icon><Download /></el-icon> 批量导入
           </el-button>
-        </el-form-item>
-        <el-form-item v-if="activeTab === 'local'">
-          <el-button type="info" @click="handleDownloadTemplate">
-            <el-icon><DocumentCopy /></el-icon> 下载 CSV 模板
+          <el-button v-if="activeTab === 'local'" type="info" @click="handleDownloadTemplate">
+            <el-icon><DocumentCopy /></el-icon> CSV 模板
           </el-button>
-        </el-form-item>
-      </el-form>
+        </div>
+      </div>
 
       <el-table :data="activeTab === 'xianyu' ? products : localProducts" stripe v-loading="loading" @selection-change="onLocalSelectionChange">
         <!-- 闲鱼商品列 -->

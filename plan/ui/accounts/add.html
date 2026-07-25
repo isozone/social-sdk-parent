@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>添加账号 - AI 鱼多宝</title>
+<style>
+@import url('../_design-system.css');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'PingFang SC','SF Pro Display',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+
+/* Page-specific */
+.add-hero{background:var(--gradient-brand);padding:56px 20px 40px;border-radius:0 0 28px 28px;position:relative;overflow:hidden;text-align:center}
+.add-hero::after{content:'';position:absolute;bottom:-30%;left:50%;transform:translateX(-50%);width:260px;height:260px;background:radial-gradient(circle,rgba(255,255,255,.08),transparent 70%);border-radius:50%}
+.add-icon-wrap{width:56px;height:56px;border-radius:18px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;position:relative;z-index:1}
+.add-icon-wrap svg{width:28px;height:28px}
+.add-title{font-size:22px;font-weight:700;color:#fff;position:relative;z-index:1}
+.add-subtitle{font-size:14px;color:rgba(255,255,255,.7);margin-top:6px;position:relative;z-index:1}
+
+.add-form{margin-top:-24px;padding:0 16px 20px;display:flex;flex-direction:column;gap:14px;position:relative;z-index:2}
+.form-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:20px;border:1px solid var(--border);box-shadow:var(--shadow-sm)}
+.form-title{font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.form-title-icon{width:28px;height:28px;border-radius:8px;background:rgba(79,70,229,.08);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.form-title-icon svg{width:16px;height:16px}
+
+.field{margin-bottom:16px}
+.field:last-child{margin-bottom:0}
+.field-label{font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:7px;display:block}
+.field-input{width:100%;height:46px;background:var(--bg-page);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0 14px;font-size:14px;color:var(--text-primary);outline:none;transition:all .25s}
+.field-input:focus{border-color:var(--brand);background:#fff;box-shadow:0 0 0 3px rgba(79,70,229,.08)}
+.field-hint{font-size:11px;color:var(--text-tertiary);margin-top:5px}
+
+textarea.field-input{height:120px;padding:12px 14px;resize:none;font-family:'SF Mono','Menlo','Monaco',monospace;font-size:11px;line-height:1.5;color:var(--text-secondary)}
+
+.tip-card{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:var(--radius-md);padding:14px 16px}
+.tip-header{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--warning);margin-bottom:6px}
+.tip-text{font-size:12px;color:var(--text-secondary);line-height:1.6}
+
+.status-bar--white{color:#fff!important}
+</style>
+</head>
+<body>
+<div class="phone-frame safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar status-bar--white"><span style="color:#fff">9:41</span><span style="color:#fff;font-size:12px">●●●●●</span></div>
+  <div class="page-content">
+    <!-- Hero -->
+    <div class="add-hero">
+      <div class="add-icon-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/></svg>
+      </div>
+      <div class="add-title">添加闲鱼账号</div>
+      <div class="add-subtitle">粘贴 Cookie 即可快速绑定</div>
+    </div>
+
+    <!-- Form -->
+    <div class="add-form">
+      <div class="form-card">
+        <div class="form-title">
+          <span class="form-title-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>
+          账号信息
+        </div>
+        <div class="field">
+          <label class="field-label">账号名称</label>
+          <input class="field-input" placeholder="给自己取的友好名称">
+        </div>
+        <div class="field">
+          <label class="field-label">备注（可选）</label>
+          <input class="field-input" placeholder="用于记录更多信息">
+        </div>
+      </div>
+
+      <div class="form-card">
+        <div class="form-title">
+          <span class="form-title-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 15h.01M10 15h.01M13 15h.01"/></svg></span>
+          Cookie 配置
+        </div>
+        <div class="field">
+          <label class="field-label">Cookie</label>
+          <textarea class="field-input cookie-area" placeholder="从浏览器开发者工具复制完整的 Cookie Header"></textarea>
+          <div class="field-hint">打开闲鱼 → F12 → Network → 复制任意请求的 Cookie 头</div>
+        </div>
+      </div>
+
+      <div class="tip-card">
+        <div class="tip-header">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          安全提示
+        </div>
+        <div class="tip-text">Cookie 将在本地加密存储（AES-256），我们不会将你的 Cookie 上传至第三方服务器。</div>
+      </div>
+
+      <button class="btn-primary shimmer">绑 定 账 号</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

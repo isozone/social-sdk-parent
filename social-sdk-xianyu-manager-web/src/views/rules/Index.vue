@@ -2,28 +2,31 @@
   <div class="page-root noflex">
     <el-card>
       <template #header>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span>规则管理</span>
-          <div style="display: flex; gap: 12px; align-items: center;">
-            <el-select
-              v-model="selectedAccountId"
-              @change="onAccountChange"
-              placeholder="选择账号"
-              style="width: 200px"
-              :loading="accountsLoading"
-              clearable
-            >
-              <el-option
-                v-for="a in accounts"
-                :key="a.id"
-                :label="a.displayName || a.accountName"
-                :value="a.id"
-              />
-            </el-select>
-            <el-button type="primary" @click="openCreateDialog('KEYWORD')" :disabled="!selectedAccountId">
-              <el-icon><Plus /></el-icon> 创建规则
-            </el-button>
+        <div class="card-head">
+          <div class="card-head-left">
+            <div class="card-chip chip-violet"><el-icon><Operation /></el-icon></div>
+            <div class="card-head-text">
+              <div class="card-title">规则管理</div>
+              <div class="card-sub">关键字词回复、AI 接管与自动回复策略配置</div>
+            </div>
           </div>
+          <el-select
+            v-model="selectedAccountId"
+            @change="onAccountChange"
+            placeholder="选择账号"
+            :loading="accountsLoading"
+            clearable
+          >
+            <el-option
+              v-for="a in accounts"
+              :key="a.id"
+              :label="a.displayName || a.accountName"
+              :value="a.id"
+            />
+          </el-select>
+          <el-button type="primary" @click="openCreateDialog('KEYWORD')" :disabled="!selectedAccountId">
+            <el-icon><Plus /></el-icon> 创建规则
+          </el-button>
         </div>
       </template>
 
@@ -171,7 +174,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, Operation } from '@element-plus/icons-vue'
 import api from '@/api/request'
 import {
   listRules, createRule, toggleRule as toggleRuleApi,

@@ -4,6 +4,8 @@ import cn.net.rjnetwork.xianyu.manager.account.mapper.AccountMapper;
 import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
 import cn.net.rjnetwork.xianyu.manager.account.task.AccountHealthTask;
 import cn.net.rjnetwork.xianyu.manager.account.renew.task.CookiesRefreshTask;
+import cn.net.rjnetwork.xianyu.manager.account.renew.task.LoginRenewTask;
+import cn.net.rjnetwork.xianyu.manager.account.renew.task.TokenRenewalTask;
 import cn.net.rjnetwork.xianyu.manager.message.service.ImMessageWatcherService;
 import cn.net.rjnetwork.xianyu.manager.monitor.service.MonitorService;
 import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
@@ -38,6 +40,8 @@ public class ScheduledTasks {
     private final MonitorTaskRunner monitorTaskRunner;
     private final CollectService collectService;
     private final CookiesRefreshTask cookiesRefreshTask;
+    private final LoginRenewTask loginRenewTask;
+    private final TokenRenewalTask tokenRenewalTask;
 
     public ScheduledTasks(AccountMapper accountMapper, ProductService productService,
                           MonitorService monitorService, AccountHealthTask healthTask,
@@ -47,7 +51,9 @@ public class ScheduledTasks {
                           MonitorTaskService monitorTaskService,
                           MonitorTaskRunner monitorTaskRunner,
                           CollectService collectService,
-                          CookiesRefreshTask cookiesRefreshTask) {
+                          CookiesRefreshTask cookiesRefreshTask,
+                          LoginRenewTask loginRenewTask,
+                          TokenRenewalTask tokenRenewalTask) {
         this.accountMapper = accountMapper;
         this.productService = productService;
         this.monitorService = monitorService;
@@ -59,6 +65,8 @@ public class ScheduledTasks {
         this.monitorTaskRunner = monitorTaskRunner;
         this.collectService = collectService;
         this.cookiesRefreshTask = cookiesRefreshTask;
+        this.loginRenewTask = loginRenewTask;
+        this.tokenRenewalTask = tokenRenewalTask;
     }
 
     // ======================== Cookie 浏览器刷新定时链路（A1） ========================
@@ -69,6 +77,26 @@ public class ScheduledTasks {
     @Scheduled(cron = "0 0/10 * * * *")
     public void runCookieRefresh() {
         cookiesRefreshTask.runScheduled();
+    }
+
+    // ======================== 登录续期定时链路（A3） ========================
+
+    /** 每 15 分钟扫描登录续期计划到期 / 重试次数未耗尽的账号，走扫码/密码登录流程拿新 Cookie。
+     *  触发条件：A1（浏览器刷新）+ A2（API 续期）双双失效 → 熔断器 OPEN → 启动 A3。
+     */
+    @Scheduled(cron = "0 0/15 * * * *")
+    public void runLoginRenew() {
+        loginRenewTask.runScheduled();
+    }
+
+    // ======================== Token/IM 续期定时链路（A4） ========================
+
+    /** 每 20 分钟扫描 im_token_cache 续期到期 / 失效的账号，调 MTOP pc.login.token 拿新 token；
+     *  被风控 punish 则联动滑块（captchaSolver.solve）刷新 x5sec，写回缓存 + 账号 imCookieHeader。
+     */
+    @Scheduled(cron = "0 0/20 * * * *")
+    public void runTokenRenewal() {
+        tokenRenewalTask.runScheduled();
     }
 
     @Scheduled(cron = "0 0/30 * * * *")

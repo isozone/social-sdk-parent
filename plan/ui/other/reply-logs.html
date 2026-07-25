@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>自动回复日志 - AI 鱼多宝</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+:root{--brand:#4f46e5;--violet:#7c3aed;--cyan:#22d3ee;--bg-page:#f5f5f7;--text-primary:#111827;--text-secondary:#6b7280;--text-tertiary:#9ca3af;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--border:#e5e7eb}
+.phone{width:393px;height:852px;border-radius:54px;background:var(--bg-page);position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.18)}
+.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}
+.status-bar{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:14px;font-weight:600;color:var(--text-primary)}
+.page-content{position:absolute;top:58px;left:0;right:0;bottom:84px;overflow-y:auto}
+.page-content::-webkit-scrollbar{display:none}
+.header{background:linear-gradient(135deg,#4f46e5,#7c3aed);padding:18px 16px 16px;border-radius:0 0 22px 22px;display:flex;align-items:center;gap:10px}
+.back{font-size:20px;color:#fff}.h-title{color:#fff;font-size:17px;font-weight:700;flex:1}
+.summary-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 16px 12px}
+.summary-card{background:#fff;border-radius:14px;padding:12px 8px;text-align:center;border:1px solid var(--border)}
+.s-num{font-size:20px;font-weight:800;color:var(--brand)}.s-label{font-size:10px;color:var(--text-tertiary);margin-top:2px}
+.filter-bar{display:flex;gap:8px;padding:0 16px 10px;overflow-x:auto}
+.f-chip{white-space:nowrap;padding:6px 12px;border-radius:16px;font-size:11px;font-weight:500;background:#fff;border:1px solid var(--border);color:var(--text-secondary)}
+.f-chip.active{background:var(--brand);color:#fff;border-color:var(--brand)}
+.log-list{padding:0 16px 20px;display:flex;flex-direction:column;gap:10px}
+.log-card{background:#fff;border-radius:16px;padding:14px 16px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.03)}
+.log-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.log-account{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--text-primary)}
+.log-avatar{width:24px;height:24px;border-radius:8px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-size:10px;display:flex;align-items:center;justify-content:center}
+.log-type{padding:3px 8px;border-radius:6px;font-size:10px;font-weight:600}
+.lt-keyword{background:rgba(79,70,229,.08);color:var(--brand)}
+.lt-ai{background:rgba(34,211,238,.1);color:#0891b2}
+.lt-auto{background:rgba(16,185,129,.1);color:var(--success)}
+.log-time{font-size:11px;color:var(--text-tertiary)}
+.log-body{display:flex;flex-direction:column;gap:8px}
+.log-line{display:flex;align-items:start;gap:8px;font-size:13px;line-height:1.5}
+.log-lbl{font-size:11px;font-weight:700;color:var(--text-tertiary);min-width:32px}
+.log-match{color:var(--brand);font-weight:500}
+.log-reply{color:var(--text-secondary)}
+.log-status{margin-top:6px;display:flex;align-items:center;gap:6px}
+.log-dot{width:6px;height:6px;border-radius:50%}
+.lm-yes{background:var(--success)}.lm-no{background:var(--text-tertiary)}
+.log-msg{font-size:11px;font-weight:500}
+.log-msg.matched{color:var(--success)}.log-msg.not-matched{color:var(--text-tertiary)}
+.empty-state{text-align:center;padding:60px 40px;color:var(--text-tertiary)}
+.empty-icon{font-size:48px;margin-bottom:16px;opacity:.5}
+.tab-bar{position:absolute;bottom:0;left:0;right:0;height:84px;background:rgba(255,255,255,.94);backdrop-filter:blur(20px);border-top:1px solid var(--border-light);display:flex;z-index:80;padding-bottom:8px}
+.tab-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}.tab-item:active{transform:scale(.92)}.tab-icon{font-size:20px}.tab-label{font-size:10px;color:var(--text-tertiary);font-weight:400}
+.tab-item.active .tab-icon{color:var(--brand)}.tab-item.active .tab-label{color:var(--brand);font-weight:600}
+.safe-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}
+</style>
+</head>
+<body>
+<div class="phone safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
+  <div class="page-content">
+    <div class="header"><span class="back">‹</span><span class="h-title">自动回复日志</span></div>
+    <div class="summary-row">
+      <div class="summary-card"><div class="s-num">328</div><div class="s-label">今日记录</div></div>
+      <div class="summary-card"><div class="s-num" style="color:var(--success)">89%</div><div class="s-label">匹配率</div></div>
+      <div class="summary-card"><div class="s-num" style="color:var(--brand)">12</div><div class="s-label">命中规则数</div></div>
+    </div>
+    <div class="filter-bar">
+      <div class="f-chip active">全部 (328)</div>
+      <div class="f-chip">主力号</div>
+      <div class="f-chip">副业号</div>
+      <div class="f-chip">关键词</div>
+      <div class="f-chip">AI</div>
+    </div>
+    <div class="log-list">
+      <div class="log-card">
+        <div class="log-header"><div class="log-account"><div class="log-avatar">主</div>主力号</div><span class="log-time">10:32:15</span></div>
+        <div class="log-body">
+          <div class="log-line"><span class="log-lbl">用户:</span><span>能便宜点吗 最低多少</span></div>
+          <div class="log-line"><span class="log-lbl">匹配:</span><span class="log-match">价格议价 → "能便宜吗"</span></div>
+          <div class="log-line"><span class="log-lbl">回复:</span><span class="log-reply">可以的亲，给您个小折扣～</span></div>
+          <div class="log-status"><span class="log-dot lm-yes"></span><span class="log-msg matched">自动发送成功</span></div>
+        </div>
+      </div>
+      <div class="log-card">
+        <div class="log-header"><div class="log-account"><div class="log-avatar">副</div>副业号</div><span class="log-time">10:15:42</span></div>
+        <div class="log-body">
+          <div class="log-line"><span class="log-lbl">用户:</span><span>你好 这个还在吗</span></div>
+          <div class="log-line"><span class="log-lbl">匹配:</span><span class="log-match">通用问候 → "你好"</span></div>
+          <div class="log-line"><span class="log-lbl">回复:</span><span class="log-reply">在的亲，有什么可以帮您的？</span></div>
+          <div class="log-status"><span class="log-dot lm-yes"></span><span class="log-msg matched">自动发送成功</span></div>
+        </div>
+      </div>
+      <div class="log-card">
+        <div class="log-header"><div class="log-account"><div class="log-avatar">主</div>主力号</div><span class="log-time">09:58:03</span></div>
+        <div class="log-body">
+          <div class="log-line"><span class="log-lbl">用户:</span><span>发货方式有哪些</span></div>
+          <div class="log-line"><span class="log-lbl">匹配:</span><span style="color:var(--text-tertiary)">未匹配到规则</span></div>
+          <div class="log-status"><span class="log-dot lm-no"></span><span class="log-msg not-matched">未自动回复</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="tab-bar safe-bottom">
+    <div class="tab-item"><span class="tab-icon">📊</span><span class="tab-label">首页</span></div>
+    <div class="tab-item"><span class="tab-icon">💬</span><span class="tab-label">消息</span></div>
+    <div class="tab-item"><span class="tab-icon">🛒</span><span class="tab-label">商品</span></div>
+    <div class="tab-item active"><span class="tab-icon">👤</span><span class="tab-label">我的</span></div>
+  </div>
+</div>
+</body>
+</html>

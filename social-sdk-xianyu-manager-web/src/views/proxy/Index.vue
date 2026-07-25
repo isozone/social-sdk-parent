@@ -1,23 +1,25 @@
 <template>
   <div class="page-root">
-    <!-- 页头 -->
-    <div class="page-header">
-      <h2>代理管理</h2>
-      <p class="page-desc">多账号多代理统一管理，支持阿布云/快代理/青果/Smartproxy 全量配置</p>
+    <div class="page-head">
+      <div class="card-head-left">
+        <div class="card-chip chip-slate"><el-icon><Connection /></el-icon></div>
+        <div class="card-head-text">
+          <div class="card-title">代理管理</div>
+          <div class="card-sub">多账号多代理统一管理，支持阿布云/快代理/青果/Smartproxy</div>
+        </div>
+      </div>
+      <div class="card-head-right" style="flex:0;">
+        <el-button type="primary" @click="showAddDialog = true">
+          <el-icon><Plus /></el-icon> 新增供应商
+        </el-button>
+      </div>
     </div>
 
     <!-- 错误提示 -->
-    <el-alert
-      v-if="error"
-      :title="error"
-      type="error"
-      closable
-      style="margin-bottom: 16px;"
-      @close="error = ''"
-    />
+    <el-alert v-if="error" :title="error" type="error" closable class="alert-box" @close="error = ''" />
 
     <!-- 指标 + 控制 -->
-    <el-card style="margin-bottom: 16px;">
+    <el-card class="metrics-card shadow-never">
       <div class="metrics-bar">
         <span class="metric">
           <el-icon><Connection /></el-icon>
@@ -59,15 +61,11 @@
           <el-icon><Refresh /></el-icon>
           刷新
         </el-button>
-        <el-button text type="danger" @click="showAddDialog = true">
-          <el-icon><Plus /></el-icon>
-          新增供应商
-        </el-button>
       </div>
     </el-card>
 
     <!-- 供应商编辑 Tab -->
-    <el-card>
+    <el-card shadow-never>
       <el-tabs v-model="activeTab">
         <el-tab-pane
           v-for="cfg in configs"
@@ -213,8 +211,15 @@
       <!-- 余额、绑定列表 -->
       <el-row :gutter="16" style="margin-top: 16px;">
         <el-col :span="12">
-          <el-card>
-            <template #header><strong>供应商余额</strong></template>
+          <el-card shadow="hover" class="mini-panel">
+            <div class="card-head">
+              <div class="card-head-left">
+                <div class="card-chip chip-amber"><el-icon><Coin /></el-icon></div>
+                <div class="card-head-text">
+                  <div class="card-title">供应商余额</div>
+                </div>
+              </div>
+            </div>
             <el-empty v-if="!status.balances || !Object.keys(status.balances).length" />
             <div v-for="(bal, k) in status.balances" :key="k" class="balance-row">
               <el-tag size="small">{{ k }}</el-tag>
@@ -223,8 +228,15 @@
           </el-card>
         </el-col>
         <el-col :span="12">
-          <el-card>
-            <template #header><strong>账号绑定</strong></template>
+          <el-card shadow="hover" class="mini-panel">
+            <div class="card-head">
+              <div class="card-head-left">
+                <div class="card-chip chip-green"><el-icon><Link /></el-icon></div>
+                <div class="card-head-text">
+                  <div class="card-title">账号绑定</div>
+                </div>
+              </div>
+            </div>
             <el-empty v-if="!status.bindings || !Object.keys(status.bindings).length" description="无绑定" />
             <div v-for="(info, accountId) in status.bindings" :key="accountId" class="binding-row">
               <el-tag size="small">账号 {{ accountId }}</el-tag>
@@ -270,7 +282,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Connection, Pointer, Link, ColdDrink, TrendCharts, Refresh,
-  FirstAidKit, Plus
+  FirstAidKit, Plus, Coin
 } from '@element-plus/icons-vue'
 import * as proxyApi from '@/api/proxy'
 
@@ -295,7 +307,6 @@ async function loadAll() {
     ])
     configs.value = cs
     status.value = st
-    // activate first tab if global not present
     if (cs.length && !cs.find(c => c.providerType === 'global')) {
       activeTab.value = cs[0].providerType
     }
@@ -426,13 +437,13 @@ onMounted(loadAll)
 </script>
 
 <style scoped>
-.page-root { padding: 20px; }
-.page-header { margin-bottom: 16px; }
-.page-header h2 { margin: 0 0 4px; }
-.page-desc { margin: 0; color: #909399; font-size: 13px; }
+.page-root { padding: 0; }
+.page-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 12px; }
+.metrics-card { border-radius: 12px; margin-bottom: 16px; border: 1px solid var(--line-2); }
 .metrics-bar { display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 12px; }
-.metric { display: flex; align-items: center; gap: 6px; font-size: 14px; color: #606266; }
-.actions { display: flex; gap: 8px; align-items: center; border-top: 1px solid #ebeef5; padding-top: 12px; }
-.balance-row, .binding-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid #f5f7fa; }
+.metric { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--text-2); }
+.actions { display: flex; gap: 8px; align-items: center; border-top: 1px solid var(--line-2); padding-top: 12px; }
+.mini-panel { border-radius: 12px; }
+.balance-row, .binding-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--hover-1); }
 .balance-row:last-child, .binding-row:last-child { border-bottom: none; }
 </style>

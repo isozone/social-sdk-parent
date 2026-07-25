@@ -1084,3 +1084,170 @@ CREATE TABLE IF NOT EXISTS scheduled_cookies_refresh_log (
     deleted             INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_cookies_refresh_started ON scheduled_cookies_refresh_log(started_at, deleted);
+
+-- ======================== A3 登录续期 ========================
+CREATE TABLE IF NOT EXISTS login_renew_schedule (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id          INTEGER NOT NULL,
+    enabled             INTEGER DEFAULT 1,
+    login_method        VARCHAR(16) DEFAULT 'QR',
+    password_encrypted  VARCHAR(512),
+    max_retry           INTEGER DEFAULT 3,
+    current_retry       INTEGER DEFAULT 0,
+    next_run_at         DATETIME,
+    last_run_at         DATETIME,
+    last_result         VARCHAR(16),
+    last_failure_reason VARCHAR(512),
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_login_renew_account ON login_renew_schedule(account_id);
+CREATE INDEX IF NOT EXISTS idx_login_renew_next_run ON login_renew_schedule(next_run_at, enabled, deleted);
+
+CREATE TABLE IF NOT EXISTS scheduled_login_renew_log (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    trigger_source      VARCHAR(16),
+    total_count         INTEGER DEFAULT 0,
+    success_count       INTEGER DEFAULT 0,
+    failed_count        INTEGER DEFAULT 0,
+    skipped_count       INTEGER DEFAULT 0,
+    waiting_qr_count    INTEGER DEFAULT 0,
+    status              VARCHAR(16),
+    started_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at            DATETIME,
+    failure_summary     VARCHAR(2000),
+    batch_job_id        INTEGER,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_login_renew_started ON scheduled_login_renew_log(started_at, deleted);
+
+-- ======================== A4 Token/IM 续期 ========================
+CREATE TABLE IF NOT EXISTS im_token_cache (
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id              INTEGER NOT NULL,
+    mtop_token              VARCHAR(128),
+    mtop_token_cookie       VARCHAR(512),
+    x5sec                   VARCHAR(512),
+    im_cookie_header        TEXT,
+    token_expires_at        DATETIME,
+    next_renew_at           DATETIME,
+    last_renew_at           DATETIME,
+    last_result             VARCHAR(16),
+    last_failure_reason     VARCHAR(512),
+    consecutive_failures    INTEGER DEFAULT 0,
+    created_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted                 INTEGER DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_im_token_account ON im_token_cache(account_id);
+CREATE INDEX IF NOT EXISTS idx_im_token_next_renew ON im_token_cache(next_renew_at, deleted);
+
+CREATE TABLE IF NOT EXISTS scheduled_token_renewal_log (
+    id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+    trigger_source          VARCHAR(16),
+    total_count             INTEGER DEFAULT 0,
+    success_count           INTEGER DEFAULT 0,
+    failed_count            INTEGER DEFAULT 0,
+    skipped_count           INTEGER DEFAULT 0,
+    captcha_triggered_count INTEGER DEFAULT 0,
+    status                  VARCHAR(16),
+    started_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at                DATETIME,
+    failure_summary         VARCHAR(2000),
+    batch_job_id            INTEGER,
+    created_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted                 INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_token_renewal_started ON scheduled_token_renewal_log(started_at, deleted);
+
+-- ======================== A5 风控冷却/限流日志 ========================
+CREATE TABLE IF NOT EXISTS risk_control_log (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id          INTEGER,
+    trigger_type        VARCHAR(32),
+    trigger_scene       VARCHAR(64),
+    risk_code           VARCHAR(64),
+    failure_reason      VARCHAR(512),
+    cooldown_seconds    INTEGER,
+    cooldown_until      DATETIME,
+    batch_job_id        INTEGER,
+    triggered_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
+    recovered           INTEGER DEFAULT 0,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_risk_account ON risk_control_log(account_id, triggered_at);
+CREATE INDEX IF NOT EXISTS idx_risk_type ON risk_control_log(trigger_type, recovered, deleted);
+CREATE INDEX IF NOT EXISTS idx_risk_cooldown ON risk_control_log(cooldown_until, recovered);
+
+CREATE TABLE IF NOT EXISTS scheduled_recovery_log (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    trigger_source      VARCHAR(16),
+    total_count         INTEGER DEFAULT 0,
+    recovered_count     INTEGER DEFAULT 0,
+    status              VARCHAR(16),
+    started_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at            DATETIME,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_recovery_started ON scheduled_recovery_log(started_at, deleted);
+
+-- ======================== A6 卡券模型升级（四类型） ========================
+CREATE TABLE IF NOT EXISTS ship_card (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    card_type       VARCHAR(16) NOT NULL,
+    card_code       VARCHAR(256),
+    card_password   VARCHAR(256),
+    extra           VARCHAR(512),
+    content         TEXT,
+    status          VARCHAR(16) DEFAULT 'AVAILABLE',
+    used_order_id   INTEGER,
+    used_at         DATETIME,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted         INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_ship_card_type ON ship_card(card_type, status, deleted);
+CREATE INDEX IF NOT EXISTS idx_ship_card_used_order ON ship_card(used_order_id);
+CREATE INDEX IF NOT EXISTS idx_ship_card_code ON ship_card(card_code);
+
+CREATE TABLE IF NOT EXISTS card_item_relation (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id      INTEGER NOT NULL,
+    card_id         INTEGER NOT NULL,
+    priority        INTEGER DEFAULT 0,
+    enabled         INTEGER DEFAULT 1,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted         INTEGER DEFAULT 0
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_card_rel_product_card ON card_item_relation(product_id, card_id);
+CREATE INDEX IF NOT EXISTS idx_card_rel_product ON card_item_relation(product_id, enabled, priority, deleted);
+CREATE INDEX IF NOT EXISTS idx_card_rel_card ON card_item_relation(card_id);
+
+-- ======================== A7 发货规则引擎 ========================
+CREATE TABLE IF NOT EXISTS delivery_block_rule (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id          INTEGER,
+    rule_type           VARCHAR(32) NOT NULL,
+    rule_params         TEXT,
+    rule_name           VARCHAR(128),
+    priority            INTEGER DEFAULT 100,
+    enabled             INTEGER DEFAULT 1,
+    action              VARCHAR(16) DEFAULT 'BLOCK',
+    notify_template     VARCHAR(512),
+    last_hit_at         DATETIME,
+    hit_count           INTEGER DEFAULT 0,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_delivery_rule_account ON delivery_block_rule(account_id, enabled, priority, deleted);
+CREATE INDEX IF NOT EXISTS idx_delivery_rule_type ON delivery_block_rule(rule_type, enabled, deleted);

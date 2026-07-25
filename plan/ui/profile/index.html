@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>个人中心 - AI 鱼多宝</title>
+<style>
+@import url('_design-system.css');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+.profile-hero{background:var(--gradient-brand);padding:52px 24px 36px;border-radius:0 0 32px 32px;position:relative;overflow:hidden;text-align:center}
+.profile-hero::before{content:'';position:absolute;top:-50%;right:-20%;width:220px;height:220px;background:radial-gradient(circle,rgba(34,211,238,.16),transparent 70%);border-radius:50%}
+.avatar-wrap{width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,.18);border:3px solid rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:34px;margin:0 auto 12px;position:relative;z-index:1;backdrop-filter:blur(10px)}
+.profile-name{font-size:22px;font-weight:800;color:#fff;text-align:center;position:relative;z-index:1;text-shadow:0 2px 8px rgba(0,0,0,.12)}
+.profile-role{font-size:12px;color:rgba(255,255,255,.65);text-align:center;position:relative;z-index:1;margin-top:3px}
+.profile-meta{display:flex;gap:24px;justify-content:center;margin-top:18px;position:relative;z-index:1}
+.meta-item{display:flex;flex-direction:column;align-items:center;gap:2px}
+.meta-num{font-size:20px;font-weight:800;color:#fff}
+.meta-label{font-size:10px;color:rgba(255,255,255,.55)}
+.quick-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:0 16px;margin-top:-18px;position:relative;z-index:2}
+.qs-card{background:var(--bg-card);border-radius:var(--radius-md);padding:16px 12px;text-align:center;border:1px solid var(--border);box-shadow:var(--shadow-sm)}
+.qs-val{font-size:20px;font-weight:800;color:var(--text-primary)}
+.qs-label{font-size:10px;color:var(--text-tertiary);margin-top:3px}
+.menu-section{background:var(--bg-card);border-radius:var(--radius-md);margin:16px 16px 0;padding:4px 0;border:1px solid var(--border);box-shadow:var(--shadow-sm)}
+.menu-item{display:flex;align-items:center;gap:14px;padding:14px 18px;cursor:pointer;transition:background .15s}
+.menu-item:active{background:var(--bg-page)}
+.menu-icon{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.mi-violet{background:rgba(79,70,229,.08);color:var(--brand)}.mi-cyan{background:rgba(34,211,238,.1);color:#0891b2}.mi-green{background:rgba(16,185,129,.08);color:var(--success)}.mi-amber{background:rgba(245,158,11,.08);color:#d97706}.mi-red{background:rgba(239,68,68,.08);color:var(--danger)}.mi-blue{background:rgba(59,130,246,.08);color:var(--info)}
+.menu-text{flex:1;text-align:left}
+.menu-title{font-size:15px;font-weight:500;color:var(--text-primary)}.menu-desc{font-size:11px;color:var(--text-tertiary);margin-top:2px}
+.menu-arrow{color:var(--text-tertiary);font-size:16px}
+.menu-badge{background:var(--danger);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;min-width:18px;text-align:center}
+.logout-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:calc(100% - 32px);height:48px;border-radius:var(--radius-sm);margin:24px 16px;background:var(--bg-card);border:1px solid var(--border);font-size:15px;font-weight:600;color:var(--danger);cursor:pointer;box-shadow:var(--shadow-sm)}
+</style>
+</head>
+<body>
+<div class="phone-frame safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span style="display:flex;gap:5px;align-items:center"><svg width="16" height="12" viewBox="0 0 16 12"><path d="M1 10.5a1 1 0 01-.5-1.86A8 8 0 018 2a8 8 0 018.5 6.64 1 1 0 01-1 1.86A6 6 0 008 4a6 6 0 00-7 6.5z"/><path d="M4 7.5a1 1 0 01-.5-1.86A4 4 0 018 2a4 4 0 014.5 3.64 1 1 0 01-1 1.86A2 2 0 008 4a2 2 0 00-4.5 3.5z" fill="#10b981"/></svg><svg width="16" height="12" viewBox="0 0 16 12"><rect x="1" y="4" width="3" height="8" rx=".5" fill-opacity=".3"/><rect x="5.5" y="2.5" width="3" height="9.5" rx=".5" fill-opacity=".5"/><rect x="10" y="0" width="3" height="12" rx=".5"/></svg><svg width="26" height="12" viewBox="0 0 28 12"><rect x=".5" y=".5" width="23" height="11" rx="3" stroke="#fff" fill="none"/><rect x="2" y="2" width="16" height="8" rx="1.5" fill="#10b981"/></svg></span></div>
+  <div class="page-content">
+    <div class="profile-hero">
+      <div class="avatar-wrap">🐟</div>
+      <div class="profile-name">Vim 老师</div>
+      <div class="profile-role">超级管理员 · Admin</div>
+      <div class="profile-meta">
+        <div class="meta-item"><div class="meta-num">156</div><div class="meta-label">商品</div></div>
+        <div class="meta-item"><div class="meta-num">3</div><div class="meta-label">账号</div></div>
+        <div class="meta-item"><div class="meta-num">47</div><div class="meta-label">订单</div></div>
+      </div>
+    </div>
+    <div class="quick-stats">
+      <div class="qs-card"><div class="qs-val" style="color:var(--brand)">¥32.6k</div><div class="qs-label">月销售额</div></div>
+      <div class="qs-card"><div class="qs-val" style="color:var(--success)">96</div><div class="qs-label">平均健康分</div></div>
+      <div class="qs-card"><div class="qs-val" style="color:var(--violet)">92%</div><div class="qs-label">回复匹配率</div></div>
+    </div>
+    <div class="menu-section">
+      <div class="menu-item"><div class="menu-icon mi-violet">👤</div><div class="menu-text"><div class="menu-title">账号管理</div><div class="menu-desc">管理闲鱼账号与 Cookie</div></div><span class="menu-arrow">›</span></div>
+      <div class="menu-item"><div class="menu-icon mi-cyan">💳</div><div class="menu-text"><div class="menu-title">钱包资产</div><div class="menu-desc">余额、冻结、可提现</div></div><span class="menu-arrow">›</span></div>
+    </div>
+    <div class="menu-section">
+      <div class="menu-item"><div class="menu-icon mi-green">⚙️</div><div class="menu-text"><div class="menu-title">关键词规则</div><div class="menu-desc">自动回复规则配置</div></div><span class="menu-arrow">›</span></div>
+      <div class="menu-item"><div class="menu-icon mi-amber">🔔</div><div class="menu-text"><div class="menu-title">通知中心</div><div class="menu-desc">查看系统通知</div></div><span class="menu-badge">3</span><span class="menu-arrow">›</span></div>
+      <div class="menu-item"><div class="menu-icon mi-blue">📋</div><div class="menu-text"><div class="menu-title">回复日志</div><div class="menu-desc">自动回复命中记录</div></div><span class="menu-arrow">›</span></div>
+    </div>
+    <div class="menu-section">
+      <div class="menu-item"><div class="menu-icon mi-violet">🤖</div><div class="menu-text"><div class="menu-title">AI 管理中心</div><div class="menu-desc">模型、客服、运营工具</div></div><span class="menu-arrow">›</span></div>
+    </div>
+    <div class="menu-section">
+      <div class="menu-item"><div class="menu-icon mi-cyan">👤</div><div class="menu-text"><div class="menu-title">个人资料</div><div class="menu-desc">昵称、邮箱、手机号</div></div><span class="menu-arrow">›</span></div>
+      <div class="menu-item"><div class="menu-icon mi-amber">🔒</div><div class="menu-text"><div class="menu-title">修改密码</div><div class="menu-desc">安全设置</div></div><span class="menu-arrow">›</span></div>
+      <div class="menu-item"><div class="menu-icon mi-red">❓</div><div class="menu-text"><div class="menu-title">帮助与反馈</div><div class="menu-desc">问题反馈 & 使用指南</div></div><span class="menu-arrow">›</span></div>
+    </div>
+    <button class="logout-btn">退出登录</button>
+  </div>
+  <div class="tab-bar safe-bottom">
+    <div class="tab-item"><span class="tab-icon">📊</span><span class="tab-label">首页</span></div>
+    <div class="tab-item"><span class="tab-icon">💬</span><span class="tab-label">消息</span></div>
+    <div class="tab-item"><span class="tab-icon">🛒</span><span class="tab-label">商品</span></div>
+    <div class="tab-item active"><span class="tab-icon">👤</span><span class="tab-label">我的</span></div>
+  </div>
+</div>
+</body>
+</html>

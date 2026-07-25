@@ -1,15 +1,24 @@
 <template>
   <div class="page-container">
-    <div class="page-header">
-      <h2>谷歌浏览器配置</h2>
-      <p class="page-desc">管理 Chrome 浏览器路径、启动模式与反检测参数</p>
+    <div class="page-head">
+      <div class="card-head-left">
+        <div class="card-chip chip-cyan"><el-icon><Monitor /></el-icon></div>
+        <div class="card-head-text">
+          <div class="card-title">谷歌浏览器配置</div>
+          <div class="card-sub">管理 Chrome 浏览器路径、启动模式与反检测参数</div>
+        </div>
+      </div>
     </div>
 
     <!-- 浏览器探测卡片 -->
     <div class="card">
       <div class="card-header">
-        <h3>浏览器探测</h3>
-        <div class="card-actions">
+        <div class="card-chip chip-violet"><el-icon><Search /></el-icon></div>
+        <div class="card-head-text">
+          <div class="card-title">浏览器探测</div>
+          <div class="card-sub">自动发现本地 Chrome / Chromium / Edge / Brave 等浏览器</div>
+        </div>
+        <div class="card-head-right">
           <el-button type="primary" :loading="detecting" @click="handleDetect">
             <el-icon><Search /></el-icon>
             重新探测
@@ -55,14 +64,18 @@
     <!-- 启动模式卡片 -->
     <div class="card">
       <div class="card-header">
-        <h3>启动模式</h3>
+        <div class="card-chip chip-green"><el-icon><SwitchButton /></el-icon></div>
+        <div class="card-head-text">
+          <div class="card-title">启动模式</div>
+          <div class="card-sub">有界面 / 无头（headless）模式选择</div>
+        </div>
       </div>
 
       <div class="form-row">
         <label>运行模式</label>
         <el-radio-group v-model="form.headless">
-          <el-radio :value="false">有界面模式</el-radio>
-          <el-radio :value="true">无头模式</el-radio>
+          <el-radio-button :value="false">有界面模式</el-radio-button>
+          <el-radio-button :value="true">无头模式</el-radio-button>
         </el-radio-group>
         <p class="hint">有界面模式兼容性与滑块成功率更高；无头模式适合服务器环境</p>
       </div>
@@ -70,17 +83,17 @@
       <div class="form-row" v-if="form.headless">
         <label>无头模式版本</label>
         <el-radio-group v-model="form.headlessMode">
-          <el-radio value="new">新版 headless（推荐，Chrome 112+）</el-radio>
-          <el-radio value="legacy">旧版 --headless</el-radio>
+          <el-radio-button value="new">新版 headless（推荐，Chrome 112+）</el-radio-button>
+          <el-radio-button value="legacy">旧版 --headless</el-radio-button>
         </el-radio-group>
       </div>
 
       <div class="form-row">
         <label>窗口尺寸</label>
         <div class="input-row">
-          <el-input-number v-model="form.windowWidth" :min="800" :max="3840" />
+          <el-input-number v-model="form.windowWidth" :min="800" :max="3840" style="width:140px;" />
           <span class="sep">×</span>
-          <el-input-number v-model="form.windowHeight" :min="600" :max="2160" />
+          <el-input-number v-model="form.windowHeight" :min="600" :max="2160" style="width:140px;" />
         </div>
       </div>
     </div>
@@ -88,15 +101,19 @@
     <!-- 高级配置卡片 -->
     <div class="card">
       <div class="card-header">
-        <h3>高级配置</h3>
+        <div class="card-chip chip-amber"><el-icon><Setting /></el-icon></div>
+        <div class="card-head-text">
+          <div class="card-title">高级配置</div>
+          <div class="card-sub">CDP 端口、指纹噪声、启动超时等进阶参数</div>
+        </div>
       </div>
 
       <div class="form-row">
         <label>CDP 端口范围</label>
         <div class="input-row">
-          <el-input-number v-model="form.portRangeStart" :min="1024" :max="65535" />
+          <el-input-number v-model="form.portRangeStart" :min="1024" :max="65535" style="width:140px;" />
           <span class="sep">至</span>
-          <el-input-number v-model="form.portRangeEnd" :min="1024" :max="65535" />
+          <el-input-number v-model="form.portRangeEnd" :min="1024" :max="65535" style="width:140px;" />
         </div>
         <p class="hint">每个账号独占一个 CDP 端口，端口段需足够容纳所有账号</p>
       </div>
@@ -115,12 +132,12 @@
 
       <div class="form-row">
         <label>启动超时（秒）</label>
-        <el-input-number v-model="form.launchTimeoutSeconds" :min="5" :max="120" />
+        <el-input-number v-model="form.launchTimeoutSeconds" :min="5" :max="120" style="width:200px;" />
       </div>
 
       <div class="form-row">
         <label>崩溃恢复次数</label>
-        <el-input-number v-model="form.maxCrashRecoveryAttempts" :min="0" :max="10" />
+        <el-input-number v-model="form.maxCrashRecoveryAttempts" :min="0" :max="10" style="width:200px;" />
       </div>
 
       <div class="form-row">
@@ -143,7 +160,13 @@
 
     <!-- 校验结果 -->
     <div class="card" v-if="validateResult">
-      <h3>路径校验结果</h3>
+      <div class="card-header">
+        <div class="card-chip chip-cyan"><el-icon><DocumentChecked /></el-icon></div>
+        <div class="card-head-text">
+          <div class="card-title">路径校验结果</div>
+          <div class="card-sub">Chrome 可执行文件的完整性与权限验证</div>
+        </div>
+      </div>
       <el-descriptions :column="1" border>
         <el-descriptions-item label="路径">{{ validateResult.path }}</el-descriptions-item>
         <el-descriptions-item label="存在">
@@ -163,9 +186,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Search, Download } from '@element-plus/icons-vue'
+import { Search, Download, Monitor, SwitchButton, Setting, DocumentChecked } from '@element-plus/icons-vue'
 import {
   getChromeConfig,
   detectChrome,
@@ -344,33 +367,29 @@ function formatSize(bytes) {
 
 <style scoped>
 .page-container {
-  padding: 20px;
+  padding: var(--space-4);
   width: 100%;
   box-sizing: border-box;
 }
 
-.page-header {
-  margin-bottom: 20px;
-}
-
-.page-header h2 {
-  margin: 0 0 6px;
-  font-size: 22px;
-  font-weight: 600;
-}
-
-.page-desc {
-  margin: 0;
-  color: #888;
-  font-size: 13px;
+.page-head {
+  margin-bottom: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .card {
   background: #fff;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   padding: 20px;
-  margin-bottom: 16px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  margin-bottom: var(--space-4);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--border);
+}
+
+.card:last-child {
+  margin-bottom: 0;
 }
 
 .card-header {
@@ -378,21 +397,12 @@ function formatSize(bytes) {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
-}
-
-.card-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.card-actions {
-  display: flex;
-  gap: 8px;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .form-row {
-  margin-bottom: 18px;
+  margin-bottom: var(--space-5);
 }
 
 .form-row:last-child {
@@ -401,20 +411,20 @@ function formatSize(bytes) {
 
 .form-row label {
   display: block;
-  font-size: 13px;
+  font-size: var(--font-base);
   font-weight: 500;
   margin-bottom: 6px;
-  color: #333;
+  color: var(--text-1);
 }
 
 .hint {
   margin: 6px 0 0;
-  font-size: 12px;
-  color: #999;
+  font-size: var(--font-sm);
+  color: var(--text-3);
 }
 
 .muted {
-  color: #aaa;
+  color: var(--text-3);
 }
 
 .input-group {
@@ -433,7 +443,7 @@ function formatSize(bytes) {
 }
 
 .sep {
-  color: #aaa;
+  color: var(--text-3);
 }
 
 .detect-result {

@@ -1,38 +1,49 @@
 <template>
   <div class="page-root">
-    <el-card style="margin: 0;">
-      <template #header>
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span>审计日志</span>
-          <el-button :icon="Refresh" circle @click="handleRefresh" title="刷新" />
+    <el-card shadow="never" style="margin: 0;">
+      <!-- 卡片头 -->
+      <div class="card-head">
+        <div class="card-head-left">
+          <div class="card-chip chip-slate"><el-icon><DocumentChecked /></el-icon></div>
+          <div class="card-head-text">
+            <div class="card-title">审计日志</div>
+            <div class="card-sub">追踪系统操作记录、结果与异常行为，用于合规审查</div>
+          </div>
         </div>
-      </template>
+        <div class="card-head-right">
+          <el-button size="small" @click="handleRefresh" title="刷新">
+            <el-icon><Refresh /></el-icon>
+          </el-button>
+        </div>
+      </div>
 
       <!-- 搜索过滤 -->
-      <el-form :inline="true" :model="filterForm" class="filter-form">
-        <el-form-item label="操作">
-          <el-input v-model="filterForm.action" placeholder="操作关键词" clearable style="width: 180px;" />
-        </el-form-item>
-        <el-form-item label="结果">
-          <el-select v-model="filterForm.resourceType" placeholder="全部" clearable style="width: 120px;">
-            <el-option label="成功" value="SUCCESS" />
-            <el-option label="失败" value="FAILURE" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleReset">重置</el-button>
-        </el-form-item>
-      </el-form>
+      <div class="page-toolbar">
+        <div class="toolbar-left">
+          <el-form :inline="true" :model="filterForm" class="filter-bar">
+            <el-form-item label="操作">
+              <el-input v-model="filterForm.action" placeholder="操作关键词" clearable style="width: 180px;" />
+            </el-form-item>
+            <el-form-item label="结果">
+              <el-select v-model="filterForm.resourceType" placeholder="全部" clearable style="width: 120px;">
+                <el-option label="成功" value="SUCCESS" />
+                <el-option label="失败" value="FAILURE" />
+              </el-select>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
+              <el-button @click="handleReset">重置</el-button>
+            </el-form-item>
+          </el-form>
+        </div>
+      </div>
 
       <!-- 数据表格 -->
       <el-table :data="records" stripe v-loading="loading" empty-text="暂无数据">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="action" label="操作" min-width="180" show-overflow-tooltip />
         <el-table-column prop="operatorName" label="操作人" width="120">
-          <template #default="{ row }">
-            {{ row.operatorName || '未知' }}
-          </template>
+          <template #default="{ row }">{{ row.operatorName || '未知' }}</template>
         </el-table-column>
         <el-table-column label="结果" width="80">
           <template #default="{ row }">
@@ -44,31 +55,30 @@
         <el-table-column prop="detail" label="详情" min-width="200" show-overflow-tooltip />
         <el-table-column prop="ipAddress" label="IP" width="130" />
         <el-table-column label="时间" width="180">
-          <template #default="{ row }">
-            {{ formatTime(row.actionTime) }}
-          </template>
+          <template #default="{ row }">{{ formatTime(row.actionTime) }}</template>
         </el-table-column>
         <template #empty><el-empty description="暂无数据" /></template>
       </el-table>
 
       <!-- 分页 -->
-      <el-pagination
-        style="margin-top: 16px; justify-content: flex-end;"
-        v-model:current-page="pageNum"
-        v-model:page-size="pageSize"
-        :page-sizes="[20, 50, 100]"
-        :total="total"
-        layout="total, sizes, prev, pager, next, jumper"
-        @size-change="handleSearch"
-        @current-change="handleSearch"
-      />
+      <div class="pagination-wrap">
+        <el-pagination
+          v-model:current-page="pageNum"
+          v-model:page-size="pageSize"
+          :page-sizes="[20, 50, 100]"
+          :total="total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSearch"
+          @current-change="handleSearch"
+        />
+      </div>
     </el-card>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { Refresh, Search } from '@element-plus/icons-vue'
+import { Refresh, Search, DocumentChecked } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { listAuditLogs } from '@/api/audit'
 
@@ -78,10 +88,7 @@ const loading = ref(false)
 const pageNum = ref(1)
 const pageSize = ref(20)
 
-const filterForm = reactive({
-  action: '',
-  resourceType: ''
-})
+const filterForm = reactive({ action: '', resourceType: '' })
 
 async function loadData() {
   loading.value = true
@@ -89,7 +96,6 @@ async function loadData() {
     const params = { page: pageNum.value, size: pageSize.value }
     if (filterForm.action) params.action = filterForm.action
     if (filterForm.resourceType) params.resourceType = filterForm.resourceType
-
     const res = await listAuditLogs(params)
     if (res.success) {
       records.value = res.data.records || []
@@ -102,17 +108,8 @@ async function loadData() {
   }
 }
 
-function handleSearch() {
-  pageNum.value = 1
-  loadData()
-}
-
-function handleReset() {
-  filterForm.action = ''
-  filterForm.resourceType = ''
-  pageNum.value = 1
-  loadData()
-}
+function handleSearch() { pageNum.value = 1; loadData() }
+function handleReset() { filterForm.action = ''; filterForm.resourceType = ''; pageNum.value = 1; loadData() }
 
 async function handleRefresh() {
   await loadData()
@@ -130,7 +127,6 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.filter-form {
-  margin-bottom: 16px;
-}
+.filter-bar :deep(.el-form-item) { margin-bottom: 0; }
+.pagination-wrap { display: flex; justify-content: flex-end; margin-top: 16px; }
 </style>

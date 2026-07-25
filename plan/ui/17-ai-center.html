@@ -1,0 +1,27 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>AI 功能中心 - AI 鱼多宝</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,'PingFang SC','SF Pro Display',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}:root{--brand:#4f46e5;--violet:#7c3aed;--cyan:#22d3ee;--bg:#f5f5f7;--t1:#111827;--t2:#6b7280;--t3:#9ca3af;--border:#e5e7eb;--danger:#ef4444;--success:#10b981;--warning:#f59e0b}.phone{width:393px;height:852px;border-radius:48px;background:var(--bg);position:relative;overflow:hidden;box-shadow:0 0 0 3px #d1d5db,0 40px 120px rgba(0,0,0,.2)}.island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:126px;height:37px;background:#1a1a2e;border-radius:20px;z-index:100}.st{position:absolute;top:58px;left:32px;right:32px;display:flex;justify-content:space-between;align-items:center;z-index:90;font-size:14px;font-weight:600;color:var(--t1)}.ct{position:absolute;top:58px;left:0;right:0;bottom:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}.ct::-webkit-scrollbar{display:none}.hd{padding:10px 16px 8px;background:rgba(255,255,255,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;position:sticky;top:0;z-index:20}.bk{font-size:22px;color:var(--t2);cursor:pointer;padding:4px}.pt{flex:1;text-align:center;font-size:16px;font-weight:600;color:var(--t1);margin-right:28px}
+.hero-ai{background:linear-gradient(135deg,var(--brand),var(--violet));padding:28px 20px;border-radius:0 0 24px 24px;color:#fff;position:relative;overflow:hidden}
+.hero-ai::before{content:'';position:absolute;top:-40%;right:-10%;width:200px;height:200px;background:radial-gradient(circle,rgba(34,211,238,.2),transparent 70%);border-radius:50%}
+.ai-greet{font-size:14px;opacity:.8}.ai-title{font-size:22px;font-weight:700;margin-top:4px;text-shadow:0 1px 4px rgba(0,0,0,.15)}.ai-sub{font-size:12px;opacity:.65;margin-top:4px}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:16px}
+.acard{background:#fff;border-radius:16px;padding:18px 16px;border:1px solid var(--border);box-shadow:0 1px 4px rgba(0,0,0,.03);cursor:pointer;transition:transform .2s}
+.acard:active{transform:scale(.96)}
+.ai-icon{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:12px}
+.ai-icon.v{background:linear-gradient(135deg,rgba(79,70,229,.12),rgba(124,58,237,.06))}.ai-icon.c{background:linear-gradient(135deg,rgba(6,182,212,.12),rgba(6,182,212,.06))}.ai-icon.g{background:linear-gradient(135deg,rgba(16,185,129,.12),rgba(16,185,129,.06))}.ai-icon.a{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(245,158,11,.06))}.ai-icon.r{background:linear-gradient(135deg,rgba(239,68,68,.12),rgba(239,68,68,.06))}.ai-icon.s{background:linear-gradient(135deg,rgba(100,116,139,.12),rgba(100,116,139,.06))}
+.ac-name{font-size:15px;font-weight:700;color:var(--t1)}.ac-desc{font-size:12px;color:var(--t3);margin-top:4px;line-height:1.4}
+.ac-badge{display:inline-block;padding:3px 8px;border-radius:8px;font-size:10px;font-weight:700;margin-top:8px}
+.badge-new{background:rgba(79,70,229,.1);color:var(--brand)}.badge-beta{background:rgba(245,158,11,.1);color:var(--warning)}.safe-bottom{padding-bottom:env(safe-area-inset-bottom,0px)}</style></head><body>
+<div class="phone safe-bottom"><div class="island"></div><div class="st"><span>9:41</span><span style="font-size:12px">●●●●●</span></div>
+<div class="ct">
+<div class="hero-ai"><div class="ai-greet">你好，Vim 老师</div><div class="ai-title">AI 功能中心</div><div class="ai-sub">智能优化你的闲鱼经营体验</div></div>
+<div class="grid">
+<div class="acard"><div class="ai-icon v">💬</div><div class="ac-name">AI 对话</div><div class="ac-desc">与 AI 自由对话，解答经营问题</div><span class="ac-badge badge-new">热门</span></div>
+<div class="acard"><div class="ai-icon c">✍️</div><div class="ac-name">标题优化</div><div class="ac-desc">一键生成高曝光商品标题</div><span class="ac-badge badge-beta">P1</span></div>
+<div class="acard"><div class="ai-icon g">🛡️</div><div class="ac-name">AI 客服</div><div class="ac-desc">智能接待买家，自动议价</div><span class="ac-badge badge-new">新</span></div>
+<div class="acard"><div class="ai-icon a">📊</div><div class="ac-name">AI 运营</div><div class="ac-desc">批量上品、周报分析</div><span class="ac-badge badge-beta">P2</span></div>
+<div class="acard"><div class="ai-icon r">🔍</div><div class="ac-name">关键词提取</div><div class="ac-desc">从商品描述中提取热门标签</div><span class="ac-badge badge-beta">P1</span></div>
+<div class="acard"><div class="ai-icon s">⚙</div><div class="ac-name">模型管理</div><div class="ac-desc">配置 AI 厂商和模型参数</div><span class="ac-badge badge-beta">P2</span></div>
+</div>
+</div>
+</div>
+</body></html>

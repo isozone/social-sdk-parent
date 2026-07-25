@@ -1156,3 +1156,170 @@ CREATE TABLE IF NOT EXISTS scheduled_cookies_refresh_log (
     deleted             INTEGER DEFAULT 0,
     INDEX idx_cookies_refresh_started (started_at, deleted)
 );
+
+-- ======================== A3 登录续期 ========================
+CREATE TABLE IF NOT EXISTS login_renew_schedule (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    account_id          BIGINT NOT NULL,
+    enabled             INTEGER DEFAULT 1,
+    login_method        VARCHAR(16) DEFAULT 'QR',
+    password_encrypted  VARCHAR(512),
+    max_retry           INTEGER DEFAULT 3,
+    current_retry       INTEGER DEFAULT 0,
+    next_run_at         DATETIME,
+    last_run_at         DATETIME,
+    last_result         VARCHAR(16),
+    last_failure_reason VARCHAR(512),
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    UNIQUE KEY uk_login_renew_account (account_id),
+    INDEX idx_login_renew_next_run (next_run_at, enabled, deleted)
+);
+
+CREATE TABLE IF NOT EXISTS scheduled_login_renew_log (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    trigger_source      VARCHAR(16),
+    total_count         INTEGER DEFAULT 0,
+    success_count       INTEGER DEFAULT 0,
+    failed_count        INTEGER DEFAULT 0,
+    skipped_count       INTEGER DEFAULT 0,
+    waiting_qr_count    INTEGER DEFAULT 0,
+    status              VARCHAR(16),
+    started_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at            DATETIME,
+    failure_summary     VARCHAR(2000),
+    batch_job_id        BIGINT,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    INDEX idx_login_renew_started (started_at, deleted)
+);
+
+-- ======================== A4 Token/IM 续期 ========================
+CREATE TABLE IF NOT EXISTS im_token_cache (
+    id                      BIGINT AUTO_INCREMENT PRIMARY KEY,
+    account_id              BIGINT NOT NULL,
+    mtop_token              VARCHAR(128),
+    mtop_token_cookie       VARCHAR(512),
+    x5sec                   VARCHAR(512),
+    im_cookie_header        TEXT,
+    token_expires_at        DATETIME,
+    next_renew_at           DATETIME,
+    last_renew_at           DATETIME,
+    last_result             VARCHAR(16),
+    last_failure_reason     VARCHAR(512),
+    consecutive_failures    INTEGER DEFAULT 0,
+    created_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at              DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted                 INTEGER DEFAULT 0,
+    UNIQUE KEY uk_im_token_account (account_id),
+    INDEX idx_im_token_next_renew (next_renew_at, deleted)
+);
+
+CREATE TABLE IF NOT EXISTS scheduled_token_renewal_log (
+    id                      BIGINT AUTO_INCREMENT PRIMARY KEY,
+    trigger_source          VARCHAR(16),
+    total_count             INTEGER DEFAULT 0,
+    success_count           INTEGER DEFAULT 0,
+    failed_count            INTEGER DEFAULT 0,
+    skipped_count           INTEGER DEFAULT 0,
+    captcha_triggered_count INTEGER DEFAULT 0,
+    status                  VARCHAR(16),
+    started_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at                DATETIME,
+    failure_summary         VARCHAR(2000),
+    batch_job_id            BIGINT,
+    created_at              DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at              DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted                 INTEGER DEFAULT 0,
+    INDEX idx_token_renewal_started (started_at, deleted)
+);
+
+-- ======================== A5 风控冷却/限流日志 ========================
+CREATE TABLE IF NOT EXISTS risk_control_log (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    account_id          BIGINT,
+    trigger_type        VARCHAR(32),
+    trigger_scene       VARCHAR(64),
+    risk_code           VARCHAR(64),
+    failure_reason      VARCHAR(512),
+    cooldown_seconds    INTEGER,
+    cooldown_until      DATETIME,
+    batch_job_id        BIGINT,
+    triggered_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
+    recovered           INTEGER DEFAULT 0,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    INDEX idx_risk_account (account_id, triggered_at),
+    INDEX idx_risk_type (trigger_type, recovered, deleted),
+    INDEX idx_risk_cooldown (cooldown_until, recovered)
+);
+
+CREATE TABLE IF NOT EXISTS scheduled_recovery_log (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    trigger_source      VARCHAR(16),
+    total_count         INTEGER DEFAULT 0,
+    recovered_count     INTEGER DEFAULT 0,
+    status              VARCHAR(16),
+    started_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at            DATETIME,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    INDEX idx_recovery_started (started_at, deleted)
+);
+
+-- ======================== A6 卡券模型升级（四类型） ========================
+CREATE TABLE IF NOT EXISTS ship_card (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    card_type       VARCHAR(16) NOT NULL,             -- CARD / ACCOUNT / LINK_QRCODE / PLAIN_TEXT
+    card_code       VARCHAR(256),                     -- 卡号/账号名（CARD/ACCOUNT 用）
+    card_password   VARCHAR(256),                     -- 密码/密保
+    extra           VARCHAR(512),                     -- 额外信息（ACCOUNT=服务器名等）
+    content         TEXT,                             -- 链接/二维码内容 或 纯文本话术
+    status          VARCHAR(16) DEFAULT 'AVAILABLE',  -- AVAILABLE / USED / EXPIRED / DISABLED
+    used_order_id   BIGINT,
+    used_at         DATETIME,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted         INTEGER DEFAULT 0,
+    INDEX idx_ship_card_type (card_type, status, deleted),
+    INDEX idx_ship_card_used_order (used_order_id),
+    INDEX idx_ship_card_code (card_code)
+);
+
+CREATE TABLE IF NOT EXISTS card_item_relation (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    product_id      BIGINT NOT NULL,
+    card_id         BIGINT NOT NULL,
+    priority        INTEGER DEFAULT 0,
+    enabled         INTEGER DEFAULT 1,
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted         INTEGER DEFAULT 0,
+    UNIQUE KEY uk_card_rel_product_card (product_id, card_id),
+    INDEX idx_card_rel_product (product_id, enabled, priority, deleted),
+    INDEX idx_card_rel_card (card_id)
+);
+
+-- ======================== A7 发货规则引擎 ========================
+CREATE TABLE IF NOT EXISTS delivery_block_rule (
+    id                  BIGINT AUTO_INCREMENT PRIMARY KEY,
+    account_id          BIGINT,
+    rule_type           VARCHAR(32) NOT NULL,
+    rule_params         TEXT,
+    rule_name           VARCHAR(128),
+    priority            INTEGER DEFAULT 100,
+    enabled             INTEGER DEFAULT 1,
+    action              VARCHAR(16) DEFAULT 'BLOCK',
+    notify_template     VARCHAR(512),
+    last_hit_at         DATETIME,
+    hit_count           INTEGER DEFAULT 0,
+    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted             INTEGER DEFAULT 0,
+    INDEX idx_delivery_rule_account (account_id, enabled, priority, deleted),
+    INDEX idx_delivery_rule_type (rule_type, enabled, deleted)
+);

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>商品详情 - AI 鱼多宝</title>
+<style>
+@import url('_design-system.css');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'PingFang SC','Inter',sans-serif;background:#d1d5db;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:20px;-webkit-font-smoothing:antialiased}
+
+/* Carousel */
+.carousel{position:relative;background:var(--gradient-brand);padding-top:100%;overflow:hidden}
+.carousel-slide{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:80px;color:#fff}
+.carousel-dots{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
+.dot{width:8px;height:8px;border-radius:4px;background:rgba(255,255,255,.35)}
+.dot.active{width:20px;background:#fff;border-radius:4px}
+
+/* Info Card */
+.info-card{background:var(--bg-card);border-radius:24px 24px 0 0;margin-top:-20px;position:relative;z-index:1;padding:20px}
+
+.product-title-text{font-size:18px;font-weight:700;color:var(--text-primary);line-height:1.5;margin-bottom:12px}
+
+.price-row{display:flex;align-items:baseline;gap:8px;margin-bottom:16px}
+.price-main{font-size:28px;font-weight:800;color:var(--danger)}
+.price-symbol{font-size:16px}
+.price-original{font-size:13px;color:var(--text-tertiary);text-decoration:line-through}
+.discount-tag{font-size:11px;font-weight:600;color:var(--success);background:rgba(16,185,129,.1);padding:3px 8px;border-radius:6px}
+
+.meta-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.meta-item{background:var(--bg-page);border-radius:var(--radius-sm);padding:12px;text-align:center}
+.meta-val{font-size:16px;font-weight:700;color:var(--text-primary)}
+.meta-label{font-size:11px;color:var(--text-tertiary);margin-top:3px}
+
+.desc-card{padding:16px;background:var(--bg-card);border-radius:var(--radius-md);margin-top:12px;border:1px solid var(--border)}
+.desc-title{font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:10px}
+.desc-text{font-size:13px;color:var(--text-secondary);line-height:1.8}
+
+/* Stats Row */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:16px;margin:0;background:var(--bg-card);border-radius:var(--radius-md);border:1px solid var(--border-light);box-shadow:var(--shadow-sm);margin-top:14px}
+.stat-cell{text-align:center}
+.stat-icon{font-size:20px;margin-bottom:4px}
+.stat-num{font-size:18px;font-weight:800;color:var(--text-primary)}
+.stat-label{font-size:10px;color:var(--text-tertiary);margin-top:2px}
+
+/* Action Buttons */
+.action-panel{display:flex;gap:8px;padding:16px;background:var(--bg-card);border-radius:var(--radius-md);border:1px solid var(--border-light);box-shadow:var(--shadow-sm);margin-top:14px}
+.a-btn{flex:1;padding:12px 4px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all .2s}
+.a-btn:active{transform:scale(.95)}
+.a-primary{background:var(--gradient-brand);color:#fff;box-shadow:0 4px 16px rgba(79,70,229,.2)}
+.a-warn{background:rgba(245,158,11,.1);color:var(--warning)}
+.a-secondary{background:var(--bg-page);color:var(--text-secondary)}
+.a-danger{background:rgba(239,68,68,.1);color:var(--danger)}
+.a-icon{font-size:18px}
+
+/* Bottom Fixed Nav */
+.bottom-nav{position:absolute;bottom:0;left:0;right:0;background:rgba(255,255,255,.96);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border-light);display:flex;align-items:center;gap:10px;padding:10px 16px;padding-bottom:max(10px,env(safe-area-inset-bottom));z-index:80}
+.back-btn{width:38px;height:38px;border-radius:50%;background:var(--bg-page);border:none;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.back-btn:active{transform:scale(.9)}
+.bottom-btn{flex:1;height:44px;border-radius:14px;font-size:14px;font-weight:600;border:none;cursor:pointer;transition:all .2s}
+.bottom-btn:active{transform:scale(.97)}
+.bottom-btn--ghost{background:var(--bg-page);color:var(--text-secondary)}
+.bottom-btn--brand{background:var(--gradient-brand);color:#fff;box-shadow:0 4px 16px rgba(79,70,229,.25)}
+</style>
+</head>
+<body>
+<div class="phone-frame safe-bottom">
+  <div class="island"></div>
+  <div class="status-bar"><span>9:41</span><span>●●●●●</span></div>
+
+  <div class="page-content">
+    <!-- Carousel -->
+    <div class="carousel">
+      <div class="carousel-slide hero-section">👟</div>
+      <div class="carousel-dots"><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+    </div>
+
+    <!-- Product Info Card -->
+    <div class="info-card">
+      <div class="tags">
+        <span class="chip chip-green">在售</span>
+        <span class="chip chip-violet">新品</span>
+      </div>
+      <h1 class="product-title-text">全新Nike Air Force 1 空军一号白色板鞋 低帮经典百搭</h1>
+      <div class="price-row">
+        <span class="price-main"><span class="price-symbol">¥</span>299</span>
+        <span class="price-original">¥599</span>
+        <span class="discount-tag">4.7折</span>
+      </div>
+      <div class="meta-grid">
+        <div class="meta-item"><div class="meta-val">12</div><div class="meta-label">库存</div></div>
+        <div class="meta-item"><div class="meta-val">1.2k</div><div class="meta-label">浏览量</div></div>
+        <div class="meta-item"><div class="meta-val">89</div><div class="meta-label">收藏</div></div>
+      </div>
+      <div class="desc-card">
+        <div class="desc-title">商品描述</div>
+        <p class="desc-text">全新未穿，专柜购入，含原始发票。尺码：42。颜色：纯白。购买渠道：Nike官方店。支持验货，假一赔十。</p>
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="stats-row">
+      <div class="stat-cell"><div class="stat-icon">✅</div><div class="stat-label">在售中</div></div>
+      <div class="stat-cell"><div class="stat-num">12天</div><div class="stat-label">发布时长</div></div>
+      <div class="stat-cell"><div class="stat-num">890</div><div class="stat-label">总浏览</div></div>
+      <div class="stat-cell"><div class="stat-num">12次</div><div class="stat-label">最近擦亮</div></div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-panel">
+      <button class="a-btn a-primary"><span class="a-icon">✨</span>擦亮</button>
+      <button class="a-btn a-warn"><span class="a-icon">🔄</span>同步</button>
+      <button class="a-btn a-secondary"><span class="a-icon">✏️</span>编辑</button>
+      <button class="a-btn a-danger"><span class="a-icon">⏸</span>下架</button>
+    </div>
+
+    <!-- Spacer for bottom nav -->
+    <div style="height:60px"></div>
+  </div>
+
+  <!-- Bottom Fixed Navigation -->
+  <div class="bottom-nav">
+    <button class="back-btn">‹</button>
+    <button class="bottom-btn bottom-btn--ghost">💬 聊天</button>
+    <button class="bottom-btn bottom-btn--brand">上架 / 下架</button>
+  </div>
+</div>
+</body>
+</html>
