@@ -10,8 +10,6 @@
     "dev:mp-qq": "uni -p mp-qq --mode development",
     "dev:mp-kuaishou": "uni -p mp-kuaishou --mode development",
     "dev:mp-lark": "uni -p mp-lark --mode development",
-    "dev:mp-dingtalk": "uni -p mp-dingtalk --mode development",
-    "dev:mp-meituan": "uni -p mp-meituan --mode development",
     "build:mp-weixin": "uni build -p mp-weixin",
     "build:mp-alipay": "uni build -p mp-alipay",
     "build:mp-toutiao": "uni build -p mp-toutiao",
@@ -19,8 +17,6 @@
     "build:mp-qq": "uni build -p mp-qq",
     "build:mp-kuaishou": "uni build -p mp-kuaishou",
     "build:mp-lark": "uni build -p mp-lark",
-    "build:mp-dingtalk": "uni build -p mp-dingtalk",
-    "build:mp-meituan": "uni build -p mp-meituan",
     "build:h5": "uni build"
   },
   "dependencies": {
@@ -29,14 +25,13 @@
     "@dcloudio/uni-h5": "^3.0.0-4060620251210001",
     "@dcloudio/uni-mp-alipay": "^3.0.0-4060620251210001",
     "@dcloudio/uni-mp-baidu": "^3.0.0-4060620251210001",
-    "@dcloudio/uni-mp-dingtalk": "^3.0.0-4060620251210001",
     "@dcloudio/uni-mp-kuaishou": "^3.0.0-4060620251210001",
     "@dcloudio/uni-mp-lark": "^3.0.0-4060620251210001",
-    "@dcloudio/uni-mp-meituan": "^3.0.0-4060620251210001",
     "@dcloudio/uni-mp-qq": "^3.0.0-4060620251210001",
     "@dcloudio/uni-mp-toutiao": "^3.0.0-4060620251210001",
     "@dcloudio/uni-mp-weixin": "^3.0.0-4060620251210001",
     "@dcloudio/uni-ui": "^1.5.6",
+    "@vitejs/plugin-vue": "^5.2.4",
     "crypto-js": "^4.2.0",
     "pinia": "^2.1.7",
     "vue": "^3.4.21"
@@ -44,8 +39,7 @@
   "devDependencies": {
     "@dcloudio/types": "^3.4.8",
     "@dcloudio/uni-automator": "^3.0.0-4060620251210001",
-    "@dcloudio/uni-stackviewerror": "^3.0.0-4060620251210001",
-    "@dcloudio/vite-plugin-uni": "^3.0.0-4060620251210001",
+    "@dcloudio/vite-plugin-uni": "^3.0.0-alpha-5020120260710001",
     "sass": "^1.77.0",
     "typescript": "~5.4.5",
     "vite": "^5.2.0"

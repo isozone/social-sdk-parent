@@ -47,6 +47,8 @@ public class AuthController {
                 "id", user.getId(),
                 "username", user.getUsername(),
                 "displayName", user.getDisplayName(),
+                "email", user.getEmail() != null ? user.getEmail() : "",
+                "phone", user.getPhone() != null ? user.getPhone() : "",
                 "roleLevel", user.getRoleLevel()
         );
         return ApiResponse.ok(data);

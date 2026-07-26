@@ -2,11 +2,18 @@ import { defineConfig } from 'vite'
 import uni from '@dcloudio/vite-plugin-uni'
 
 export default defineConfig({
-  plugins: [uni()],
+  plugins: [
+    uni({
+      vue: {
+        // uni-mp-vite 期望 vueOptions 存在，给空对象避免 undefined
+        compilerOptions: {},
+      },
+    }),
+  ],
   css: {
     preprocessorOptions: {
       scss: {
-        additionalData: `@import "@/uni.scss";`,
+        // 不全局注入 uni.scss，避免与 .vue 内显式 @import 重复
       },
     },
   },

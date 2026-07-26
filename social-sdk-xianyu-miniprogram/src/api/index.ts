@@ -1,4 +1,5 @@
 export { request, api } from './request'
+export { api as default } from './request'
 export * from './encrypt'
 export * from './auth'
 export * from './dashboard'

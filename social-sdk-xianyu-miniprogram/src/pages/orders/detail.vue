@@ -20,7 +20,8 @@
   </view>
 </template>
 <script setup lang="ts">
-import { ref, onMounted, onLoad } from '@dcloudio/uni-app'
+import { ref, onMounted } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import api from '@/api'
 let oid = 0; const order = ref<any>({})
 onLoad((opt: any) => { oid = Number(opt.id); load() })

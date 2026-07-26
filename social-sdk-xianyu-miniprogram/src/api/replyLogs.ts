@@ -12,5 +12,5 @@ export interface ReplyLogItem {
 }
 
 export function getList(params?: any) {
-  return api.get<PageResponse<ReplyLogItem>>('/api/mini/monitor/reply-logs', params)
+  return api.get<PageResponse<ReplyLogItem>>('/api/mini/reply-logs', params)
 }

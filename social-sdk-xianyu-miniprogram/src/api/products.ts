@@ -3,33 +3,56 @@ import type { ProductItem, CategoryNode, PolishResult } from '@/types/product'
 import type { PageResponse } from '@/types/common'
 
 export function getProducts(params?: any) {
-  return api.get<PageResponse<ProductItem>>('/api/mini/monitor/products', params)
+  return api.get<PageResponse<ProductItem>>('/api/mini/products', params)
 }
 
 export function getProduct(id: number | string) {
-  return api.get<ProductItem>(`/api/mini/monitor/products/${id}`)
+  return api.get<ProductItem>(`/api/mini/products/${id}`)
+}
+
+export function createProduct(data: any) {
+  return api.post('/api/mini/products', data)
+}
+
+export function updateProduct(id: number | string, data: any) {
+  return api.put(`/api/mini/products/${id}`, data)
+}
+
+export function deleteProduct(id: number | string) {
+  return api.delete(`/api/mini/products/${id}`)
+}
+
+export function syncProducts(accountId: number | string) {
+  return api.post('/api/mini/products/sync', { accountId })
 }
 
 export function shelfOn(id: number | string) {
-  return api.post(`/api/mini/monitor/products/${id}/shelf-on`)
+  return api.post(`/api/mini/products/${id}/shelf-on`)
 }
 
 export function shelfOff(id: number | string) {
-  return api.post(`/api/mini/monitor/products/${id}/shelf-off`)
+  return api.post(`/api/mini/products/${id}/shelf-off`)
 }
 
 export function polish(id: number | string) {
-  return api.post<PolishResult>(`/api/mini/monitor/products/${id}/polish`)
+  return api.post<PolishResult>(`/api/mini/products/${id}/polish`)
 }
 
 export function polishBatch(ids: number[]) {
-  return api.post<PolishResult[]>('/api/mini/monitor/products/polish-batch', { ids })
+  return api.post<PolishResult[]>('/api/mini/products/polish/batch', { ids })
+}
+
+export function updatePrice(id: number | string, price: number) {
+  return api.put(`/api/mini/products/${id}/price`, { price })
+}
+
+export function updateStock(id: number | string, stock: number) {
+  return api.put(`/api/mini/products/${id}/stock`, { stock })
 }
 
 export function uploadImage(fileUrl: string): Promise<{ url: string }> {
   return new Promise((resolve, reject) => {
     const headers: Record<string, string> = {}
-    // set Authorization via storage if Pinia store not yet initialized
     const token = (() => {
       try {
         const t = uni.getStorageSync('mini_token')
@@ -37,9 +60,10 @@ export function uploadImage(fileUrl: string): Promise<{ url: string }> {
       } catch { return '' }
     })()
     if (token) headers['Authorization'] = `Bearer ${token}`
+    headers['X-App-Type'] = 'mini-program'
 
     uni.uploadFile({
-      url: '/api/mini/monitor/products/upload-image',
+      url: '/api/mini/products/upload',
       filePath: fileUrl,
       name: 'file',
       header: headers,
@@ -62,5 +86,5 @@ export function uploadImage(fileUrl: string): Promise<{ url: string }> {
 }
 
 export function getCategoryTree() {
-  return api.get<CategoryNode[]>('/api/mini/monitor/categories/tree')
+  return api.get<CategoryNode[]>('/api/mini/products/category-tree')
 }

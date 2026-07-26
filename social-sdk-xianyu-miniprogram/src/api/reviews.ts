@@ -14,7 +14,7 @@ export interface ReviewItem {
 }
 
 export function getList(params?: any) {
-  return api.get<PageResponse<ReviewItem>>('/api/mini/monitor/reviews', params)
+  return api.get<PageResponse<ReviewItem>>('/api/mini/reviews', params)
 }
 
 export interface SubmitReviewParams {
@@ -24,7 +24,7 @@ export interface SubmitReviewParams {
 }
 
 export function submitReview(data: SubmitReviewParams) {
-  return api.post('/api/mini/monitor/reviews', data)
+  return api.post('/api/mini/reviews', data)
 }
 
 export interface RefundParams {
@@ -33,5 +33,5 @@ export interface RefundParams {
 }
 
 export function refund(data: RefundParams) {
-  return api.post(`/api/mini/monitor/reviews/refund`, data)
+  return api.post('/api/mini/reviews/refund', data)
 }

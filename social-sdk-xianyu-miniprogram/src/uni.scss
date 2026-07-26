@@ -1,0 +1,62 @@
+// ==========================================
+// AI 鱼多宝 — Design Tokens
+// ==========================================
+
+// Brand
+$brand-primary: #4f46e5;
+$brand-secondary: #7c3aed;
+$brand-gradient: linear-gradient(135deg, #4f46e5, #7c3aed);
+
+// Accent
+$accent-cyan: #22d3ee;
+
+// Backgrounds
+$bg-page: #f5f5f7;
+$bg-card: #ffffff;
+$bg-input: #f8f8f9;
+
+// Text
+$text-primary: #111827;
+$text-secondary: #6b7280;
+$text-tertiary: #9ca3af;
+
+// Status colors
+$success: #22c55e;
+$warning: #f59e0b;
+$danger: #ef4444;
+$info: #3b82f6;
+
+// Border
+$border-color: #e5e7eb;
+$border-light: #f3f4f6;
+
+// Radius & shadow
+$card-radius: 16rpx;
+$card-shadow: 0 2rpx 16rpx rgba(0, 0, 0, 0.04);
+$btn-shadow: 0 4rpx 16rpx rgba(79, 70, 229, 0.25);
+
+// Sizes
+$page-padding: 24rpx;
+$content-padding: 32rpx;
+
+// Typography
+$text-lg: 32rpx;
+$text-md: 28rpx;
+$text-sm: 24rpx;
+$text-xs: 22rpx;
+
+// Transitions
+$transition-fast: 150ms ease;
+$transition-base: 250ms ease;
+
+// Platform-specific: some platforms don't support CSS vars well
+// We compile to concrete values in uni.scss, then reference via variables
+$title-font-size: 36rpx;
+$card-title-font-size: 28rpx;
+$body-font-size: 28rpx;
+$sub-text-font-size: 24rpx;
+$micro-font-size: 22rpx;
+
+// Tab bar
+$tab-bar-height: 100rpx;
+$tab-icon-size: 44rpx;

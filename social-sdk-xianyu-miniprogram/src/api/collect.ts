@@ -13,9 +13,9 @@ export interface CollectItem {
 }
 
 export function getList(params?: any) {
-  return api.get<PageResponse<CollectItem>>('/api/mini/monitor/collect', params)
+  return api.get<PageResponse<CollectItem>>('/api/mini/collect', params)
 }
 
 export function sync(id: number | string) {
-  return api.post(`/api/mini/monitor/collect/${id}/sync`)
+  return api.post(`/api/mini/collect/${id}/sync`)
 }
