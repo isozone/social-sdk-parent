@@ -49,19 +49,23 @@
    ```
 
 5. 成功判断必须以 `code === "OK"` 为准，不要只判断 HTTP 200。
-6. 账号作用域通过 `OpenApp.boundAccountIds` 控制：
+6. 令牌有效期为 7200 秒，存储在 Caffeine 内存缓存；服务重启、缓存淘汰或多实例切换后需要重新换取。
+7. 账号作用域通过 `OpenApp.boundAccountIds` 控制：
    - 空列表 = 可访问全部账号；
    - 非空 = 只能访问白名单账号；
    - 越权返回 `OPEN_ACCOUNT_FORBIDDEN`。
-7. 对外 VO 必须脱敏，不允许暴露：
+8. 限流按 `appKey` 粒度计算，`rateLimitPerMinute` 为 0 表示不限制，未配置时按 60 次/分钟处理。
+9. 对外 VO 必须脱敏，不允许暴露：
    - `cookieHeader`
    - `cookiesJson`
    - `imCookieHeader`
    - `imAccessToken`
    - `appSecret` 明文（二次查询时）
+   - AI provider/model API Key 或密文配置
+   - 通知通道 `configJson` 密文或明文
    - 云盘 token / shareLink / extractCode 等敏感字段
    - 内部错误堆栈或账号风控细节
-8. 新增接口时必须复用：
+10. 新增接口时必须复用：
    - `OpenApiResponse`
    - `OpenApiException`
    - `OpenApiErrorCode`
@@ -115,8 +119,6 @@ Content-Type: application/json
 }
 ```
 
-令牌有效期为 7200 秒。服务重启后内存 token 失效，需要重新换取。
-
 ### 3. 调用业务接口
 
 ```http
@@ -128,23 +130,32 @@ Authorization: Bearer <accessToken>
 
 | code | HTTP 状态 | 含义 | 处理建议 |
 |---|---:|---|---|
-| `OPEN_UNAUTHORIZED` | 401 | 未提供 Bearer token | 检查 Authorization 请求头 |
-| `OPEN_INVALID_TOKEN` | 401 | token 无效、过期或服务重启后丢失 | 重新调用 `/oauth/token` |
+| `OPEN_UNAUTHORIZED` | 401 | 未提供 Bearer token，或 token 换取时 app 凭证错误 | 检查 Authorization 请求头或 appKey/appSecret |
+| `OPEN_INVALID_TOKEN` | 401 | token 无效、过期、服务重启后丢失或实例不一致 | 重新调用 `/oauth/token` |
 | `OPEN_APP_DISABLED` | 403 | 应用被禁用 | 管理后台启用应用 |
 | `OPEN_APP_EXPIRED` | 403 | 应用过期 | 延长应用有效期或重建应用 |
 | `OPEN_RATE_LIMIT` | 429 | 超过每分钟限流 | 降低调用频率，指数退避重试 |
 | `OPEN_ACCOUNT_FORBIDDEN` | 403 | 访问非绑定账号 | 检查 `boundAccountIds` 或更换账号 ID |
 | `OPEN_INVALID_PARAM` | 400 | 参数错误 | 检查 query/path/body |
 | `OPEN_NOT_FOUND` | 404 | 资源不存在或不可见 | 检查资源 ID 与账号作用域 |
-| `OPEN_INTERNAL` | 500 | 服务内部错误 | 查后端日志 |
+| `OPEN_INTERNAL` | 500 | 服务内部错误 | 查后端日志，避免向外暴露堆栈 |
 
 ## 当前 OpenAPI 端点清单
+
+除 OAuth token 外，以下 OpenAPI v1 端点都需要第三方 Bearer token。
 
 ### OAuth
 
 | 方法 | 路径 | 鉴权 | 说明 |
 |---|---|---|---|
 | POST | `/openapi/v1/oauth/token` | 无 | 用 `appKey` + `appSecret` 换取 Bearer token |
+
+### 应用管理（内部管理员接口）
+
+| 方法 | 路径 | 鉴权 | 说明 |
+|---|---|---|---|
+| POST | `/api/openapi/apps` | 管理后台 JWT | 创建开放应用，首次返回 appSecret 明文 |
+| GET | `/api/openapi/apps` | 管理后台 JWT | 查询开放应用列表，不能返回 appSecret 明文 |
 
 ### 账号
 
@@ -179,17 +190,12 @@ Authorization: Bearer <accessToken>
 | GET | `/openapi/v1/wallets/{accountId}` | `accountId` | 按账号查询钱包 |
 | GET | `/openapi/v1/wallets/{accountId}/transactions` | `accountId` | 查询账号钱包流水 |
 
-### 收藏关注
+### 收藏关注、关键词与自动回复
 
 | 方法 | 路径 | 常用参数 | 说明 |
 |---|---|---|---|
 | GET | `/openapi/v1/collects` | `accountId?` | 查询收藏/关注列表 |
 | GET | `/openapi/v1/collects/{id}` | `id` | 查询收藏/关注详情 |
-
-### 关键词与自动回复
-
-| 方法 | 路径 | 常用参数 | 说明 |
-|---|---|---|---|
 | GET | `/openapi/v1/keyword-rules` | `accountId?` | 查询关键词规则 |
 | GET | `/openapi/v1/keyword-rules/{id}` | `id` | 查询关键词规则详情 |
 | GET | `/openapi/v1/auto-reply-configs` | `accountId?` | 查询自动回复配置 |
@@ -247,9 +253,9 @@ Authorization: Bearer <accessToken>
 | GET | `/openapi/v1/virtual-ship/tasks` | `accountId?` | 查询虚拟发货任务 |
 | GET | `/openapi/v1/virtual-ship/tasks/{id}` | `id` | 查询虚拟发货任务详情 |
 | GET | `/openapi/v1/cloud/accounts` | `accountId?` | 查询云盘账号，token 脱敏 |
-| GET | `/openapi/v1/cloud/accounts/{id}` | `id` | 查询云盘账号详情 |
+| GET | `/openapi/v1/cloud/accounts/{id}` | `id` | 查询云盘账号详情，token 脱敏 |
 | GET | `/openapi/v1/cloud/files` | `accountId?` | 查询云盘文件，分享信息脱敏 |
-| GET | `/openapi/v1/cloud/files/{id}` | `id` | 查询云盘文件详情 |
+| GET | `/openapi/v1/cloud/files/{id}` | `id` | 查询云盘文件详情，分享信息脱敏 |
 
 ## 调用示例
 
@@ -389,11 +395,14 @@ public class OpenApiExampleController {
 
 新增或修改 OpenAPI 端点前后必须检查：
 
-- [ ] 路径是否在 `/openapi/v1/**` 下。
+- [ ] 路径是否在 `/openapi/v1/**` 下；内部应用管理接口除外。
+- [ ] 除 `/oauth/token` 外是否受 `OpenApiAuthInterceptor` 保护。
 - [ ] 是否返回 `OpenApiResponse.ok(data)`。
 - [ ] 是否用 `OpenApiException(OpenApiErrorCode.xxx, message)` 抛业务错误。
 - [ ] 列表接口是否按 `boundAccountIds` 过滤。
+- [ ] 列表接口若接收 `accountId`，是否先调用 `assertAccountAccessible(app, accountId)`。
 - [ ] 详情接口是否根据资源反查 `accountId` 并调用 `assertAccountAccessible`。
+- [ ] 无账号归属的全局目录接口是否确认不包含敏感配置。
 - [ ] VO 是否脱敏，不能直接返回数据库实体。
 - [ ] `appSecret`、Cookie、Token、密文配置、风控错误、堆栈不能出现在响应中。
 - [ ] 是否需要补充 `docs/openapi.md` 与本 skill 的端点清单。
@@ -403,29 +412,33 @@ public class OpenApiExampleController {
 
 ### 401：未授权或 token 无效
 
-1. 检查是否带了请求头：`Authorization: Bearer <token>`。
-2. 确认 token 是否来自当前服务实例。服务重启后内存 token 会失效。
-3. 重新调用 `/openapi/v1/oauth/token` 获取 token。
-4. 如果仍失败，检查 `OpenApiAuthInterceptor` 和 `OpenApiTokenCache`。
+1. 检查业务接口是否带了请求头：`Authorization: Bearer <token>`。
+2. 如果是 `/oauth/token` 失败，确认 `appKey` 是否存在、`appSecret` 是否正确。
+3. 确认 token 是否来自当前服务实例。服务重启、Caffeine 淘汰或请求打到另一实例后内存 token 会失效。
+4. 重新调用 `/openapi/v1/oauth/token` 获取 token。
+5. 如果仍失败，检查 `OpenApiAuthInterceptor`、`OpenAppService` 和 `OpenApiTokenCache`。
 
-### 403：账号越权
+### 403：账号越权、应用禁用或过期
 
-1. 确认请求参数里的 `accountId`。
+1. 如果返回 `OPEN_ACCOUNT_FORBIDDEN`，确认请求参数里的 `accountId`。
 2. 查询内部应用配置的 `boundAccountIds`。
 3. 如果访问详情接口，确认资源所属账号是否在绑定列表内。
 4. 空 `boundAccountIds` 代表不限制；非空时必须包含目标账号。
+5. 如果返回 `OPEN_APP_DISABLED` 或 `OPEN_APP_EXPIRED`，检查 `open_app.status` 与 `expire_at`。
 
 ### 429：限流
 
 1. 查询应用 `rateLimitPerMinute`。
 2. 按 appKey 粒度统计，多个调用方共享同一 appKey 会互相影响。
-3. 客户端应做指数退避或本地限速。
+3. `rateLimitPerMinute=0` 表示不限制；未配置时默认 60 次/分钟。
+4. 客户端应做指数退避或本地限速。
 
 ### 500：内部错误
 
-1. 先看后端日志中的 `GlobalExceptionHandler` 或 `OpenApiExceptionHandler`。
+1. 先看后端日志中的 `OpenApiExceptionHandler` 之后是否还有未处理异常。
 2. 常见原因是旧库缺表/缺列、Mapper 查询字段不一致、VO 映射空指针。
-3. 如果是缺表，优先补 schema 文件和 `DatabaseInitializer` 旧库迁移兜底。
+3. 如果是缺表/缺列，优先补 schema 文件和 `DatabaseInitializer` 旧库迁移兜底。
+4. 对外响应只能返回 `OPEN_INTERNAL` 和通用消息，不能泄露堆栈。
 
 ## 与管理后台 API 的区别
 
@@ -433,7 +446,7 @@ public class OpenApiExampleController {
 |---|---|---|---|---|
 | 管理后台 API | `/api/**` | 管理员 JWT | 内部前端 | 可读写敏感配置，权限更高 |
 | OpenAPI | `/openapi/v1/**` | appKey/appSecret 换取 Bearer | 第三方应用 | 只暴露脱敏后的业务数据，并受账号白名单和限流约束 |
-| 应用管理 | `/api/openapi/apps` | 管理员 JWT | 管理员 | 创建/查询开放应用，返回 appKey/appSecret |
+| 应用管理 | `/api/openapi/apps` | 管理员 JWT | 管理员 | 创建/查询开放应用，首次创建返回 appKey/appSecret |
 
 ## 文档维护约定
 

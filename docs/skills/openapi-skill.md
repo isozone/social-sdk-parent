@@ -2,7 +2,7 @@
 
 ## Description
 
-Use this skill to help users integrate with an OpenAPI-based HTTP service that uses app credentials, Bearer access tokens, a unified response envelope, account-level access scope, and rate limiting.
+Use this skill to help users integrate with the Social SDK / Xianyu Manager OpenAPI v1 HTTP service. The public API uses app credentials, Bearer access tokens, a unified response envelope, account-level access scope, and per-app rate limiting.
 
 This skill is designed for public use. It focuses on client integration, request examples, error handling, endpoint discovery, and safe troubleshooting. It intentionally avoids project-internal implementation details such as source paths, database migrations, framework classes, private interceptors, build commands, and internal stack traces.
 
@@ -10,13 +10,13 @@ This skill is designed for public use. It focuses on client integration, request
 
 Use this skill when the user asks to:
 
-- Integrate with an OpenAPI / public API / developer platform.
-- Obtain or refresh an access token from `appKey` and `appSecret`.
+- Integrate with the OpenAPI / public API / developer platform.
+- Obtain an access token from `appKey` and `appSecret`.
 - Generate curl, JavaScript, Python, Postman, or SDK examples.
-- Call account, product, order, message, wallet, notification, AI, cloud, or monitoring endpoints.
+- Call account, product, local-product, message, order, wallet, collect, rule, auto-reply, notification, AI, monitor, market, buyer, virtual fulfillment, or cloud storage endpoints.
 - Diagnose API errors such as 401, 403, 429, invalid token, forbidden account access, or rate limit responses.
 - Explain response envelopes and error codes.
-- Build a lightweight client wrapper around an OpenAPI service.
+- Build a lightweight client wrapper around the OpenAPI service.
 - Review whether a public API response is safe and does not expose secrets.
 
 ## Inputs to Collect
@@ -63,9 +63,10 @@ Assume these conventions unless the user provides a different OpenAPI specificat
    ```
 
 5. Treat `code === "OK"` as success. Do not rely only on HTTP status 200.
-6. Tokens may expire. If the API returns invalid-token errors, refresh the token and retry once.
-7. Some endpoints are account-scoped. If the app is bound to specific account IDs, requests for other accounts should fail with a forbidden error.
-8. API responses must not expose secrets such as app secrets, cookies, session tokens, private credentials, cloud drive tokens, or raw stack traces.
+6. Tokens expire after 7200 seconds. If the API returns invalid-token errors, exchange credentials for a new token and retry once.
+7. Tokens are service-instance memory state. After a server restart or instance switch, get a new token.
+8. Some endpoints are account-scoped. If the app is bound to specific account IDs, requests for other accounts should fail with a forbidden error.
+9. API responses must not expose secrets such as app secrets, cookies, session tokens, private credentials, cloud drive tokens, raw share credentials, or stack traces.
 
 ## Authentication Flow
 
@@ -111,21 +112,19 @@ When the API returns an invalid-token or expired-token response, call `/openapi/
 
 | Code | Typical HTTP Status | Meaning | Client Action |
 |---|---:|---|---|
-| `OPEN_UNAUTHORIZED` | 401 | Missing access token | Add `Authorization: Bearer <token>`. |
-| `OPEN_INVALID_TOKEN` | 401 | Token invalid, expired, or no longer recognized | Refresh token and retry once. |
-| `OPEN_APP_DISABLED` | 403 | Application disabled | Ask platform admin to enable the app. |
-| `OPEN_APP_EXPIRED` | 403 | Application credentials expired | Ask platform admin to renew or recreate the app. |
+| `OPEN_UNAUTHORIZED` | 401 | Missing token or invalid app credentials during token exchange | Add `Authorization: Bearer <token>` for business calls, or verify `appKey`/`appSecret` for token exchange. |
+| `OPEN_INVALID_TOKEN` | 401 | Token invalid, expired, or no longer recognized by this service instance | Exchange credentials for a new token and retry once. |
+| `OPEN_APP_DISABLED` | 403 | Application disabled | Ask the platform admin to enable the app. |
+| `OPEN_APP_EXPIRED` | 403 | Application credentials expired | Ask the platform admin to renew or recreate the app. |
 | `OPEN_RATE_LIMIT` | 429 | Rate limit exceeded | Back off and retry later. Add client-side throttling. |
 | `OPEN_ACCOUNT_FORBIDDEN` | 403 | App is not allowed to access the target account | Use an allowed account ID or update app account bindings. |
 | `OPEN_INVALID_PARAM` | 400 | Invalid query/path/body parameter | Validate request parameters. |
 | `OPEN_NOT_FOUND` | 404 | Resource not found or not visible to this app | Check ID and account scope. |
-| `OPEN_INTERNAL` | 500 | Server-side failure | Preserve request ID/log context if available and contact the service owner. |
+| `OPEN_INTERNAL` | 500 | Server-side failure | Preserve sanitized request context and contact the service owner. |
 
-If the actual API uses different error codes, adapt the table to the OpenAPI JSON or official docs.
+## Endpoint Catalog
 
-## Endpoint Catalog Pattern
-
-When documenting or generating examples, group endpoints by business domain. Use tables with method, path, parameters, and purpose.
+All endpoints below require `Authorization: Bearer <accessToken>` except the OAuth token endpoint.
 
 ### OAuth
 
@@ -140,13 +139,13 @@ When documenting or generating examples, group endpoints by business domain. Use
 | GET | `/openapi/v1/accounts` | `accountId?` | List accounts visible to the application. |
 | GET | `/openapi/v1/accounts/{id}` | `id` | Get account detail with scope checks. |
 
-### Products
+### Products and Local Products
 
 | Method | Path | Common Parameters | Purpose |
 |---|---|---|---|
-| GET | `/openapi/v1/products` | `accountId?`, `status?`, `keyword?` | List products. |
-| GET | `/openapi/v1/products/{id}` | `id` | Get product detail. |
-| GET | `/openapi/v1/local-products` | `accountId?`, `status?`, `keyword?` | List local/draft products if supported. |
+| GET | `/openapi/v1/products` | `accountId?` | List Xianyu products. |
+| GET | `/openapi/v1/products/{id}` | `id` | Get Xianyu product detail. |
+| GET | `/openapi/v1/local-products` | `accountId?`, `status?`, `keyword?` | List local/draft products. |
 | GET | `/openapi/v1/local-products/{id}` | `id` | Get local product detail. |
 
 ### Messages and Orders
@@ -166,6 +165,35 @@ When documenting or generating examples, group endpoints by business domain. Use
 | GET | `/openapi/v1/wallets/{accountId}` | `accountId` | Get wallet by account. |
 | GET | `/openapi/v1/wallets/{accountId}/transactions` | `accountId` | List wallet transactions. |
 
+### Collects, Rules, and Auto Reply
+
+| Method | Path | Common Parameters | Purpose |
+|---|---|---|---|
+| GET | `/openapi/v1/collects` | `accountId?` | List collect/follow records. |
+| GET | `/openapi/v1/collects/{id}` | `id` | Get collect/follow detail. |
+| GET | `/openapi/v1/keyword-rules` | `accountId?` | List keyword rules. |
+| GET | `/openapi/v1/keyword-rules/{id}` | `id` | Get keyword rule detail. |
+| GET | `/openapi/v1/auto-reply-configs` | `accountId?` | List auto-reply configs. |
+| GET | `/openapi/v1/auto-reply-configs/{id}` | `id` | Get auto-reply config detail. |
+| GET | `/openapi/v1/auto-reply-logs` | `accountId?`, `replyType?`, `matched?`, `from?`, `to?` | List auto-reply logs. |
+
+### AI
+
+| Method | Path | Common Parameters | Purpose |
+|---|---|---|---|
+| GET | `/openapi/v1/ai/providers` | `enabled?` | List AI providers with credentials redacted. |
+| GET | `/openapi/v1/ai/models` | None | List AI models with credentials redacted. |
+| GET | `/openapi/v1/ai/ops/tasks` | `accountId?` | List AI operation tasks. |
+| GET | `/openapi/v1/ai/ops/tasks/{id}` | `id` | Get AI operation task detail. |
+| GET | `/openapi/v1/ai/ops/suggestions` | `accountId?` | List AI operation suggestions. |
+| GET | `/openapi/v1/ai/ops/suggestions/{id}` | `id` | Get AI operation suggestion detail. |
+| GET | `/openapi/v1/ai/cs/sessions` | `accountId?` | List AI customer-service sessions. |
+| GET | `/openapi/v1/ai/cs/sessions/{id}` | `id` | Get AI customer-service session detail. |
+| GET | `/openapi/v1/ai/cs/knowledge` | `accountId?` | List AI knowledge entries. |
+| GET | `/openapi/v1/ai/cs/knowledge/{id}` | `id` | Get AI knowledge detail. |
+| GET | `/openapi/v1/ai/cs/policies` | `accountId?` | List AI customer-service policies. |
+| GET | `/openapi/v1/ai/cs/policies/{id}` | `id` | Get AI policy detail. |
+
 ### Notifications
 
 | Method | Path | Common Parameters | Purpose |
@@ -178,27 +206,31 @@ When documenting or generating examples, group endpoints by business domain. Use
 | GET | `/openapi/v1/notify/subscriptions` | `scenario?`, `channelId?` | List notification subscriptions. |
 | GET | `/openapi/v1/notify/subscriptions/{id}` | `id` | Get notification subscription detail. |
 
-### AI, Monitoring, Market, Cloud, and Fulfillment
+### Monitoring, Market, and Buyer Profiles
 
 | Method | Path | Common Parameters | Purpose |
 |---|---|---|---|
-| GET | `/openapi/v1/ai/providers` | `enabled?` | List AI providers with credentials redacted. |
-| GET | `/openapi/v1/ai/models` | None | List AI models. |
-| GET | `/openapi/v1/ai/ops/tasks` | `accountId?` | List AI operation tasks. |
-| GET | `/openapi/v1/ai/ops/suggestions` | `accountId?` | List AI operation suggestions. |
-| GET | `/openapi/v1/ai/cs/sessions` | `accountId?` | List AI customer-service sessions. |
-| GET | `/openapi/v1/ai/cs/knowledge` | `accountId?` | List AI knowledge entries. |
-| GET | `/openapi/v1/ai/cs/policies` | `accountId?` | List AI customer-service policies. |
 | GET | `/openapi/v1/monitor/tasks` | `accountId?`, `status?` | List monitoring tasks. |
+| GET | `/openapi/v1/monitor/tasks/{id}` | `id` | Get monitoring task detail. |
 | GET | `/openapi/v1/monitor/results` | `accountId?`, `taskId?`, `from?`, `to?` | List monitoring results. |
 | GET | `/openapi/v1/market/daily-stats` | `keyword?`, `date?` | List market daily statistics. |
 | GET | `/openapi/v1/market/sellers` | `accountId?`, `keyword?` | List seller profiles. |
 | GET | `/openapi/v1/market/price-history` | `accountId?`, `itemId?`, `keyword?` | List price history. |
 | GET | `/openapi/v1/buyer/profiles` | `accountId?` | List buyer profiles. |
+| GET | `/openapi/v1/buyer/profiles/{id}` | `id` | Get buyer profile detail. |
+
+### Virtual Fulfillment and Cloud Storage
+
+| Method | Path | Common Parameters | Purpose |
+|---|---|---|---|
 | GET | `/openapi/v1/virtual-ship/configs` | `accountId?` | List virtual fulfillment configs. |
+| GET | `/openapi/v1/virtual-ship/configs/{id}` | `id` | Get virtual fulfillment config detail. |
 | GET | `/openapi/v1/virtual-ship/tasks` | `accountId?` | List virtual fulfillment tasks. |
+| GET | `/openapi/v1/virtual-ship/tasks/{id}` | `id` | Get virtual fulfillment task detail. |
 | GET | `/openapi/v1/cloud/accounts` | `accountId?` | List cloud accounts with tokens redacted. |
+| GET | `/openapi/v1/cloud/accounts/{id}` | `id` | Get cloud account detail with tokens redacted. |
 | GET | `/openapi/v1/cloud/files` | `accountId?` | List cloud files with private sharing data redacted. |
+| GET | `/openapi/v1/cloud/files/{id}` | `id` | Get cloud file detail with private sharing data redacted. |
 
 ## curl Example
 
@@ -246,9 +278,7 @@ class OpenApiClient {
 
     const url = new URL(`${this.baseUrl}/openapi/v1${path}`)
     Object.entries(params || {}).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        url.searchParams.set(key, value)
-      }
+      if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, value)
     })
 
     const res = await fetch(url, {
@@ -279,11 +309,8 @@ const client = new OpenApiClient({
 })
 
 const accounts = await client.request('/accounts')
-const products = await client.request('/products', {
-  params: { accountId: accounts[0]?.id }
-})
-
-console.log({ accounts, products })
+const orders = await client.request('/orders', { params: { accountId: accounts[0]?.id } })
+console.log({ accounts, orders })
 ```
 
 ## Python Client Example
@@ -336,8 +363,8 @@ client = OpenApiClient(
     app_secret='xxxxxxxxxxxxxxxx',
 )
 
-orders = client.get('/orders', params={'accountId': 123})
-print(orders)
+wallet = client.get('/wallets/123')
+print(wallet)
 ```
 
 ## Postman Setup
@@ -384,14 +411,10 @@ Authorization: Bearer {{accessToken}}
 When generating examples or diagnostics:
 
 1. Mask real secrets unless the user explicitly asks for a runnable local snippet and understands the risk.
-2. Prefer placeholders:
-   - `https://api.example.com`
-   - `ak_xxxxxxxx`
-   - `xxxxxxxxxxxxxxxx`
-   - `<accessToken>`
-3. Do not include cookies, session headers, raw private tokens, database credentials, or stack traces in public examples.
+2. Prefer placeholders: `https://api.example.com`, `ak_xxxxxxxx`, `xxxxxxxxxxxxxxxx`, and `<accessToken>`.
+3. Do not include cookies, session headers, raw private tokens, database credentials, cloud-drive credentials, share extract codes, or stack traces in public examples.
 4. Do not suggest disabling authentication, bypassing scope checks, or increasing rate limits as a first fix.
-5. For logs, recommend redacting `Authorization`, `appSecret`, cookies, and any vendor API keys.
+5. For logs, recommend redacting `Authorization`, `appSecret`, cookies, cloud storage credentials, and any vendor API keys.
 
 ## Troubleshooting Playbook
 
@@ -399,11 +422,12 @@ When generating examples or diagnostics:
 
 Checklist:
 
-1. Does the request include `Authorization: Bearer <accessToken>`?
-2. Is there an accidental extra quote, missing space, or `BearerBearer` typo?
-3. Has the token expired?
-4. Was the token generated against the same `baseUrl` being called?
-5. Retry token exchange once, then retry the business request.
+1. Does the business request include `Authorization: Bearer <accessToken>`?
+2. For token exchange, are `appKey` and `appSecret` correct?
+3. Is there an accidental extra quote, missing space, or `BearerBearer` typo?
+4. Has the token expired after 7200 seconds?
+5. Was the token generated against the same `baseUrl` and service instance being called?
+6. Retry token exchange once, then retry the business request.
 
 ### 403 Forbidden / Account Forbidden
 
@@ -421,7 +445,7 @@ Checklist:
 1. Reduce request concurrency.
 2. Add client-side rate limiting by app key.
 3. Use exponential backoff with jitter.
-4. Cache stable reference data such as accounts, AI models, templates, and provider lists.
+4. Cache stable reference data such as accounts, AI models, templates, provider lists, and notification channels.
 
 Example backoff strategy:
 
@@ -436,7 +460,7 @@ Checklist:
 
 1. Validate required path parameters.
 2. Check date/time format. Prefer ISO-8601, for example `2026-07-22T10:00:00`.
-3. Check enum values such as `status`, `replyType`, or `scenario`.
+3. Check enum values such as `status`, `replyType`, `scenario`, or `enabled`.
 4. Avoid sending empty strings when the parameter should be omitted.
 
 ### 404 Not Found
@@ -451,7 +475,7 @@ Checklist:
 
 Checklist:
 
-1. Capture method, path, query params, sanitized request body, timestamp, and response code.
+1. Capture method, path, query params, sanitized request body, timestamp, HTTP status, and JSON `code`/`message`.
 2. Do not expose secrets in bug reports.
 3. If the API provides a request ID, include it.
 4. Ask the service owner to inspect server logs.
