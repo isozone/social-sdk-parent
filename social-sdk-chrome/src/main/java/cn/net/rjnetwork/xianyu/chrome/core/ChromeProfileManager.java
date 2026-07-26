@@ -124,12 +124,12 @@ public class ChromeProfileManager {
             }
         }
 
-        enforceProfileLimit(accountId);
-
         // 1. 派生 seed
         long seed = deriveSeed(accountId);
 
-        // 2. CDP 端口分配
+        // 2. CDP 端口分配。通常先启动新容器再回收旧容器，避免新启动失败误杀可用账号；
+        // 但端口池无备用端口时，必须先回收一个 LRU 容器释放端口，否则无法启动新容器。
+        ensurePortAvailableForLaunch(accountId);
         int port = portPool.acquirePort();
 
         // 3. 绑定代理
@@ -177,6 +177,10 @@ public class ChromeProfileManager {
 
         // 6. 启动成功后注入反检测 JS（应用 per-account seed 噪声，失败不影响启动））
         safeInjectFingerprint(profile);
+
+        // 7. 新容器确认可用后再回收超额旧容器，避免新启动失败时误杀正在工作的账号；
+        // 同时排除刚启动的账号，避免并发访问让新 profile 变成 LRU 后被立即回收。
+        enforceProfileLimit(accountId);
 
         return profile;
     }
@@ -357,11 +361,21 @@ public class ChromeProfileManager {
         enforceProfileLimit(-1L);
     }
 
+    private void ensurePortAvailableForLaunch(long incomingAccountId) {
+        if (portPool.availableCount() > 0) {
+            return;
+        }
+        Optional<ChromeProfile> victim = findLeastRecentlyUsed(incomingAccountId);
+        if (victim.isEmpty()) {
+            return;
+        }
+        log.info("[CLEANUP] CDP 端口池已满, 启动新容器前回收 LRU 容器 accountId={}", victim.get().getAccountId());
+        stopAccount(victim.get().getAccountId());
+    }
+
     private void enforceProfileLimit(long incomingAccountId) {
         int maxActive = Math.max(1, config.getMaxActiveProfiles());
-        int current = activeProfiles.size();
-        boolean beforeLaunch = incomingAccountId > 0;
-        int needToStop = beforeLaunch ? current - maxActive + 1 : current - maxActive;
+        int needToStop = activeProfiles.size() - maxActive;
         if (needToStop <= 0) {
             return;
         }
@@ -375,6 +389,12 @@ public class ChromeProfileManager {
                     profile.getAccountId(), maxActive);
             stopAccount(profile.getAccountId());
         }
+    }
+
+    private Optional<ChromeProfile> findLeastRecentlyUsed(long excludedAccountId) {
+        return activeProfiles.values().stream()
+                .filter(p -> !p.getAccountId().equals(excludedAccountId))
+                .min(Comparator.comparing(p -> p.getLastAccessAt() != null ? p.getLastAccessAt() : p.getLaunchedAt()));
     }
 
     /**

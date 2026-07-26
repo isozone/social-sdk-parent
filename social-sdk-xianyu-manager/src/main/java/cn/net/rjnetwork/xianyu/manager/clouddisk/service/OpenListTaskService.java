@@ -426,7 +426,7 @@ public class OpenListTaskService {
         });
     }
 
-    public void subscribe(SseEmitter emitter) {
+    public synchronized void subscribe(SseEmitter emitter) {
         if (emitters.size() >= MAX_SSE_EMITTERS) {
             String oldest = emitters.keys().hasMoreElements() ? emitters.keys().nextElement() : null;
             if (oldest != null) {
