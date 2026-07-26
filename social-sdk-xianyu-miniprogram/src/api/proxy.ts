@@ -1,30 +1,26 @@
 import { api } from './request'
 
-export interface ProxyStatus {
-  online: number
-  total: number
-}
-
-export interface ProxyConfig {
-  host: string
-  port: number
-  username?: string
-  password?: string
-  type: 'HTTP' | 'HTTPS' | 'SOCKS5'
-}
-
-export function getStatus() {
-  return api.get<ProxyStatus>('/api/mini/monitor/proxy/status')
-}
-
+// 后端真实端点：ProxyController /api/proxy + @GetMapping("/config")
 export function getConfig() {
-  return api.get<ProxyConfig>('/api/mini/monitor/proxy/config')
+  return api.get('/api/mini/proxy/config')
 }
 
-export function updateConfig(config: ProxyConfig) {
-  return api.put('/api/mini/monitor/proxy/config', config)
+// 后端真实端点：ProxyController /api/proxy + @PostMapping("/config")
+export function saveConfig(data: any) {
+  return api.post('/api/mini/proxy/config', data)
 }
 
-export function healthCheck(proxyId?: number | string) {
-  return api.post(`/api/mini/monitor/proxy/health-check${proxyId ? `/${proxyId}` : ''}`)
+// 后端真实端点：ProxyController /api/proxy + @GetMapping("/status")
+export function getStatus() {
+  return api.get('/api/mini/proxy/status')
+}
+
+// 后端真实端点：ProxyController /api/proxy + @PostMapping("/reload")
+export function reload() {
+  return api.post('/api/mini/proxy/reload')
+}
+
+// 后端真实端点：ProxyController /api/proxy + @GetMapping("/health-check")
+export function healthCheck() {
+  return api.get('/api/mini/proxy/health-check')
 }

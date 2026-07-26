@@ -22,13 +22,15 @@ export const useAuthStore = defineStore('auth', () => {
   } catch {}
 
   async function login(username: string, password: string) {
-    const data = await api.post('/auth/login', { username, password }, false)
-    if (data?.accessToken) {
-      token.value = data.accessToken
-      profile.value = data.user || null
-      uni.setStorageSync('aiyudb_token', data.accessToken)
-      if (data.user) {
-        uni.setStorageSync('aiyudb_profile', JSON.stringify(data.user))
+    // 后端 JwtResponse 字段：token / tokenType / expiresIn / user{id,username,displayName,roleLevel}
+    const data = await api.post('/api/mini/auth/login', { username, password }, false)
+    const jwt = data as any
+    if (jwt?.token) {
+      token.value = jwt.token
+      profile.value = jwt.user || null
+      uni.setStorageSync('aiyudb_token', jwt.token)
+      if (jwt.user) {
+        uni.setStorageSync('aiyudb_profile', JSON.stringify(jwt.user))
       }
     }
     return data
@@ -37,13 +39,13 @@ export const useAuthStore = defineStore('auth', () => {
   async function fetchProfile() {
     if (!token.value) return
     try {
-      const data = await api.get('/auth/profile', undefined, false)
+      const data = await api.get('/api/mini/auth/profile', undefined, false)
       if (data) {
         profile.value = data as AdminUser
         uni.setStorageSync('aiyudb_profile', JSON.stringify(data))
       }
-    } catch (e) {
-      console.warn('[auth] fetchProfile failed:', e)
+    } catch {
+      // profile 刷新失败不影响已持久化的登录态
     }
   }
 
@@ -57,7 +59,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function updateProfile(data: Partial<AdminUser>) {
-    const updated = await api.put('/auth/profile', data)
+    const updated = await api.put('/api/mini/auth/profile', data)
     if (updated) {
       profile.value = { ...profile.value!, ...updated }
       uni.setStorageSync('aiyudb_profile', JSON.stringify(profile.value))
@@ -65,8 +67,8 @@ export const useAuthStore = defineStore('auth', () => {
     return updated
   }
 
-  async function changePassword(oldPassword: string, newPassword: string) {
-    return api.put('/auth/password', { oldPassword, newPassword })
+  async function changePassword(newPassword: string) {
+    return api.put('/api/mini/auth/password', { newPassword })
   }
 
   return {

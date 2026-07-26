@@ -1,24 +1,11 @@
 import { api } from './request'
+import type { AdminUser, JwtResponse } from '@/types/common'
 
-export interface LoginResponse {
-  accessToken: string
-  expiresIn: number
-  user: {
-    id: number
-    username: string
-    displayName: string
-    roleLevel: number
-  }
-}
+// 对齐后端 JwtResponse：token / tokenType / expiresIn / user{id,username,displayName,roleLevel}
+export type LoginResponse = JwtResponse
 
-export interface ProfileData {
-  id: number
-  username: string
-  displayName: string
-  roleLevel: number
-  email?: string
-  phone?: string
-}
+// 对齐后端 AuthController.getProfile 返回 Map 字段 + AdminUser 实体
+export type ProfileData = AdminUser
 
 export function login(username: string, password: string) {
   return api.post<LoginResponse>('/api/mini/auth/login', { username, password }, false)
@@ -32,6 +19,6 @@ export function updateProfile(data: Partial<ProfileData>) {
   return api.put('/api/mini/auth/profile', data)
 }
 
-export function updatePassword(oldPw: string, newPw: string) {
-  return api.put('/api/mini/auth/password', { oldPassword: oldPw, newPassword: newPw })
+export function updatePassword(newPw: string) {
+  return api.put('/api/mini/auth/password', { newPassword: newPw })
 }

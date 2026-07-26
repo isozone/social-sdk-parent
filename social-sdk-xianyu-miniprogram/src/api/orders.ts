@@ -1,23 +1,27 @@
 import { api } from './request'
-import type { OrderItem, DeliveryParams, OrderStats } from '@/types/order'
 import type { PageResponse } from '@/types/common'
 
-export function getOrders(params?: any) {
-  return api.get<PageResponse<OrderItem>>('/api/mini/monitor/orders', params)
+// 后端真实端点：OrderController /api/orders
+export function getList(params?: any) {
+  return api.get<PageResponse<any>>('/api/mini/orders', params)
 }
 
-export function getOrder(id: number | string) {
-  return api.get<OrderItem>(`/api/mini/monitor/orders/${id}`)
+// 后端真实端点：OrderController /api/orders + @GetMapping("/{id}")
+export function getDetail(id: number | string) {
+  return api.get<any>(`/api/mini/orders/${id}`)
 }
 
-export function delivery(id: number | string, data: DeliveryParams) {
-  return api.post(`/api/mini/monitor/orders/${id}/delivery`, data)
+// 后端真实端点：OrderController /api/orders + @PostMapping("/accounts/{accountId}/sync")
+export function syncByAccount(accountId: number | string) {
+  return api.post(`/api/mini/orders/accounts/${accountId}/sync`)
 }
 
-export function syncOrders() {
-  return api.post('/api/mini/monitor/orders/sync')
+// 后端真实端点：OrderController /api/orders + @GetMapping("/accounts/{accountId}/debug")
+export function debugByAccount(accountId: number | string) {
+  return api.get(`/api/mini/orders/accounts/${accountId}/debug`)
 }
 
-export function getOrderStats() {
-  return api.get<OrderStats>('/api/mini/monitor/orders/stats')
+// 后端真实端点：OrderController /api/orders + @PostMapping("/{id}/delivery")
+export function delivery(id: number | string, data: any) {
+  return api.post(`/api/mini/orders/${id}/delivery`, data)
 }

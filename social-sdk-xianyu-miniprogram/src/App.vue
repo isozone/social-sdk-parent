@@ -2,9 +2,8 @@
 import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
 import { useAuthStore } from '@/store/modules/auth'
 
-onLaunch(() => {
-  console.log('[App] Launch')
-})
+onLaunch(() => {})
+
 
 onShow(() => {
   const auth = useAuthStore()
@@ -14,9 +13,7 @@ onShow(() => {
   }
 })
 
-onHide(() => {
-  console.log('[App] Hide')
-})
+onHide(() => {})
 </script>
 
 <style lang="scss">

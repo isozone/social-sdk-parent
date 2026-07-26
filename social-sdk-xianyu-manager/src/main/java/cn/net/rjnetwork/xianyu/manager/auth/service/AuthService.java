@@ -49,6 +49,8 @@ public class AuthService {
         info.setId(user.getId());
         info.setUsername(user.getUsername());
         info.setDisplayName(user.getDisplayName());
+        info.setEmail(user.getEmail());
+        info.setPhone(user.getPhone());
         info.setRoleLevel(user.getRoleLevel());
         return JwtResponse.of(token, jwtUtils.getExpiration(), info);
     }

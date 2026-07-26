@@ -1,7 +1,12 @@
 import { encryptPayload, decryptResponse } from './encrypt'
 import { useAuthStore } from '@/store/modules/auth'
 
-const BASE = ''
+// 服务器地址闭环：登录页「服务器」切换写入 aiyudb_server_base，启动时读取拼到所有请求前
+// 默认空串 = 同源（小程序与后端同域），自定义地址 = 跨域部署
+function readServerBase(): string {
+  try { return uni.getStorageSync('aiyudb_server_base') || '' } catch { return '' }
+}
+const BASE = readServerBase()
 
 function getToken(): string {
   const auth = useAuthStore()

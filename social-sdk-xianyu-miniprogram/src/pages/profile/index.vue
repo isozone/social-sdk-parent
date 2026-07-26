@@ -45,12 +45,12 @@
       <view class="modal-content" @click.stop>
         <text class="modal-title">修改密码</text>
         <view class="input-group">
-          <text class="label">原密码</text>
-          <input type="password" v-model="oldPwd" placeholder="请输入原密码" />
-        </view>
-        <view class="input-group">
           <text class="label">新密码</text>
           <input type="password" v-model="newPwd" placeholder="请输入新密码" />
+        </view>
+        <view class="input-group">
+          <text class="label">确认新密码</text>
+          <input type="password" v-model="newPwdConfirm" placeholder="请再次输入新密码" />
         </view>
         <view class="modal-actions">
           <button class="cancel-btn" @click="showPasswordModal = false">取消</button>
@@ -67,8 +67,8 @@ import { useAuthStore } from '@/store/modules/auth'
 
 const auth = useAuthStore()
 const showPasswordModal = ref(false)
-const oldPwd = ref('')
 const newPwd = ref('')
+const newPwdConfirm = ref('')
 const loading = ref(false)
 
 const profileItems = computed(() => [
@@ -84,16 +84,20 @@ async function editItem(key: string) {
 }
 
 async function changePassword() {
-  if (!oldPwd.value || !newPwd.value) {
+  if (!newPwd.value || !newPwdConfirm.value) {
     uni.showToast({ title: '请填写完整', icon: 'none' })
     return
   }
+  if (newPwd.value !== newPwdConfirm.value) {
+    uni.showToast({ title: '两次新密码不一致', icon: 'none' })
+    return
+  }
   try {
-    await auth.changePassword(oldPwd.value, newPwd.value)
+    await auth.changePassword(newPwd.value)
     uni.showToast({ title: '密码修改成功', icon: 'success' })
     showPasswordModal.value = false
-    oldPwd.value = ''
     newPwd.value = ''
+    newPwdConfirm.value = ''
   } catch (e: any) {
     uni.showToast({ title: e?.message || '修改失败', icon: 'none' })
   }

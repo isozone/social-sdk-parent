@@ -1,24 +1,16 @@
 import { api } from './request'
-import type { PageResponse } from '@/types/common'
 
-export interface CircuitBreakerItem {
-  id: number
-  target: string
-  action: string
-  count: number
-  rate: number
-  triggered: boolean
-  lastTriggeredAt?: string
+// 后端真实端点：CircuitBreakerController /api/circuit-breaker + @GetMapping("/{accountId}/{serviceName}")
+export function getStatus(accountId: number | string, serviceName: string) {
+  return api.get(`/api/mini/circuit-breaker/${accountId}/${serviceName}`)
 }
 
-export function getList(params?: any) {
-  return api.get<PageResponse<CircuitBreakerItem>>('/api/mini/monitor/circuit-breaker', params)
+// 后端真实端点：CircuitBreakerController /api/circuit-breaker + @PostMapping("/{accountId}/{serviceName}/reset")
+export function reset(accountId: number | string, serviceName: string) {
+  return api.post(`/api/mini/circuit-breaker/${accountId}/${serviceName}/reset`)
 }
 
-export function reset(id: number | string) {
-  return api.post(`/api/mini/monitor/circuit-breaker/${id}/reset`)
-}
-
-export function globalReset() {
-  return api.post('/api/mini/monitor/circuit-breaker/global-reset')
+// 后端真实端点：CircuitBreakerController /api/circuit-breaker + @PostMapping("/global/{serviceName}/reset")
+export function globalReset(serviceName: string) {
+  return api.post(`/api/mini/circuit-breaker/global/${serviceName}/reset`)
 }

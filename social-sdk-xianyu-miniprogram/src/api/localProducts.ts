@@ -1,31 +1,32 @@
 import { api } from './request'
-import type { LocalProductItem, PublishProductParams } from '@/types/product'
 import type { PageResponse } from '@/types/common'
 
-export function getLocalProducts(params?: any) {
-  return api.get<PageResponse<LocalProductItem>>('/api/mini/monitor/local-products', params)
+// 后端真实端点：LocalProductController /api/local-products
+export function getList(params?: any) {
+  return api.get<PageResponse<any>>('/api/mini/local-products', params)
 }
 
-export function getLocalProduct(id: number | string) {
-  return api.get<LocalProductItem>(`/api/mini/monitor/local-products/${id}`)
+// 后端真实端点：LocalProductController /api/local-products + @GetMapping("/{id}")
+export function getDetail(id: number | string) {
+  return api.get<any>(`/api/mini/local-products/${id}`)
 }
 
-export function createLocalProduct(data: Omit<PublishProductParams, 'categoryId'> & { categoryId?: string }) {
-  return api.post<LocalProductItem>('/api/mini/monitor/local-products', data)
+// 后端真实端点：LocalProductController /api/local-products + @PutMapping("/{id}")
+export function update(id: number | string, data: any) {
+  return api.put(`/api/mini/local-products/${id}`, data)
 }
 
-export function updateLocalProduct(id: number | string, data: Partial<LocalProductItem>) {
-  return api.put<LocalProductItem>(`/api/mini/monitor/local-products/${id}`, data)
+// 后端真实端点：LocalProductController /api/local-products + @DeleteMapping("/{id}")
+export function remove(id: number | string) {
+  return api.delete(`/api/mini/local-products/${id}`)
 }
 
-export function deleteLocalProduct(id: number | string) {
-  return api.delete(`/api/mini/monitor/local-products/${id}`)
-}
-
+// 后端真实端点：LocalProductController /api/local-products + @PostMapping("/{id}/publish")
 export function publish(id: number | string) {
-  return api.post(`/api/mini/monitor/local-products/${id}/publish`)
+  return api.post(`/api/mini/local-products/${id}/publish`)
 }
 
-export function batchPublish(ids: number[]) {
-  return api.post('/api/mini/monitor/local-products/batch-publish', { ids })
+// 后端真实端点：LocalProductController /api/local-products + @PostMapping("/batch-publish")
+export function batchPublish(data: any) {
+  return api.post('/api/mini/local-products/batch-publish', data)
 }

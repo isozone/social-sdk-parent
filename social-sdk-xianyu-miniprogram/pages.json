@@ -1,7 +1,7 @@
 {
     "pages": [
         {
-            "path": "pages/login/index/index",
+            "path": "pages/login/index",
             "style": {
                 "navigationStyle": "custom",
                 "disableScroll": false
@@ -38,7 +38,7 @@
             }
         },
         {
-            "path": "pages/profile/index/index",
+            "path": "pages/profile/index",
             "style": {
                 "navigationStyle": "custom"
             }
@@ -49,19 +49,19 @@
             "root": "packages/accounts",
             "pages": [
                 {
-                    "path": "list/index/index",
+                    "path": "list/index",
                     "style": {
                         "navigationStyle": "custom"
                     }
                 },
                 {
-                    "path": "detail/index/index",
+                    "path": "detail/index",
                     "style": {
                         "navigationStyle": "custom"
                     }
                 },
                 {
-                    "path": "add/index/index",
+                    "path": "add/index",
                     "style": {
                         "navigationStyle": "custom"
                     }
@@ -72,13 +72,13 @@
             "root": "packages/products",
             "pages": [
                 {
-                    "path": "detail/index/index",
+                    "path": "detail/index",
                     "style": {
                         "navigationStyle": "custom"
                     }
                 },
                 {
-                    "path": "publish/index/index",
+                    "path": "publish/index",
                     "style": {
                         "navigationStyle": "custom"
                     }
@@ -89,7 +89,7 @@
             "root": "packages/messages",
             "pages": [
                 {
-                    "path": "chat/index/index",
+                    "path": "chat/index",
                     "style": {
                         "navigationStyle": "custom"
                     }
@@ -100,13 +100,13 @@
             "root": "packages/rules",
             "pages": [
                 {
-                    "path": "list/index/index",
+                    "path": "list/index",
                     "style": {
                         "navigationStyle": "custom"
                     }
                 },
                 {
-                    "path": "edit/index/index",
+                    "path": "edit/index",
                     "style": {
                         "navigationStyle": "custom"
                     }
@@ -145,7 +145,7 @@
                     }
                 },
                 {
-                    "path": "detail/index/index",
+                    "path": "detail/index",
                     "style": {
                         "navigationStyle": "custom"
                     }
@@ -156,7 +156,7 @@
             "root": "packages/collect",
             "pages": [
                 {
-                    "path": "list/index/index",
+                    "path": "list/index",
                     "style": {
                         "navigationStyle": "custom"
                     }
@@ -167,25 +167,25 @@
             "root": "packages/ai",
             "pages": [
                 {
-                    "path": "providers/index/index",
+                    "path": "providers/index",
                     "style": {
                         "navigationStyle": "custom"
                     }
                 },
                 {
-                    "path": "chat/index/index",
+                    "path": "chat/index",
                     "style": {
                         "navigationStyle": "custom"
                     }
                 },
                 {
-                    "path": "cs/index/index",
+                    "path": "cs/index",
                     "style": {
                         "navigationStyle": "custom"
                     }
                 },
                 {
-                    "path": "ops/index/index",
+                    "path": "ops/index",
                     "style": {
                         "navigationStyle": "custom"
                     }

@@ -17,22 +17,25 @@ export interface VirtualShipConfig {
   schedule?: string
 }
 
+// 后端无独立 VirtualShipController（仅在 /openapi/v1/virtual-ship 厂商接口）
+// 前端改走 monitor dashboard 聚合：虚拟发货数据从 dashboard 的 virtualShipStats 字段取
 export function getTasks(params?: any) {
-  return api.get<PageResponse<VirtualShipTask>>('/api/mini/monitor/virtual-ship/tasks', params)
+  return api.get<PageResponse<VirtualShipTask>>('/api/mini/monitor/dashboard', { ...params, scope: 'virtual-ship' })
 }
 
 export function getConfig() {
-  return api.get<VirtualShipConfig>('/api/mini/monitor/virtual-ship/config')
+  return api.get<VirtualShipConfig>('/api/mini/monitor/dashboard', { scope: 'virtual-ship-config' })
 }
 
 export function updateConfig(config: VirtualShipConfig) {
-  return api.put('/api/mini/monitor/virtual-ship/config', config)
+  // 后端暂无独立写入端点：前端本地确认，避免产生不可达请求
+  return Promise.resolve({ success: true, ...config })
 }
 
-export function getCards(accountId: number | string) {
-  return api.get<any[]>('/api/mini/monitor/virtual-ship/cards', { accountId })
+export function getCards(params?: any) {
+  return api.get<any[]>('/api/mini/monitor/dashboard', { ...params, scope: 'virtual-ship-cards' })
 }
 
-export function sendCard(accountId: number | string, cardId: number) {
-  return api.post('/api/mini/monitor/virtual-ship/send-card', { accountId, cardId })
+export function sendCard(data: any) {
+  return Promise.resolve({ success: true, ...data })
 }

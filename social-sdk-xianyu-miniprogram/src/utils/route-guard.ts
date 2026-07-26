@@ -3,13 +3,40 @@
  *
  * @param token - 当前用户 token，为空时表示未登录
  */
+const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+
+function decodeBase64Url(input: string): string {
+  const normalized = input.replace(/-/g, '+').replace(/_/g, '/')
+  let buffer = 0
+  let bits = 0
+  let output = ''
+
+  for (let i = 0; i < normalized.length; i++) {
+    const ch = normalized[i]
+    if (ch === '=') break
+    const value = BASE64_CHARS.indexOf(ch)
+    if (value < 0) continue
+    buffer = (buffer << 6) | value
+    bits += 6
+    if (bits >= 8) {
+      bits -= 8
+      output += String.fromCharCode((buffer >> bits) & 0xff)
+    }
+  }
+  try {
+    return decodeURIComponent(output.split('').map(ch => `%${ch.charCodeAt(0).toString(16).padStart(2, '0')}`).join(''))
+  } catch {
+    return output
+  }
+}
+
 export function shouldNavigateToLogin(token?: string | null): boolean {
   if (!token) {
     return true
   }
   try {
     // 简单校验 token 是否看似过期：尝试解析并检查 exp
-    const payload = JSON.parse(decodeURIComponent(escape(atob(token.split('.')[1] || ''))))
+    const payload = JSON.parse(decodeBase64Url(token.split('.')[1] || ''))
     if (payload.exp && payload.exp * 1000 < Date.now()) {
       return true
     }

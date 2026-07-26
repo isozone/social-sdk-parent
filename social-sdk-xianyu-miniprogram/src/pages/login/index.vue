@@ -29,19 +29,29 @@
         </view>
 
         <view class="remember-row">
-          <label class="remember">
-            <text class="check">✓</text> 记住我
-          </label>
-          <text class="forgot" @click="$refs.forget.show()">忘记密码？</text>
+          <view class="remember" @click="remember = !remember">
+            <view class="check" :class="{ on: remember }">✓</view>
+            <text>记住我</text>
+          </view>
+          <text class="forgot" @click="showForgotTip">忘记密码？</text>
         </view>
 
         <button class="login-btn" :disabled="loading" @click="onLogin">登 录</button>
 
         <view class="divider">其他登录方式</view>
         <view class="quick-logins">
-          <view class="quick-btn" @click="uni.showToast({ title: '暂不支持', icon: 'none' })">💬</view>
-          <view class="quick-btn" @click="uni.showToast({ title: '暂不支持', icon: 'none' })">📷</view>
-          <view class="quick-btn" @click="uni.showToast({ title: '暂不支持', icon: 'none' })">📱</view>
+          <view class="quick-btn" @click="quickDemoLogin">
+            <text>🚀</text>
+            <text class="quick-label">演示账号</text>
+          </view>
+          <view class="quick-btn" @click="showServerSwitch">
+            <text>🌐</text>
+            <text class="quick-label">服务器</text>
+          </view>
+          <view class="quick-btn" @click="showAbout">
+            <text>ℹ️</text>
+            <text class="quick-label">关于</text>
+          </view>
         </view>
       </view>
     </view>
@@ -52,7 +62,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/store/modules/auth'
 
 const auth = useAuthStore()
@@ -60,6 +70,22 @@ const username = ref('')
 const password = ref('')
 const showPwd = ref(false)
 const loading = ref(false)
+const remember = ref(true)
+
+onMounted(() => {
+  // 记住登录态闭环：上次勾选「记住我」成功登录后，下次自动回填用户名
+  try {
+    const savedUser = uni.getStorageSync('aiyudb_remember_user')
+    if (savedUser) {
+      username.value = savedUser
+      remember.value = true
+    }
+    const savedServer = uni.getStorageSync('aiyudb_server_base')
+    if (savedServer) {
+      // 服务器地址闭环：上次切换的环境本轮自动生效（request.ts 启动时也会读）
+    }
+  } catch {}
+})
 
 async function onLogin() {
   if (!username.value || !password.value) {
@@ -69,6 +95,11 @@ async function onLogin() {
   loading.value = true
   try {
     await auth.login(username.value, password.value)
+    if (remember.value) {
+      uni.setStorageSync('aiyudb_remember_user', username.value)
+    } else {
+      uni.removeStorageSync('aiyudb_remember_user')
+    }
     uni.showToast({ title: '登录成功', icon: 'success' })
     setTimeout(() => {
       uni.switchTab({ url: '/pages/index/index' })
@@ -78,6 +109,79 @@ async function onLogin() {
   } finally {
     loading.value = false
   }
+}
+
+async function quickDemoLogin() {
+  // 演示账号一键登录闭环：用后端 application.yml 配置的默认 admin/admin123
+  uni.showModal({
+    title: '演示账号登录',
+    content: '将使用演示账号 admin / admin123 登录，仅用于功能体验',
+    success: async (r) => {
+      if (!r.confirm) return
+      loading.value = true
+      try {
+        username.value = 'admin'
+        password.value = 'admin123'
+        await auth.login('admin', 'admin123')
+        uni.setStorageSync('aiyudb_remember_user', 'admin')
+        uni.showToast({ title: '演示账号登录成功', icon: 'success' })
+        setTimeout(() => uni.switchTab({ url: '/pages/index/index' }), 500)
+      } catch (e: any) {
+        uni.showToast({ title: e?.message || '演示账号未配置', icon: 'none' })
+      } finally {
+        loading.value = false
+      }
+    }
+  })
+}
+
+function showServerSwitch() {
+  // 服务器地址切换闭环：支持多环境部署，写入本地存储供 request.ts 启动读取
+  const current = uni.getStorageSync('aiyudb_server_base') || '默认（同源）'
+  uni.showActionSheet({
+    itemList: ['默认（同源）', '本地开发 http://localhost:8080', '自定义地址'],
+    success: (r) => {
+      if (r.tapIndex === 2) {
+        // 自定义地址：uni 本身不支持 prompt，用 edit 给个简化方案
+        uni.showModal({
+          title: '自定义服务器地址',
+          editable: true,
+          placeholderText: 'https://your-server.com',
+          success: (m) => {
+            if (m.confirm && m.content) {
+              uni.setStorageSync('aiyudb_server_base', m.content)
+              uni.showToast({ title: '已保存，重启小程序生效', icon: 'none' })
+            }
+          }
+        })
+      } else if (r.tapIndex === 0) {
+        uni.removeStorageSync('aiyudb_server_base')
+        uni.showToast({ title: '已切回同源', icon: 'none' })
+      } else if (r.tapIndex === 1) {
+        uni.setStorageSync('aiyudb_server_base', 'http://localhost:8080')
+        uni.showToast({ title: '已切换到本地开发', icon: 'none' })
+      }
+    }
+  })
+}
+
+function showAbout() {
+  uni.showModal({
+    title: '关于 AI 鱼多宝',
+    content: '闲鱼卖家智能经营助手\n账号 · 商品 · 消息 · 订单 · 钱包 · AI 客服 · 关键词规则\nv1.0.0',
+    showCancel: false,
+    confirmText: '知道了'
+  })
+}
+
+function showForgotTip() {
+  // 管理后台无 OAuth/短信找回，闭环：提示联系管理员重置（后端去原密码校验后用户可自行改）
+  uni.showModal({
+    title: '忘记密码',
+    content: '请联系管理员重置密码，或登录后在「个人中心 → 修改密码」直接设置新密码（无需原密码）',
+    showCancel: false,
+    confirmText: '知道了'
+  })
 }
 </script>
 
@@ -278,7 +382,14 @@ input::placeholder {
   align-items: center;
   justify-content: center;
   font-size: 22rpx;
-  color: #818cf8;
+  color: transparent;
+  transition: all 0.2s;
+}
+
+.check.on {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  border-color: transparent;
+  color: #fff;
 }
 
 .forgot {
@@ -341,9 +452,11 @@ input::placeholder {
   background: rgba(255, 255, 255, 0.04);
   border: 2rpx solid rgba(255, 255, 255, 0.08);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 48rpx;
+  gap: 6rpx;
+  font-size: 40rpx;
   transition: all 0.25s;
   color: #9ca3af;
 }
@@ -353,6 +466,11 @@ input::placeholder {
   color: #f9fafb;
   transform: translateY(-6rpx);
   border-color: rgba(255, 255, 255, 0.15);
+}
+
+.quick-label {
+  font-size: 20rpx;
+  letter-spacing: 1rpx;
 }
 
 .slogan {

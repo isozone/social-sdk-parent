@@ -29,6 +29,12 @@ export const useAccountStore = defineStore('account', () => {
     }
   }
 
+  // setCurrent 别名：直接传整个 account 对象（AccountSwitcher 等组件期望此签名）
+  async function setCurrent(acc: AccountItem) {
+    current.value = acc
+    uni.setStorageSync('aiyudb_accountId', String(acc.id))
+  }
+
   async function clearAccount() {
     current.value = null
     uni.removeStorageSync('aiyudb_accountId')
@@ -44,5 +50,5 @@ export const useAccountStore = defineStore('account', () => {
     }
   }
 
-  return { current, list, loading, accountId, setAccount, clearAccount, fetchList }
+  return { current, list, loading, accountId, setAccount, setCurrent, clearAccount, fetchList }
 })

@@ -63,8 +63,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { getRule, createRule, updateRule, deleteRule, testRule } from '@/api/rules'
+import { useAccountStore } from '@/store/modules/account'
 import type { TestRuleMatchResult } from '@/types/rule'
 
+const accountStore = useAccountStore()
 const isEdit = ref(false)
 const ruleId = ref<number | null>(null)
 const form = ref({
@@ -81,13 +83,23 @@ const testResult = ref<TestRuleMatchResult | null>(null)
 
 const canSave = computed(() => form.value.keyword && form.value.replyText)
 
+function accountLabel(a: any) {
+  return a?.nickname || a?.accountName || a?.username || `账号 ${a?.id ?? ''}`
+}
+
 onMounted(async () => {
+  if (!accountStore.list.length) {
+    await accountStore.fetchList().catch(() => {})
+  }
   const pages = getCurrentPages() as any[]
   const cur = pages[pages.length - 1]?.options || {}
   if (cur.id) {
     isEdit.value = true
     ruleId.value = Number(cur.id)
     await load()
+  } else if (accountStore.current) {
+    form.value.accountId = Number(accountStore.current.id) || 0
+    form.value.accountName = accountLabel(accountStore.current)
   }
 })
 
@@ -99,13 +111,45 @@ async function load() {
       priority: String(r.priority), accountId: r.accountId, enabled: r.enabled,
     })
     form.value.accountName = (r as any).accountName || ''
+    if (!form.value.accountName && form.value.accountId) {
+      const hit = accountStore.list.find((a: any) => Number(a.id) === Number(form.value.accountId))
+      if (hit) form.value.accountName = accountLabel(hit)
+    }
   } catch (e: any) {
     uni.showToast({ title: e?.message || '加载失败', icon: 'none' })
   }
 }
 
-function pickAccount() {
-  uni.showToast({ title: '账号选择器待补', icon: 'none' })
+async function pickAccount() {
+  try {
+    if (!accountStore.list.length) {
+      await accountStore.fetchList()
+    }
+  } catch (e: any) {
+    uni.showToast({ title: e?.message || '账号列表加载失败', icon: 'none' })
+    return
+  }
+  const items = accountStore.list || []
+  if (!items.length) {
+    uni.showToast({ title: '暂无可用账号', icon: 'none' })
+    return
+  }
+  const labels = ['全部账号', ...items.map((a: any) => accountLabel(a))]
+  uni.showActionSheet({
+    itemList: labels,
+    success: async (res) => {
+      if (res.tapIndex === 0) {
+        form.value.accountId = 0
+        form.value.accountName = '全部账号'
+        return
+      }
+      const picked = items[res.tapIndex - 1]
+      if (!picked) return
+      form.value.accountId = Number(picked.id) || 0
+      form.value.accountName = accountLabel(picked)
+      await accountStore.setCurrent(picked)
+    },
+  })
 }
 
 async function runTest() {

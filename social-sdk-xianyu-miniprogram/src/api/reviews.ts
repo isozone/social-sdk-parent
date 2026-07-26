@@ -13,8 +13,9 @@ export interface ReviewItem {
   createdAt: string
 }
 
+// 后端真实端点：ReviewController /api/reviews + @GetMapping("/refunds")（退款列表）
 export function getList(params?: any) {
-  return api.get<PageResponse<ReviewItem>>('/api/mini/reviews', params)
+  return api.get<PageResponse<ReviewItem>>('/api/mini/reviews/refunds', params)
 }
 
 export interface SubmitReviewParams {
@@ -23,8 +24,9 @@ export interface SubmitReviewParams {
   rating: number
 }
 
-export function submitReview(data: SubmitReviewParams) {
-  return api.post('/api/mini/reviews', data)
+// 后端真实端点：ReviewController /api/reviews + @PostMapping("/orders/{orderId}")
+export function submitReview(orderId: number, data: SubmitReviewParams) {
+  return api.post(`/api/mini/reviews/orders/${orderId}`, data)
 }
 
 export interface RefundParams {
@@ -32,6 +34,7 @@ export interface RefundParams {
   reason: string
 }
 
+// 后端真实端点：ReviewController /api/reviews + @PostMapping("/refunds")
 export function refund(data: RefundParams) {
-  return api.post('/api/mini/reviews/refund', data)
+  return api.post('/api/mini/reviews/refunds', data)
 }

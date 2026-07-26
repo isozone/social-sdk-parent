@@ -6,14 +6,17 @@ export function getMessages() {
   return api.get<PageResponse<NotifyMessage>>('/api/mini/notify/messages')
 }
 
+// 后端真实端点：NotifyMessageController /api/notify/messages + @GetMapping("/unread-count")
 export function getUnreadCount() {
-  return api.get<UnreadCount>('/api/mini/notify/unread-count')
+  return api.get<UnreadCount>('/api/mini/notify/messages/unread-count')
 }
 
 export function markRead(id: number | string) {
-  return api.post(`/api/mini/notify/mark-read`, { id })
+  // 后端真实端点：NotifyMessageController /api/notify/messages + @PostMapping("/{id}/read")
+  return api.post(`/api/mini/notify/messages/${id}/read`)
 }
 
+// 后端真实端点：NotifyMessageController /api/notify/messages + @PostMapping("/read-all")
 export function markAllRead() {
-  return api.post('/api/mini/notify/mark-all-read')
+  return api.post('/api/mini/notify/messages/read-all')
 }

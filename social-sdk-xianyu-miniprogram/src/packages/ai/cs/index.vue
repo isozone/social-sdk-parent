@@ -48,7 +48,21 @@ const page = ref(1)
 const pageSize = 20
 const accountName = ref('')
 
-onMounted(() => reload())
+function accountLabel(a: any) {
+  return a?.nickname || a?.accountName || a?.username || `账号 ${a?.id ?? ''}`
+}
+
+onMounted(async () => {
+  if (!accountStore.list.length) {
+    await accountStore.fetchList().catch(() => {})
+  }
+  if (accountStore.current) {
+    accountName.value = accountLabel(accountStore.current)
+  } else {
+    accountName.value = '全部账号'
+  }
+  await reload()
+})
 
 async function reload() { page.value = 1; noMore.value = false; list.value = []; await load() }
 async function load() {
@@ -64,8 +78,37 @@ async function load() {
 }
 async function loadMore() { if (loadingMore.value || noMore.value) return; page.value += 1; await load() }
 
-function pickAccount() {
-  uni.showToast({ title: '账号选择器待补', icon: 'none' })
+async function pickAccount() {
+  try {
+    if (!accountStore.list.length) {
+      await accountStore.fetchList()
+    }
+  } catch (e: any) {
+    uni.showToast({ title: e?.message || '账号列表加载失败', icon: 'none' })
+    return
+  }
+  const items = accountStore.list || []
+  if (!items.length) {
+    uni.showToast({ title: '暂无可用账号', icon: 'none' })
+    return
+  }
+  const labels = ['全部账号', ...items.map((a: any) => accountLabel(a))]
+  uni.showActionSheet({
+    itemList: labels,
+    success: async (res) => {
+      if (res.tapIndex === 0) {
+        await accountStore.clearAccount()
+        accountName.value = '全部账号'
+        await reload()
+        return
+      }
+      const picked = items[res.tapIndex - 1]
+      if (!picked) return
+      await accountStore.setCurrent(picked)
+      accountName.value = accountLabel(picked)
+      await reload()
+    },
+  })
 }
 function openSession(c: any) {
   if (c.sessionId && c.accountId) {
