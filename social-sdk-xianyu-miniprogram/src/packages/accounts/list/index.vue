@@ -64,8 +64,7 @@ function goBack() { uni.navigateBack() }
 </script>
 
 <style scoped lang="scss">
-@import "@/uni.scss";
-.page-accounts { min-height: 100vh; background: $bg-page; display: flex; flex-direction: column; }
+.page-accounts { min-height: 100vh; background: #f5f5f7; display: flex; flex-direction: column; }
 .nav-bar { display: flex; align-items: center; justify-content: space-between; height: 88rpx; padding: 0 24rpx; background: rgba(255,255,255,.92); border-bottom: 1rpx solid #e5e7eb; flex-shrink: 0; }
 .nav-back { display: flex; align-items: center; gap: 8rpx; font-size: 28rpx; color: #4f46e5; font-weight: 600; }
 .nav-arrow { font-size: 36rpx; font-weight: 300; }

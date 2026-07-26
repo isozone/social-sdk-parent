@@ -9,8 +9,8 @@
 #     -e MYSQL_DATABASE=xianyu_manager \
 #     -p 3306:3306 mysql:8
 # 方言开关：触发 MysqlProvider 的 @ConditionalOnProperty(prefix="bitefu.wall", name="db-type", havingValue="mysql")。
-# 不设的话 SqliteProvider 兜底激活，把 SQLite 的 PRAGMA journal_mode=WAL 注入到 MySQL 连接里，
-# MySQL 不认 PRAGMA 就报 1064 语法错。
+# 不设的话 SqliteProvider 兜底激活，把 SQLite 初始化语句注入到 MySQL 连接里，
+# MySQL 不认 SQLite 初始化语句就报 1064 语法错。
 bitefu:
   wall:
     db-type: mysql
@@ -19,8 +19,8 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${DB_URL:jdbc:mysql://localhost:3306/xianyu_manager?characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&zeroDateTimeBehavior=CONVERT_TO_NULL}
-    username: root
-    password: root
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root}
     # 覆盖 application.yml 的 SQLite wall filter 配置：
     # 不切 db-type 的话，wall 用 SQLite 规则拦 MySQL schema 的 AUTO_INCREMENT/行内注释，
     # 导致 xianyu_account 建不出来，后续所有 FK 引它的表全炸（Failed to open referenced table）。

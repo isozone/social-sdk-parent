@@ -65,6 +65,9 @@ public class DruidConfig {
         ds.setTestOnReturn(false);
         ds.setKeepAlive(true);
 
+        String dialect = databaseProvider != null ? databaseProvider.dialect().toLowerCase() : "sqlite";
+        validateDialectMatchesUrl(dialect, url);
+
         // ===== 连接初始化 SQL（SQLite PRAGMA / MySQL/PG SET） =====
         if (databaseProvider != null) {
             String[] initSqls = databaseProvider.connectionInitSqls();
@@ -79,7 +82,6 @@ public class DruidConfig {
         // 引它的表连锁炸（Failed to open referenced table）。MySQL/PG 走网络但库是私有的，
         // 注入面与 SQLite 同源（管理后台/没外部写入），统一关 wall 只留 stat + slf4j。
         // 业务方真要 wall 时可在 application-*.yml 用 `spring.datasource.druid.filters` 覆盖。
-        String dialect = databaseProvider != null ? databaseProvider.dialect() : "sqlite";
         ds.setFilters("stat,slf4j");
 
         // ===== 连接泄漏检测 =====
@@ -94,6 +96,24 @@ public class DruidConfig {
 
         log.info("DruidDataSource initialized dialect={}, maxActive={}, url={}", dialect, maxActive, url);
         return ds;
+    }
+
+    private void validateDialectMatchesUrl(String dialect, String url) {
+        if (url == null || url.isBlank()) {
+            return;
+        }
+        String lowerUrl = url.toLowerCase();
+        boolean matched = switch (dialect) {
+            case "sqlite" -> lowerUrl.startsWith("jdbc:sqlite:");
+            case "mysql" -> lowerUrl.startsWith("jdbc:mysql:");
+            case "postgres" -> lowerUrl.startsWith("jdbc:postgresql:");
+            default -> false;
+        };
+        if (!matched) {
+            throw new IllegalStateException("Database dialect mismatch: bitefu.wall.db-type=" + dialect
+                    + " but spring.datasource.url=" + url
+                    + ". Set bitefu.wall.db-type to sqlite/mysql/postgres together with the matching JDBC URL.");
+        }
     }
 
     private void ensureSqliteDatabaseDirectory(String url) {

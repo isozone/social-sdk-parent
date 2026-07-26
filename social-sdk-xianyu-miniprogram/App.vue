@@ -2,9 +2,7 @@
 import { onLaunch, onShow, onHide } from '@dcloudio/uni-app'
 import { useAuthStore } from '@/store/modules/auth'
 
-onLaunch(() => {
-  console.log('[App] Launch')
-})
+onLaunch(() => {})
 
 onShow(() => {
   const auth = useAuthStore()
@@ -14,20 +12,16 @@ onShow(() => {
   }
 })
 
-onHide(() => {
-  console.log('[App] Hide')
-})
+onHide(() => {})
 </script>
 
 <style lang="scss">
-@import "@/uni.scss";
-
 /* ========== Base reset ========== */
 page {
-  background-color: $bg-page;
+  background-color: #f5f5f7;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 28rpx;
-  color: $text-primary;
+  color: #111827;
   box-sizing: border-box;
 }
 
@@ -60,13 +54,13 @@ button {
 }
 
 /* link */
-a, .link {
-  color: $brand-primary;
+.link {
+  color: #4f46e5;
   text-decoration: none;
 }
 
 /* selection */
 ::selection {
-  background-color: rgba($brand-primary, 0.3);
+  background-color: rgba(79, 70, 229, 0.3);
 }
 </style>

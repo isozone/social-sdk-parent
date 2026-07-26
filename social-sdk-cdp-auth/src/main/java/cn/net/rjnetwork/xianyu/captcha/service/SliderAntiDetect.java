@@ -12,9 +12,6 @@ public final class SliderAntiDetect {
 
     private SliderAntiDetect() {}
 
-    /** 完整的反检测 JS init script（无账号 seed 的兼容兜底）。 */
-    public static final String INIT_SCRIPT = buildScript(DEFAULT_SEED);
-
     /**
      * 根据账号 seed 生成反检测 JS 脚本（per-account 指纹隔离）。
      * <p>脚本会从真实 UA 判断 OS，避免 Windows UA + macOS platform/WebGL 的混合指纹。</p>
@@ -184,9 +181,6 @@ public final class SliderAntiDetect {
         };
         return renderers[(int) (noise % renderers.length)];
     }
-
-    /** 完整的反检测 JS init script — 保留为 buildScript(DEFAULT_SEED) 的别名。 */
-    public static final String INIT_SCRIPT_INLINE = INIT_SCRIPT;
 
     /**
      * 默认桌面模式启动参数：只保留必要、相对常见的参数；Docker/headless 专用参数由 ChromeSession 按 headless 模式补充。

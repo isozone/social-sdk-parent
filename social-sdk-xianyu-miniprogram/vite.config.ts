@@ -13,7 +13,7 @@ export default defineConfig({
   css: {
     preprocessorOptions: {
       scss: {
-        // 不全局注入 uni.scss，避免与 .vue 内显式 @import 重复
+        silenceDeprecations: ['legacy-js-api', 'import'],
       },
     },
   },
