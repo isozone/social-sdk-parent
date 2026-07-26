@@ -22,7 +22,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import api from '@/api'
+import { api } from '@/api/request'
 let oid = 0; const order = ref<any>({})
 onLoad((opt: any) => { oid = Number(opt.id); load() })
 async function load() { try { const r = await api.get(`/api/mini/orders/${oid}`); Object.assign(order.value, r) } catch {} }

@@ -18,7 +18,7 @@
 </template>
 <script setup lang="ts">
 import { ref } from 'vue'
-import api from '@/api'
+import { api } from '@/api/request'
 import EmptyState from '@/components/common/EmptyState.vue'
 const sessions = ref<any[]>([])
 const loading = ref(false)

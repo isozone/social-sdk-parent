@@ -30,7 +30,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import api from '@/api'
+import { api } from '@/api/request'
 
 const list = ref<any[]>([])
 const loading = ref(false)

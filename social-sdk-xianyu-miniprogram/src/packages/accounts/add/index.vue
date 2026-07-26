@@ -16,7 +16,7 @@
 </template>
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import api from '@/api'
+import { api } from '@/api/request'
 const form = ref({ accountName: '', cookieHeader: '', remark: '' })
 const canSubmit = computed(() => !!form.value.accountName && !!form.value.cookieHeader)
 async function createAccount() {

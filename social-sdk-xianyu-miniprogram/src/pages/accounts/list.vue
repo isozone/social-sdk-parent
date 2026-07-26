@@ -12,7 +12,7 @@
   </view>
 </template>
 <script setup lang="ts">
-import { ref } from 'vue'; import api from '@/api'; import EmptyState from '@/components/common/EmptyState.vue'
+import { ref } from 'vue'; import { api } from '@/api/request'; import EmptyState from '@/components/common/EmptyState.vue'
 const list = ref<any[]>([]), loading = ref(false)
 async function load() { loading.value=true; try{const r=await api.get('/api/mini/accounts',{page:1,size:50},false);if(Array.isArray(r))list.value=r;else if(r?.records)list.value=r.records}catch{}finally{loading.value=false} }
 function goAdd(){uni.navigateTo({url:'/packages/accounts/add/index'})}

@@ -410,7 +410,7 @@ public class XianyuLoginApiService {
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         mergeSetCookies(session.cookies, response);
 
-        if (resolveMh5TokenCookie(session.cookies) != null) {
+        if (!resolveMh5TokenCookie(session.cookies).isBlank()) {
             return;
         }
 
@@ -477,7 +477,7 @@ public class XianyuLoginApiService {
                 + ", bizParams=" + session.bizParams);
 
         String viewDataJson = extractViewDataJson(html);
-        if (viewDataJson == null) {
+        if (viewDataJson.isBlank()) {
             throw new RuntimeException("Parse mini_login viewData failed");
         }
 
@@ -837,7 +837,7 @@ public class XianyuLoginApiService {
     }
 
     private String userAgent() {
-        return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36";
+        return XianyuRuntimeFingerprint.USER_AGENT;
     }
 
     private QrLoginResult toPublicResult(InternalQrSession src) {

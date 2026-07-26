@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { AccountItem } from '@/types/account'
-import api from '@/api'
+import { api } from '@/api/request'
 
 export const useAccountStore = defineStore('account', () => {
   const current = ref<AccountItem | null>(null)

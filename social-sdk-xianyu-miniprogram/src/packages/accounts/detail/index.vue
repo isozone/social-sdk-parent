@@ -37,7 +37,7 @@
 </template>
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import api from '@/api'
+import { api } from '@/api/request'
 const account = ref<any>({})
 onMounted(async () => {
   const pages = getCurrentPages() as any[]

@@ -1,5 +1,4 @@
 import { encryptPayload, decryptResponse } from './encrypt'
-import { useAuthStore } from '@/store/modules/auth'
 
 // 服务器地址闭环：登录页「服务器」切换写入 aiyudb_server_base，所有请求/上传实时读取。
 // 默认空串 = 同源；自定义地址 = 跨域部署。配置一次后台基础 URL 即可贯通业务。
@@ -18,8 +17,6 @@ export function buildApiUrl(path: string): string {
 }
 
 export function getToken(): string {
-  const auth = useAuthStore()
-  if (auth.token) return auth.token
   try { return String(uni.getStorageSync('aiyudb_token') || '') } catch { return '' }
 }
 
@@ -78,8 +75,10 @@ export async function request<T = any>(cfg: ReqConfig): Promise<T> {
 
     const data = res.data as any
     if (data?.code === 401 || data?.code === '401' || res.statusCode === 401) {
-      const auth = useAuthStore()
-      auth.logout()
+      try {
+        uni.removeStorageSync('aiyudb_token')
+        uni.removeStorageSync('aiyudb_user')
+      } catch {}
       uni.redirectTo({ url: '/pages/login/index' })
       throw new Error('登录已过期，请重新登录')
     }

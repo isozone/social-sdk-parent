@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { NotifyMessage, UnreadCount } from '@/types/notify'
-import api from '@/api'
+import { api } from '@/api/request'
 
 export const useNotifyStore = defineStore('notify', () => {
   const messages = ref<NotifyMessage[]>([])

@@ -135,7 +135,7 @@ public class XianyuCaptchaService {
      */
     public CaptchaRefetchResult handleRiskControl(JsonNode response, String deviceId) {
         String punishUrl = extractPunishUrl(response);
-        if (punishUrl != null) {
+        if (punishUrl != null && !punishUrl.isBlank()) {
             CaptchaRefetchResult r = new CaptchaRefetchResult();
             r.setSuccess(false);
             r.setUrl(punishUrl);

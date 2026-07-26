@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { ProductItem, LocalProductItem, CategoryNode } from '@/types/product'
-import api from '@/api'
+import { api } from '@/api/request'
 
 export const useProductStore = defineStore('product', () => {
   const items = ref<ProductItem[]>([])

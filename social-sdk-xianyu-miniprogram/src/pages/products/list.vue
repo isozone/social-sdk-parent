@@ -38,7 +38,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import api from '@/api'
+import { api } from '@/api/request'
 import type { ProductItem } from '@/types/product'
 import SearchInput from '@/components/common/SearchInput.vue'
 import EmptyState from '@/components/common/EmptyState.vue'

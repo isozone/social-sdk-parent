@@ -37,7 +37,7 @@
 </template>
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import api from '@/api'
+import { api } from '@/api/request'
 const product = ref<any>({})
 const statusText = computed(() => ({ ON_SALE: '在售', OFF_SALE: '已下架', DRAFT: '草稿' }[product.value.status] || product.value.status))
 onMounted(async () => {

@@ -39,7 +39,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue'
-import api from '@/api'
+import { api } from '@/api/request'
 import { getSessionHistory, sendMessage } from '@/api/messages'
 
 const accountId = ref<number>(0)

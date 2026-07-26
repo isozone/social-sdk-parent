@@ -76,6 +76,7 @@ selenium/
 
 # Node.js / Frontend
 node_modules/
+node/
 .pnpm-store/
 dist/
 .nuxt/

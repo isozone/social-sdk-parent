@@ -2,7 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { AdminUser } from '@/types/common'
-import api from '@/api'
+import { api } from '@/api/request'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string>('')
