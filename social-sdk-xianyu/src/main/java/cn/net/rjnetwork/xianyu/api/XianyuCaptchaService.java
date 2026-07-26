@@ -122,12 +122,12 @@ public class XianyuCaptchaService {
      * 从风控拦截响应里提取 punish 验证 URL
      */
     public String extractPunishUrl(JsonNode response) {
-        if (response == null) return null;
+        if (response == null) return "";
         JsonNode data = response.path("data");
         if (data.has("punishUrl")) return data.get("punishUrl").asText("");
         if (data.has("verifyUrl")) return data.get("verifyUrl").asText("");
         if (data.has("captchaUrl")) return data.get("captchaUrl").asText("");
-        return null;
+        return "";
     }
 
     /**

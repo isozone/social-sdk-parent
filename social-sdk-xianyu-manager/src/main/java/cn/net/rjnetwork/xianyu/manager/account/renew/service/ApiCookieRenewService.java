@@ -20,7 +20,7 @@ import java.util.Optional;
  * <p>与 A1（浏览器刷新）形成双通道：A2 优先（不启动 Chrome 容器，省资源），
  * 失败降级到 A1。链路：</p>
  * <ol>
- *   <li>用账号当前 cookie 构造 {@link XianyuMtopApiClient}，调一次轻量 MTOP 接口
+ *   <li>用账号当前 cookie 通过代理感知工厂构造 {@link XianyuMtopApiClient}，调一次轻量 MTOP 接口
  *       （mtop.alibaba.xianyu.user.userInfo.get），触发 {@link XianyuMtopApiClient#primeTokenIfNeeded}
  *       自动剔除过期 _m_h5_tk、让服务端重下发新 token；</li>
  *   <li>调 {@link XianyuMtopApiClient#getMergedCookie} 拿到合并 Set-Cookie 后的新 cookie；</li>

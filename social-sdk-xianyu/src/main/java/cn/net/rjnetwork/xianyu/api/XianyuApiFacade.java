@@ -40,7 +40,13 @@ public class XianyuApiFacade {
     private final XianyuCaptchaService captchaService;
 
     public XianyuApiFacade(String cookie) {
-        this.apiClient = new XianyuMtopApiClient(cookie);
+        this(cookie, null, null);
+    }
+
+    public XianyuApiFacade(String cookie,
+                           cn.net.rjnetwork.xianyu.proxy.core.ProxyPoolManager proxyPoolManager,
+                           Long accountId) {
+        this.apiClient = new XianyuMtopApiClient(cookie, proxyPoolManager, accountId);
         this.loginApiService = new XianyuLoginApiService(cookie);
         this.profileApiService = new XianyuProfileApiService(apiClient);
         this.productApiService = new XianyuProductApiService(apiClient);

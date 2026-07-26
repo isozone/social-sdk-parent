@@ -508,7 +508,7 @@ public class XianyuLoginApiService {
      * 优先匹配隐藏 input，其次匹配 JS 赋值。
      */
     private String extractHtmlValue(String html, String name) {
-        if (html == null || name == null) return null;
+        if (html == null || name == null) return "";
         // 匹配 name="xxx" value="yyy"（任意顺序）
         java.util.regex.Pattern p1 = java.util.regex.Pattern.compile(
                 "name\\s*=\\s*\"" + java.util.regex.Pattern.quote(name) + "\"[^>]*value\\s*=\\s*\"([^\"]*)\"",
@@ -536,7 +536,7 @@ public class XianyuLoginApiService {
         java.util.regex.Matcher m4 = p4.matcher(html);
         if (m4.find()) return m4.group(1);
 
-        return null;
+        return "";
     }
 
     private void generateQrCode(InternalQrSession session) throws Exception {
@@ -714,12 +714,12 @@ public class XianyuLoginApiService {
     }
 
     private String resolveMh5TokenCookie(Map<String, String> cookies) {
-        if (cookies == null) return null;
+        if (cookies == null) return "";
         return firstNonBlank(cookies.get("m_h5_tk"), cookies.get("_m_h5_tk"));
     }
 
     private String extractTokenFromCookie(String tokenCookie) {
-        if (tokenCookie == null) return null;
+        if (tokenCookie == null) return "";
         int idx = tokenCookie.indexOf('_');
         return idx > 0 ? tokenCookie.substring(0, idx) : tokenCookie;
     }
@@ -775,13 +775,13 @@ public class XianyuLoginApiService {
     }
 
     private String extractViewDataJson(String html) {
-        if (html == null) return null;
+        if (html == null) return "";
         int markerIdx = html.indexOf("window.viewData");
-        if (markerIdx < 0) return null;
+        if (markerIdx < 0) return "";
         int eqIdx = html.indexOf("=", markerIdx);
-        if (eqIdx < 0) return null;
+        if (eqIdx < 0) return "";
         int startBrace = html.indexOf('{', eqIdx);
-        if (startBrace < 0) return null;
+        if (startBrace < 0) return "";
 
         int depth = 0;
         boolean inString = false;
@@ -801,7 +801,7 @@ public class XianyuLoginApiService {
                 if (depth == 0) return html.substring(startBrace, i + 1);
             }
         }
-        return null;
+        return "";
     }
 
     private String generateBase64QrImage(String content) {
@@ -824,16 +824,16 @@ public class XianyuLoginApiService {
             String base64 = Base64.getEncoder().encodeToString(baos.toByteArray());
             return "data:image/png;base64," + base64;
         } catch (Exception e) {
-            return null;
+            return "";
         }
     }
 
     private String firstNonBlank(String... values) {
-        if (values == null) return null;
+        if (values == null) return "";
         for (String v : values) {
             if (v != null && !v.trim().isEmpty()) return v;
         }
-        return null;
+        return "";
     }
 
     private String userAgent() {

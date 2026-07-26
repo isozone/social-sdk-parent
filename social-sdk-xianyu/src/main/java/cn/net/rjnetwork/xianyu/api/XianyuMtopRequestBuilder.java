@@ -206,7 +206,7 @@ public class XianyuMtopRequestBuilder {
         try {
             return MAPPER.readTree(responseBody);
         } catch (Exception e) {
-            return null;
+            throw new IllegalArgumentException("Invalid MTOP JSON response", e);
         }
     }
 
@@ -228,14 +228,14 @@ public class XianyuMtopRequestBuilder {
     }
 
     public static String getCookieValue(String cookieStr, String name) {
-        if (cookieStr == null || cookieStr.isEmpty()) return null;
+        if (cookieStr == null || cookieStr.isEmpty()) return "";
         for (String cookie : cookieStr.split(";")) {
             String[] parts = cookie.trim().split("=", 2);
             if (parts.length == 2 && parts[0].trim().equals(name)) {
                 return parts[1];
             }
         }
-        return null;
+        return "";
     }
 
     private static String md5Hex(String input) {
