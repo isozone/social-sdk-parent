@@ -49,8 +49,9 @@ public class XianyuMtopRequestBuilder {
 
     public XianyuMtopRequestBuilder(String api) {
         this.api = api;
-        this.headers.put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36");
+        this.headers.put("User-Agent", XianyuRuntimeFingerprint.USER_AGENT);
         this.headers.put("Accept", "application/json");
+        this.headers.put("Accept-Language", XianyuRuntimeFingerprint.ACCEPT_LANGUAGE);
         this.headers.put("Content-Type", "application/x-www-form-urlencoded");
     }
 

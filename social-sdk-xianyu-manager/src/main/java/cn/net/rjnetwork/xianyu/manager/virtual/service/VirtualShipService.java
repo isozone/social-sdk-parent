@@ -64,6 +64,8 @@ public class VirtualShipService {
     /** 网盘存储服务（FILE 类型发货） */
     private final CloudStorageService cloudStorageService;
     private final ApplicationEventPublisher eventPublisher;
+    @org.springframework.beans.factory.annotation.Autowired
+    private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
     /** 统一发货执行引擎：调度/补发/手动触发都收敛到 AutoShipService，避免双引擎重复发货。 */
     private AutoShipService autoShipService;
     /** self 代理，用于调用 REQUIRES_NEW 固化 MESSAGE_SENT 标记。 */
@@ -320,7 +322,7 @@ public class VirtualShipService {
         if (acc == null || acc.getCookieHeader() == null || acc.getCookieHeader().isBlank()) {
             throw new IllegalStateException("account cookie missing for dummyDelivery");
         }
-        XianyuMtopApiClient mtop = new XianyuMtopApiClient(acc.getCookieHeader());
+        XianyuMtopApiClient mtop = xianyuMtopClientFactory.create(acc);
         if (acc.getImCookieHeader() != null && !acc.getImCookieHeader().isBlank()) {
             mtop.setImCookieHeader(acc.getImCookieHeader());
         }

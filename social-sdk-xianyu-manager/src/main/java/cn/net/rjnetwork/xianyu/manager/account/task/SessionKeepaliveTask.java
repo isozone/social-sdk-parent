@@ -36,6 +36,8 @@ public class SessionKeepaliveTask {
     private static final Logger log = LoggerFactory.getLogger(SessionKeepaliveTask.class);
 
     private final AccountMapper accountMapper;
+    @org.springframework.beans.factory.annotation.Autowired
+    private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
 
     public SessionKeepaliveTask(AccountMapper accountMapper) {
         this.accountMapper = accountMapper;
@@ -53,7 +55,7 @@ public class SessionKeepaliveTask {
                     fail++;
                     continue;
                 }
-                XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(acc.getCookieHeader());
+                XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(acc);
                 XianyuProfileApiService profileApi = new XianyuProfileApiService(mtopClient);
                 JsonNode resp = profileApi.getLoginUserInfo();
                 String ret = resp != null ? resp.path("ret").toString() : "";

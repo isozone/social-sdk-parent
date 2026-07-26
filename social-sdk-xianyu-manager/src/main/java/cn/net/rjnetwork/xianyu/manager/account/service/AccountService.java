@@ -43,6 +43,9 @@ public class AccountService {
     /** 最近一次 Chrome 容器启动失败原因（accountId → error message） */
     private final Map<Long, String> chromeLaunchErrors = new ConcurrentHashMap<>();
 
+    @Autowired
+    private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
+
     public AccountService(AccountMapper accountMapper) {
         this.accountMapper = accountMapper;
     }
@@ -233,7 +236,7 @@ public class AccountService {
 
         // 获取更详细的个人信息
         try {
-            XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(cookieHeader);
+            XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(cookieHeader, account.getId());
             XianyuProfileApiService profileApi = new XianyuProfileApiService(mtopClient);
 
             JsonNode navData = profileApi.getUserPageNav();

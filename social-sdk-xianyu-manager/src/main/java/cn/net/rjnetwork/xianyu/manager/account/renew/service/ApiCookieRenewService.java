@@ -40,10 +40,14 @@ public class ApiCookieRenewService {
 
     private final AccountMapper accountMapper;
     private final CircuitBreakerService circuitBreaker;
+    private final cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
 
-    public ApiCookieRenewService(AccountMapper accountMapper, CircuitBreakerService circuitBreaker) {
+    public ApiCookieRenewService(AccountMapper accountMapper,
+                                 CircuitBreakerService circuitBreaker,
+                                 cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory) {
         this.accountMapper = accountMapper;
         this.circuitBreaker = circuitBreaker;
+        this.xianyuMtopClientFactory = xianyuMtopClientFactory;
     }
 
     /**
@@ -63,11 +67,7 @@ public class ApiCookieRenewService {
 
         try {
             // 1. 构造 MTOP client，调轻量接口触发 token 预热 + Set-Cookie 吸收
-            XianyuMtopApiClient client = new XianyuMtopApiClient(cookie);
-            // IM cookie 也并入，让 _m_h5_tk 预热走完整链路
-            if (account.getImCookieHeader() != null && !account.getImCookieHeader().isBlank()) {
-                client.setImCookieHeader(account.getImCookieHeader());
-            }
+            XianyuMtopApiClient client = xianyuMtopClientFactory.create(account);
             JsonNode resp = client.callMtop(USER_INFO_API, USER_INFO_VERSION, "{}");
             // 拿到合并 Set-Cookie 后的新 cookie
             String newCookie = client.getMergedCookie();

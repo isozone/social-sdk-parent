@@ -19,6 +19,8 @@ import java.time.LocalDateTime;
 public class AccountProfileService {
 
     private final AccountMapper accountMapper;
+    @org.springframework.beans.factory.annotation.Autowired
+    private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
 
     public AccountProfileService(AccountMapper accountMapper) {
         this.accountMapper = accountMapper;
@@ -37,7 +39,7 @@ public class AccountProfileService {
         }
 
         try {
-            XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+            XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
             XianyuProfileApiService profileApi = new XianyuProfileApiService(mtopClient);
             XianyuLoginApiService loginApi = new XianyuLoginApiService(account.getCookieHeader());
 

@@ -341,8 +341,7 @@ public class XianyuApiFacade {
         try {
             return messageApiService.sendMessage(sessionId, content, selfUserId, peerUserId);
         } catch (Exception e) {
-            System.err.println("[Facade sendMessage] " + e.getMessage());
-            return null;
+            throw new IllegalStateException("Facade sendMessage failed: " + e.getMessage(), e);
         }
     }
     public JsonNode getMessageHistory(String sessionId, String page) {
@@ -354,8 +353,7 @@ public class XianyuApiFacade {
         try {
             return messageApiService.getMessageHistory(sessionId, size);
         } catch (Exception e) {
-            System.err.println("[Facade getMessageHistory] " + e.getMessage());
-            return null;
+            throw new IllegalStateException("Facade getMessageHistory failed: " + e.getMessage(), e);
         }
     }
 

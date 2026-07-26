@@ -50,6 +50,8 @@ public class OrderSyncService {
     private final ProductMapper productMapper;
     private final VirtualShipService virtualShipService;
     private final ApplicationEventPublisher eventPublisher;
+    @org.springframework.beans.factory.annotation.Autowired
+    private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
     /** 订单状态机服务（BOT-O1）—— 可选注入避免循环依赖。 */
     private OrderStateMachineService orderStateMachineService;
 
@@ -84,7 +86,7 @@ public class OrderSyncService {
         }
 
         try {
-            XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+            XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
             XianyuOrderApiService orderApi = new XianyuOrderApiService(mtopClient);
 
             SyncResult result = new SyncResult();
@@ -121,7 +123,7 @@ public class OrderSyncService {
         }
 
         try {
-            XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+            XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
             XianyuOrderApiService orderApi = new XianyuOrderApiService(mtopClient);
 
             // bought 原始结构（第一页）

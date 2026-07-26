@@ -40,6 +40,7 @@ public class XianyuCaptchaSolver {
     private static final Logger log = LoggerFactory.getLogger(XianyuCaptchaSolver.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final AtomicLong CDP_COMMAND_ID = new AtomicLong(1L);
 
     private final CdpCaptchaConfig config;
     private static final String IM_PAGE_URL = "https://www.goofish.com/im";
@@ -55,20 +56,6 @@ public class XianyuCaptchaSolver {
         this.config = config;
     }
 
-    private volatile String effectiveCdpEndpoint;
-
-    /**
-     * 上层按账号指定 CDP 端点（per-account Chrome 容器）。
-     * <p>调用 {@link #solve(String, String)} 时传入 {@code http://127.0.0.1:<port>}，
-     * 这里把它缓存到 {@link #effectiveCdpEndpoint}，后续 {@link #getCdpHttpEndpoint()}
-     * 直接返回该值，避免落到全局单点 9222。</p>
-     */
-    public void setEffectiveCdpEndpoint(String endpoint) {
-        if (endpoint != null && !endpoint.isBlank()) {
-            this.effectiveCdpEndpoint = endpoint;
-        }
-    }
-
     private static class CdpFrameContext {
         final int contextId;
         final double offsetX;
@@ -82,20 +69,25 @@ public class XianyuCaptchaSolver {
     }
 
     public String getCdpHttpEndpoint() {
-        String cached = effectiveCdpEndpoint;
-        if (cached != null && !cached.isBlank()) return cached;
+        return resolveCdpHttpEndpoint(null);
+    }
+
+    private String resolveCdpHttpEndpoint(String accountCdpEndpoint) {
+        if (accountCdpEndpoint != null && !accountCdpEndpoint.isBlank()) {
+            return accountCdpEndpoint.trim().replaceAll("/+$", "");
+        }
         String configured = config.getCdpEndpoint();
         for (String candidate : List.of(configured, "http://127.0.0.1:9222")) {
             if (candidate == null || candidate.isBlank()) continue;
-            if (isCdpAlive(candidate)) {
-                effectiveCdpEndpoint = candidate;
-                if (!candidate.equals(configured)) {
-                    log.warn("[CDP-AUTH] configured CDP {} unavailable, fallback to {}", configured, candidate);
+            String normalized = candidate.trim().replaceAll("/+$", "");
+            if (isCdpAlive(normalized)) {
+                if (!normalized.equals(configured)) {
+                    log.warn("[CDP-AUTH] configured CDP {} unavailable, fallback to {}", configured, normalized);
                 }
-                return candidate;
+                return normalized;
             }
         }
-        return configured;
+        return configured != null ? configured.trim().replaceAll("/+$", "") : "http://127.0.0.1:9222";
     }
 
     private boolean isCdpAlive(String endpoint) {
@@ -124,7 +116,7 @@ public class XianyuCaptchaSolver {
             sendCommand(socket, "Page.enable", new LinkedHashMap<>());
             sendCommand(socket, "Runtime.enable", new LinkedHashMap<>());
             sendCommand(socket, "Network.enable", new LinkedHashMap<>());
-            installAntiDetect(socket);
+            installAntiDetect(socket, SliderAntiDetect.DEFAULT_SEED);
 
             Map<String, Object> eval = new LinkedHashMap<>();
             eval.put("expression", "JSON.stringify({url: location.href, title: document.title, width: innerWidth, height: innerHeight, dpr: devicePixelRatio})");
@@ -174,13 +166,14 @@ public class XianyuCaptchaSolver {
     }
 
     private String ensureGoofishImPageEndpoint() throws Exception {
-        String browserEndpoint = getCdpEndpointFromBrowser();
-        Map<String, Object> targets = getTargets(browserEndpoint);
+        String cdpHttpEndpoint = resolveCdpHttpEndpoint(null);
+        String browserEndpoint = getCdpEndpointFromBrowser(cdpHttpEndpoint);
+        Map<String, Object> targets = getTargets(cdpHttpEndpoint);
         String targetId = findGoofishTargetId(targets);
         if (targetId == null || targetId.isBlank()) {
-            targetId = createNewTarget(browserEndpoint, "about:blank");
+            targetId = createNewTarget(cdpHttpEndpoint, "about:blank");
         }
-        String pageEndpoint = getPageWebSocketEndpoint(targetId);
+        String pageEndpoint = getPageWebSocketEndpoint(cdpHttpEndpoint, targetId);
         boolean shouldNavigate = true;
         Object infoObj = targets.get(targetId);
         if (infoObj instanceof Map<?, ?> info) {
@@ -189,7 +182,7 @@ public class XianyuCaptchaSolver {
             shouldNavigate = !url.contains("goofish.com/im");
         }
         if (shouldNavigate) {
-            navigateToAccountPage(pageEndpoint, IM_PAGE_URL);
+            navigateToAccountPage(pageEndpoint, IM_PAGE_URL, SliderAntiDetect.DEFAULT_SEED);
             Thread.sleep(2500);
         }
         return pageEndpoint;
@@ -202,7 +195,7 @@ public class XianyuCaptchaSolver {
      * @return 验证码处理结果，包含新 cookie（x5sec 等，IM 专用）
      */
     public CaptchaResult solve(String punishUrl) {
-        return solve(punishUrl, null, null, null);
+        return solve(punishUrl, null, SliderAntiDetect.DEFAULT_SEED, null, null);
     }
 
     /**
@@ -215,7 +208,12 @@ public class XianyuCaptchaSolver {
      * @return 验证码处理结果，包含新 cookie（x5sec 等，IM 专用）
      */
     public CaptchaResult solve(String punishUrl, String accountCdpEndpoint) {
-        return solve(punishUrl, accountCdpEndpoint, null, null);
+        return solve(punishUrl, accountCdpEndpoint, SliderAntiDetect.DEFAULT_SEED, null, null);
+    }
+
+    public CaptchaResult solve(String punishUrl, String accountCdpEndpoint,
+                               String loginCookieHeader, String imCookieHeader) {
+        return solve(punishUrl, accountCdpEndpoint, SliderAntiDetect.DEFAULT_SEED, loginCookieHeader, imCookieHeader);
     }
 
     /**
@@ -238,30 +236,28 @@ public class XianyuCaptchaSolver {
      * @param imCookieHeader     IM 滑块验证 cookie（x5sec 等），与登录 cookie 合并注入
      * @return 验证码处理结果；{@link CaptchaResult#isLoginExpired()} 为 true 时表示登录态失效
      */
-    public CaptchaResult solve(String punishUrl, String accountCdpEndpoint,
+    public CaptchaResult solve(String punishUrl, String accountCdpEndpoint, long fingerprintSeed,
                                String loginCookieHeader, String imCookieHeader) {
-        if (accountCdpEndpoint != null && !accountCdpEndpoint.isBlank()) {
-            // 切换到 per-account 端点，绕过全局单点 9222
-            this.effectiveCdpEndpoint = accountCdpEndpoint;
-        }
-        log.info("[CDP-AUTH] 开始自动滑块验证, URL: {}, cdpEndpoint={}, hasLoginCookie={}, hasImCookie={}",
+        String cdpHttpEndpoint = resolveCdpHttpEndpoint(accountCdpEndpoint);
+        log.info("[CDP-AUTH] 开始自动滑块验证, URL: {}, cdpEndpoint={}, seed={}, hasLoginCookie={}, hasImCookie={}",
                 truncate(punishUrl, 200),
-                accountCdpEndpoint != null ? accountCdpEndpoint : "<global>",
+                cdpHttpEndpoint,
+                fingerprintSeed,
                 loginCookieHeader != null && !loginCookieHeader.isBlank(),
                 imCookieHeader != null && !imCookieHeader.isBlank());
 
         // 1. 获取浏览器级 CDP WebSocket，用于 Target.* 命令
         String browserEndpoint;
         try {
-            browserEndpoint = getCdpEndpointFromBrowser();
+            browserEndpoint = getCdpEndpointFromBrowser(cdpHttpEndpoint);
         } catch (Exception e) {
-            return CaptchaResult.fail("无法连接 CDP 浏览器（" + getCdpHttpEndpoint() + "）：" + describeException(e));
+            return CaptchaResult.fail("无法连接 CDP 浏览器（" + cdpHttpEndpoint + "）：" + describeException(e));
         }
 
         // 2. 获取所有页面列表
         Map<String, Object> targets;
         try {
-            targets = getTargets(browserEndpoint);
+            targets = getTargets(cdpHttpEndpoint);
         } catch (Exception e) {
             return CaptchaResult.fail("获取 CDP 目标列表失败：" + e.getMessage());
         }
@@ -278,7 +274,7 @@ public class XianyuCaptchaSolver {
                 log.info("[CDP-AUTH] 复用已有空白标签页 id={}", targetId);
             } else {
                 try {
-                    targetId = createNewTarget(browserEndpoint, "about:blank");
+                    targetId = createNewTarget(cdpHttpEndpoint, "about:blank");
                 } catch (Exception e) {
                     return CaptchaResult.fail("创建 CDP 标签页失败：" + e.getMessage());
                 }
@@ -291,14 +287,14 @@ public class XianyuCaptchaSolver {
         // 4. 获取页面级 CDP WebSocket。Page/Runtime/Input 命令必须发到 page 端点
         String cdpEndpoint;
         try {
-            cdpEndpoint = getPageWebSocketEndpoint(targetId);
+            cdpEndpoint = getPageWebSocketEndpoint(cdpHttpEndpoint, targetId);
         } catch (Exception e) {
             return CaptchaResult.fail("获取页面 CDP 端点失败：" + e.getMessage());
         }
 
         // 4a. 关闭多余空白标签页，避免出现「闲鱼窗口 + 空白窗口」两个窗口
         try {
-            closeExtraBlankTargets(browserEndpoint, targetId, targets);
+            closeExtraBlankTargets(cdpHttpEndpoint, targetId, targets);
         } catch (Exception e) {
             log.warn("[CDP-AUTH] 关闭多余空白标签页异常: {}", e.getMessage());
         }
@@ -325,7 +321,7 @@ public class XianyuCaptchaSolver {
             }
         }
         try {
-            navigateToAccountPage(cdpEndpoint, IM_PAGE_URL);
+            navigateToAccountPage(cdpEndpoint, IM_PAGE_URL, fingerprintSeed);
             Thread.sleep(5000); // 等待消息页加载、IM 初始化和验证码渲染
         } catch (Exception e) {
             return CaptchaResult.fail("导航到闲鱼消息页失败：" + e.getMessage());
@@ -1104,10 +1100,10 @@ public class XianyuCaptchaSolver {
     /**
      * 通过浏览器远程调试接口获取 CDP WebSocket 端点
      */
-    private String getCdpEndpointFromBrowser() throws Exception {
+    private String getCdpEndpointFromBrowser(String cdpHttpEndpoint) throws Exception {
         HttpClient client = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(5)).build();
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(getCdpHttpEndpoint() + "/json/version"))
+                .uri(URI.create(cdpHttpEndpoint + "/json/version"))
                 .timeout(java.time.Duration.ofSeconds(5))
                 .GET()
                 .build();
@@ -1123,10 +1119,10 @@ public class XianyuCaptchaSolver {
     /**
      * 获取页面级 CDP WebSocket 端点（用于 Page/Runtime/Input 命令）
      */
-    private String getPageWebSocketEndpoint(String targetId) throws Exception {
+    private String getPageWebSocketEndpoint(String cdpHttpEndpoint, String targetId) throws Exception {
         HttpClient client = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(5)).build();
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(getCdpHttpEndpoint() + "/json/list"))
+                .uri(URI.create(cdpHttpEndpoint + "/json/list"))
                 .timeout(java.time.Duration.ofSeconds(5))
                 .GET()
                 .build();
@@ -1202,7 +1198,7 @@ public class XianyuCaptchaSolver {
     private Map<String, Object> getTargets(String cdpEndpoint) throws Exception {
         HttpClient client = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(5)).build();
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(getCdpHttpEndpoint() + "/json/list"))
+                .uri(URI.create(cdpEndpoint + "/json/list"))
                 .timeout(java.time.Duration.ofSeconds(5))
                 .GET()
                 .build();
@@ -1272,7 +1268,7 @@ public class XianyuCaptchaSolver {
             try {
                 HttpClient client = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(5)).build();
                 HttpRequest request = HttpRequest.newBuilder()
-                        .uri(URI.create(getCdpHttpEndpoint() + "/json/close/" + id))
+                        .uri(URI.create(cdpEndpoint + "/json/close/" + id))
                         .timeout(java.time.Duration.ofSeconds(5))
                         .PUT(HttpRequest.BodyPublishers.noBody())
                         .build();
@@ -1290,7 +1286,7 @@ public class XianyuCaptchaSolver {
     private String createNewTarget(String cdpEndpoint, String url) throws Exception {
         HttpClient client = HttpClient.newBuilder().connectTimeout(java.time.Duration.ofSeconds(5)).build();
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(getCdpHttpEndpoint() + "/json/new?" + url))
+                .uri(URI.create(cdpEndpoint + "/json/new?" + url))
                 .timeout(java.time.Duration.ofSeconds(5))
                 .PUT(HttpRequest.BodyPublishers.noBody())
                 .build();
@@ -1364,13 +1360,13 @@ public class XianyuCaptchaSolver {
     /**
      * 导航到指定页面
      */
-    private void navigateToAccountPage(String cdpEndpoint, String url) throws Exception {
+    private void navigateToAccountPage(String cdpEndpoint, String url, long fingerprintSeed) throws Exception {
         Socket socket = null;
         try {
             socket = openWebSocket(cdpEndpoint);
             sendCommand(socket, "Page.enable", new LinkedHashMap<>());
             sendCommand(socket, "Network.enable", new LinkedHashMap<>());
-            installAntiDetect(socket);
+            installAntiDetect(socket, fingerprintSeed);
             Map<String, Object> params = new LinkedHashMap<>();
             params.put("url", url);
             sendCommand(socket, "Page.navigate", params);
@@ -1381,18 +1377,19 @@ public class XianyuCaptchaSolver {
         }
     }
 
-    private void installAntiDetect(Socket socket) {
+    private void installAntiDetect(Socket socket, long fingerprintSeed) {
         try {
+            String script = SliderAntiDetect.buildScript(fingerprintSeed);
             Map<String, Object> params = new LinkedHashMap<>();
-            params.put("source", SliderAntiDetect.INIT_SCRIPT);
+            params.put("source", script);
             sendCommand(socket, "Page.addScriptToEvaluateOnNewDocument", params);
 
             Map<String, Object> runtimeParams = new LinkedHashMap<>();
-            runtimeParams.put("expression", SliderAntiDetect.INIT_SCRIPT);
+            runtimeParams.put("expression", script);
             runtimeParams.put("awaitPromise", false);
             runtimeParams.put("returnByValue", true);
             sendCommand(socket, "Runtime.evaluate", runtimeParams);
-            log.info("[CDP-AUTH] 已注入滑块反检测脚本");
+            log.info("[CDP-AUTH] 已注入滑块反检测脚本, seed={}", fingerprintSeed);
         } catch (Exception e) {
             log.debug("[CDP-AUTH] 注入滑块反检测脚本失败: {}", e.getMessage());
         }
@@ -1402,7 +1399,7 @@ public class XianyuCaptchaSolver {
      * 发送 CDP 命令（带掩码的 WebSocket 帧）
      */
     private Map<String, Object> sendCommand(Socket socket, String method, Map<String, Object> params) throws Exception {
-        int id = (int) (System.currentTimeMillis() % 100000);
+        long id = CDP_COMMAND_ID.getAndIncrement();
         Map<String, Object> command = new LinkedHashMap<>();
         command.put("id", id);
         command.put("method", method);
@@ -1411,29 +1408,41 @@ public class XianyuCaptchaSolver {
         String json = MAPPER.writeValueAsString(command);
         writeFrame(socket, json);
 
-        // 读取响应
-        return readResponse(socket, id);
+        Map<String, Object> response = readResponse(socket, id, method);
+        Object error = response.get("error");
+        if (error != null) {
+            throw new IOException("CDP command failed: method=" + method + ", id=" + id + ", error=" + MAPPER.writeValueAsString(error));
+        }
+        return response;
     }
 
     /**
-     * 读取 CDP 响应（匹配 id）
+     * 读取 CDP 响应（匹配 id）。
+     * <p>超时/连接关闭/错误帧必须显式抛错，不能返回空 Map；否则上层会把 cookie 注入、导航、鼠标事件等失败误判为成功。</p>
      */
-    private Map<String, Object> readResponse(Socket socket, int expectedId) throws Exception {
+    private Map<String, Object> readResponse(Socket socket, long expectedId, String method) throws Exception {
         InputStream in = socket.getInputStream();
         byte[] buf = new byte[65536];
         ByteArrayOutputStream frameBuf = new ByteArrayOutputStream();
 
         long deadline = System.currentTimeMillis() + 10000;
         while (System.currentTimeMillis() < deadline) {
-            int n = in.read(buf);
-            if (n == -1) throw new IOException("Connection closed while reading response");
+            int n;
+            try {
+                n = in.read(buf);
+            } catch (java.net.SocketTimeoutException e) {
+                if (System.currentTimeMillis() >= deadline) break;
+                continue;
+            }
+            if (n == -1) throw new IOException("Connection closed while reading CDP response: method=" + method + ", id=" + expectedId);
             frameBuf.write(buf, 0, n);
 
-            // 尝试解析帧
             byte[] data = frameBuf.toByteArray();
             int offset = 0;
             while (data.length - offset >= 2) {
-                int opcode = data[offset] & 0x0F;
+                int frameStart = offset;
+                int firstByte = data[offset] & 0xFF;
+                int opcode = firstByte & 0x0F;
                 int secondByte = data[offset + 1] & 0xFF;
                 long payloadLen = secondByte & 0x7F;
                 offset += 2;
@@ -1452,38 +1461,70 @@ public class XianyuCaptchaSolver {
                 }
 
                 boolean masked = (secondByte & 0x80) != 0;
-                if (masked) offset += 4;
+                byte[] mask = null;
+                if (masked) {
+                    if (data.length < offset + 4) break;
+                    mask = Arrays.copyOfRange(data, offset, offset + 4);
+                    offset += 4;
+                }
 
-                if (data.length < offset + payloadLen) break;
+                if (payloadLen > Integer.MAX_VALUE) {
+                    throw new IOException("CDP frame too large: " + payloadLen);
+                }
+                if (data.length < offset + payloadLen) {
+                    offset = frameStart;
+                    break;
+                }
 
                 byte[] payload = new byte[(int) payloadLen];
                 System.arraycopy(data, offset, payload, 0, (int) payloadLen);
                 offset += (int) payloadLen;
+                if (masked && mask != null) {
+                    for (int i = 0; i < payload.length; i++) payload[i] = (byte) (payload[i] ^ mask[i % 4]);
+                }
 
-                if (opcode == 1) {
-                    String text = new String(payload, StandardCharsets.UTF_8);
+                if (opcode == 0x8) {
+                    throw new IOException("CDP websocket closed by peer: method=" + method + ", id=" + expectedId);
+                } else if (opcode == 0x9) {
+                    writePongFrame(socket, payload);
+                } else if (opcode == 0x1) {
+                    String text = new String(payload, StandardCharsets.UTF_8).trim();
                     if (text.startsWith("{")) {
-                        try {
-                            JsonNode json = MAPPER.readTree(text);
-                            if (json.has("id") && json.path("id").asInt(-1) == expectedId) {
-                                return MAPPER.convertValue(json, Map.class);
-                            }
-                        } catch (Exception e) {
-                            // 忽略非 JSON 或 id 不匹配的帧
+                        JsonNode json = MAPPER.readTree(text);
+                        if (json.has("id") && json.path("id").asLong(-1L) == expectedId) {
+                            return MAPPER.convertValue(json, Map.class);
                         }
                     }
                 }
 
-                // 移除已处理的数据
                 frameBuf.reset();
-                if (data.length > offset) {
-                    frameBuf.write(data, offset, data.length - offset);
-                }
+                if (data.length > offset) frameBuf.write(data, offset, data.length - offset);
                 data = frameBuf.toByteArray();
                 offset = 0;
             }
         }
-        return new LinkedHashMap<>();
+        throw new java.util.concurrent.TimeoutException("CDP response timeout: method=" + method + ", id=" + expectedId);
+    }
+
+    private void writePongFrame(Socket socket, byte[] payload) throws Exception {
+        byte[] maskKey = new byte[4];
+        RANDOM.nextBytes(maskKey);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.write(0x8A); // FIN + pong opcode
+        int len = payload != null ? payload.length : 0;
+        if (len < 126) {
+            out.write(0x80 | len);
+        } else if (len <= 65535) {
+            out.write(0x80 | 126);
+            out.write((len >> 8) & 0xFF);
+            out.write(len & 0xFF);
+        } else {
+            throw new IOException("Pong payload too large: " + len);
+        }
+        out.write(maskKey);
+        for (int i = 0; i < len; i++) out.write(payload[i] ^ maskKey[i % 4]);
+        socket.getOutputStream().write(out.toByteArray());
+        socket.getOutputStream().flush();
     }
 
     /**

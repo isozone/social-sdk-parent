@@ -536,34 +536,19 @@ public class ChromeSession {
                 }
             }
         } else {
-            // 内置反检测参数（与 SliderAntiDetect.LAUNCH_ARGS 对齐）
+            // 桌面默认只保留必要且常见的参数，避免 Docker/自动化参数组合暴露异常指纹。
             cmd.add("--disable-blink-features=AutomationControlled");
-            cmd.add("--no-sandbox");
-            cmd.add("--disable-dev-shm-usage");
-            cmd.add("--disable-infobars");
-            cmd.add("--disable-background-timer-throttling");
-            cmd.add("--disable-backgrounding-occluded-windows");
-            cmd.add("--disable-renderer-backgrounding");
-            cmd.add("--disable-features=IsolateOrigins,site-per-process");
-            cmd.add("--disable-site-isolation-trials");
-            cmd.add("--disable-hang-monitor");
-            cmd.add("--disable-prompt-on-repost");
-            cmd.add("--disable-sync");
-            cmd.add("--disable-default-apps");
-            cmd.add("--disable-crash-reporter");
-            cmd.add("--disable-component-extensions-with-background-pages");
-            cmd.add("--disable-features=TranslateUI");
-            cmd.add("--disable-ipc-flooding-protection");
             cmd.add("--no-first-run");
             cmd.add("--no-default-browser-check");
-            cmd.add("--enable-features=NetworkService,NetworkServiceInProcess");
             cmd.add("--force-color-profile=srgb");
-            cmd.add("--metrics-recording-only");
-            cmd.add("--mute-audio");
-            cmd.add("--disable-notifications");
-            cmd.add("--disable-popup-blocking");
-            cmd.add("--password-store=basic");
-            cmd.add("--use-mock-keychain");
+            cmd.add("--lang=zh-CN");
+        }
+
+        if (config.isHeadless()) {
+            // headless/Docker 环境才追加容器类参数，不污染本机桌面模式指纹。
+            cmd.add("--no-sandbox");
+            cmd.add("--disable-dev-shm-usage");
+            cmd.add("--disable-gpu-sandbox");
         }
 
         // 不自动打开首页

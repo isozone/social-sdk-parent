@@ -51,6 +51,8 @@ public class TokenRenewalService {
     private final CircuitBreakerService circuitBreaker;
     private final BatchJobService batchJobService;
     private final XianyuCaptchaSolver captchaSolver;
+    @org.springframework.beans.factory.annotation.Autowired
+    private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
 
     public TokenRenewalService(AccountMapper accountMapper,
                                 ImTokenCacheMapper tokenCacheMapper,
@@ -155,7 +157,7 @@ public class TokenRenewalService {
         }
         try {
             // 1. 构造 MTOP client，调 pc.login.token 拿新 token
-            XianyuMtopApiClient client = new XianyuMtopApiClient(account.getCookieHeader());
+            XianyuMtopApiClient client = xianyuMtopClientFactory.create(account);
             if (account.getImCookieHeader() != null && !account.getImCookieHeader().isBlank()) {
                 client.setImCookieHeader(account.getImCookieHeader());
             }
@@ -204,7 +206,12 @@ public class TokenRenewalService {
                 return RenewOutcome.FAILED;
             }
             // 调滑块解题（复用 XianyuCaptchaSolver，与消息同步链路同链路）
-            var result = captchaSolver.solve(punishUrl);
+            String accountCdpEndpoint = account.getCdpPort() != null && account.getCdpPort() > 0
+                    ? "http://127.0.0.1:" + account.getCdpPort()
+                    : null;
+            long seed = account.getChromeSeed() != null ? account.getChromeSeed() : account.getId();
+            var result = captchaSolver.solve(punishUrl, accountCdpEndpoint, seed,
+                    account.getCookieHeader(), account.getImCookieHeader());
             if (result != null && result.isSuccess() && result.getNewCookie() != null) {
                 // x5sec 等 IM 专用 cookie 写入账号 imCookieHeader + 本表
                 account.setImCookieHeader(result.getNewCookie());

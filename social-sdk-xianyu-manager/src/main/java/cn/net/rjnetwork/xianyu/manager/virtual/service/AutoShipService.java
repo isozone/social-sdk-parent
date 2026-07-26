@@ -74,6 +74,8 @@ public class AutoShipService {
     private final MessageService messageService;
     private final BatchJobService batchJobService;
     private final ApplicationEventPublisher eventPublisher;
+    @org.springframework.beans.factory.annotation.Autowired
+    private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
     /** self 代理，用于调用 REQUIRES_NEW 固化 MESSAGE_SENT 标记。 */
     private AutoShipService self;
 
@@ -329,7 +331,7 @@ public class AutoShipService {
         if (account.getCookieHeader() == null || account.getCookieHeader().isBlank()) {
             throw new IllegalStateException("account cookie missing for dummyDelivery");
         }
-        XianyuMtopApiClient mtop = new XianyuMtopApiClient(account.getCookieHeader());
+        XianyuMtopApiClient mtop = xianyuMtopClientFactory.create(account);
         if (account.getImCookieHeader() != null && !account.getImCookieHeader().isBlank()) {
             mtop.setImCookieHeader(account.getImCookieHeader());
         }

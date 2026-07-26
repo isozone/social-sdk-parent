@@ -34,9 +34,7 @@ public class XianyuMtopApiClient {
     private static final String APP_KEY = "34839810";
     private static final String REFERER = "https://www.goofish.com/";
     private static final String ORIGIN = "https://www.goofish.com";
-    private static final String USER_AGENT =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                    + "(KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36";
+    private static final String USER_AGENT = XianyuRuntimeFingerprint.USER_AGENT;
 
     private String cookie;
     private boolean tokenPrimed = false;
@@ -79,6 +77,7 @@ public class XianyuMtopApiClient {
         this.accountId = accountId;
         this.baseHeaders.put("User-Agent", USER_AGENT);
         this.baseHeaders.put("Accept", "application/json");
+        this.baseHeaders.put("Accept-Language", XianyuRuntimeFingerprint.ACCEPT_LANGUAGE);
         this.baseHeaders.put("Content-Type", "application/x-www-form-urlencoded");
         this.baseHeaders.put("Referer", REFERER);
         this.baseHeaders.put("Origin", ORIGIN);
@@ -192,15 +191,16 @@ public class XianyuMtopApiClient {
                     .header("Origin", ORIGIN)
                     .header("Referer", REFERER)
                     .header("User-Agent", USER_AGENT)
-                    .header("Cookie", cookie != null ? cookie : "")
+                    .header("Accept-Language", XianyuRuntimeFingerprint.ACCEPT_LANGUAGE)
+                    .header("Cookie", getMergedCookie())
                     .POST(HttpRequest.BodyPublishers.ofByteArray(body));
 
             HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
             this.cookie = mergeCookieFromResponse(cookie, response);
             return MAPPER.readTree(response.body());
         } catch (Exception e) {
-            System.err.println("[MTOP uploadMultipart Error] " + e.getMessage());
-            return null;
+            lastErrorResponse = "Upload Error: " + e.getMessage();
+            throw new IllegalStateException("MTOP uploadMultipart failed: " + e.getMessage(), e);
         }
     }
 
@@ -254,8 +254,8 @@ public class XianyuMtopApiClient {
             }
             return resp;
         } catch (Exception e) {
-            System.err.println("[MTOP callMtop Error] api=" + api + ", err=" + e.getMessage());
-            return null;
+            lastErrorResponse = "CallMtop Error: api=" + api + ", err=" + e.getMessage();
+            throw new IllegalStateException("MTOP call failed: api=" + api + ", err=" + e.getMessage(), e);
         }
     }
 
@@ -310,8 +310,7 @@ public class XianyuMtopApiClient {
             }
 
             lastErrorResponse = "Error: " + e.getMessage();
-            System.err.println("[MTOP " + method + " Error] " + e.getMessage());
-            return null;
+            throw new IllegalStateException("MTOP " + method + " failed: " + e.getMessage(), e);
         }
     }
 
@@ -469,6 +468,18 @@ public class XianyuMtopApiClient {
 
     public String getCookie() {
         return cookie;
+    }
+
+    public cn.net.rjnetwork.xianyu.proxy.core.ProxyPoolManager getProxyPoolManager() {
+        return proxyPoolManager;
+    }
+
+    public Long getAccountId() {
+        return accountId;
+    }
+
+    public String getUserAgent() {
+        return USER_AGENT;
     }
 
     public void updateCookie(String newCookie) {

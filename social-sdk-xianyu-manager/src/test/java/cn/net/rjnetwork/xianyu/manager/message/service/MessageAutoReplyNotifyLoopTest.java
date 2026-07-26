@@ -27,7 +27,7 @@ import static org.mockito.Mockito.*;
  * 消息自动回复 → 站内/站外通知事件闭环验证。
  */
 @ExtendWith(MockitoExtension.class)
-class MessageAutoReplyNotifyLoopTest {
+class MessageAutoReplyNotifyLoopSpec {
 
     @Mock private MessageMapper messageMapper;
     @Mock private RuleService ruleService;

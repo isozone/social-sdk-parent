@@ -26,6 +26,8 @@ public class SellerProfileService {
 
     private final SellerProfileMapper mapper;
     private final AccountMapper accountMapper;
+    @org.springframework.beans.factory.annotation.Autowired
+    private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
 
     public SellerProfileService(SellerProfileMapper mapper, AccountMapper accountMapper) {
         this.mapper = mapper;
@@ -49,7 +51,7 @@ public class SellerProfileService {
 
         XianyuAccount account = accounts.get(0);
         try {
-            XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+            XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
             XianyuProfileApiService profileApi = new XianyuProfileApiService(mtopClient);
 
             // 用 getUserPageHead 获取卖家信息（传 userId）

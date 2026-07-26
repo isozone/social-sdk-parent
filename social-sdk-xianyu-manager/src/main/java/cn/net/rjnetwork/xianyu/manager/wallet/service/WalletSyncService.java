@@ -44,6 +44,8 @@ public class WalletSyncService {
     private final WalletMapper walletMapper;
     private final WalletTransactionMapper transactionMapper;
     private final ApplicationEventPublisher eventPublisher;
+    @org.springframework.beans.factory.annotation.Autowired
+    private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
 
     public WalletSyncService(AccountMapper accountMapper, WalletMapper walletMapper,
                              WalletTransactionMapper transactionMapper,
@@ -73,7 +75,7 @@ public class WalletSyncService {
         }
 
         try {
-            XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+            XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
             XianyuWalletApiService walletApi = new XianyuWalletApiService(mtopClient);
 
             // 1) 余额
@@ -132,7 +134,7 @@ public class WalletSyncService {
             return debug;
         }
         try {
-            XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+            XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
             XianyuWalletApiService walletApi = new XianyuWalletApiService(mtopClient);
             JsonNode bal = walletApi.getBalance();
             JsonNode bills = walletApi.getBillList("1", "50");
@@ -157,7 +159,7 @@ public class WalletSyncService {
         XianyuAccount account = accountMapper.selectById(accountId);
         if (account == null || account.getCookieHeader() == null) return null;
         try {
-            XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+            XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
             return mtopClient.callMtop(api, version, "{}");
         } catch (Exception e) {
             return null;

@@ -31,6 +31,8 @@ public class MarketKeywordService {
     private final AccountMapper accountMapper;
     private final PriceHistoryService priceHistoryService;
     private final cn.net.rjnetwork.xianyu.manager.market.mapper.MarketSnapshotMapper snapshotMapper;
+    @org.springframework.beans.factory.annotation.Autowired
+    private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
 
     public MarketKeywordService(MarketKeywordMapper keywordMapper,
                                 AccountMapper accountMapper,
@@ -154,7 +156,7 @@ public class MarketKeywordService {
 
         XianyuAccount account = accounts.get(0);
         try {
-            XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+            XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
             XianyuProductApiService productApi = new XianyuProductApiService(mtopClient);
 
             // 激活搜索

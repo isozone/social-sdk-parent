@@ -59,6 +59,8 @@ public class MessageService {
     private final AuditService auditService;
     /** 风控暂停保护（BOT-A6）—— 识别风控码后暂停账号 + 写 risk_log。可选注入避免循环依赖。 */
     private RiskControlProtector riskControlProtector;
+    @org.springframework.beans.factory.annotation.Autowired
+    private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
 
     public MessageService(MessageMapper messageMapper, RuleService ruleService,
                           ApplicationEventPublisher eventPublisher, AccountMapper accountMapper,
@@ -261,7 +263,7 @@ public class MessageService {
     }
 
     private boolean pullMessagesLocked(XianyuAccount acc, boolean allowCaptcha) throws Exception {
-        XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(acc.getCookieHeader());
+        XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(acc);
         // 传递 IM/滑块验证 cookie（x5sec 等），与登录 cookie 合并用于 IM 连接
         if (acc.getImCookieHeader() != null && !acc.getImCookieHeader().isBlank()) {
             mtopClient.setImCookieHeader(acc.getImCookieHeader());
@@ -361,7 +363,7 @@ public class MessageService {
 
     /** 通过 IM 长连接拉取指定会话或全量历史 */
     private boolean pullHistoryInternal(XianyuAccount acc, String targetCid, int limit, boolean allowCaptcha) throws Exception {
-        XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(acc.getCookieHeader());
+        XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(acc);
         if (acc.getImCookieHeader() != null && !acc.getImCookieHeader().isBlank()) {
             mtopClient.setImCookieHeader(acc.getImCookieHeader());
         }
@@ -509,7 +511,7 @@ public class MessageService {
             // 把账号登录 cookie + IM cookie 一并传给 solver，让它在导航到 goofish.com/im 之前
             // 通过 CDP Network.setCookies 注入到 Chrome 容器，解决空白 profile 没登录态的问题。
             cn.net.rjnetwork.xianyu.captcha.model.CaptchaResult result = captchaSolver.solve(
-                    url, accountCdpEndpoint, acc.getCookieHeader(), acc.getImCookieHeader());
+                    url, accountCdpEndpoint, resolveChromeSeed(acc), acc.getCookieHeader(), acc.getImCookieHeader());
 
             // 登录态失效：注入登录 cookie 后 IM 页仍跳到登录页，说明账号登录 cookie 已过期。
             // 此时滑块过了也进不了消息页，推送 ACCOUNT_COOKIE_EXPIRED 通知，让用户在网页端重新登录。
@@ -580,7 +582,7 @@ public class MessageService {
             publishCaptchaRequired(acc, url, rawError);
             String accountCdpEndpoint = ensureAccountCdpEndpoint(acc);
             cn.net.rjnetwork.xianyu.captcha.model.CaptchaResult result = captchaSolver.solve(
-                    url, accountCdpEndpoint, acc.getCookieHeader(), acc.getImCookieHeader());
+                    url, accountCdpEndpoint, resolveChromeSeed(acc), acc.getCookieHeader(), acc.getImCookieHeader());
 
             // 登录态失效：推送 ACCOUNT_COOKIE_EXPIRED 通知，sendMessage 上层不再重试
             if (result.isLoginExpired()) {
@@ -703,6 +705,12 @@ public class MessageService {
         String endpoint = "http://127.0.0.1:" + acc.getCdpPort();
         log.info("[MESSAGE] launched Chrome container for account {}, cdpEndpoint={}", accountId, endpoint);
         return endpoint;
+    }
+
+    private long resolveChromeSeed(XianyuAccount acc) {
+        if (acc.getChromeSeed() != null) return acc.getChromeSeed();
+        long accountId = acc.getId() != null ? acc.getId() : 0L;
+        return accountId == 0L ? cn.net.rjnetwork.xianyu.captcha.service.SliderAntiDetect.DEFAULT_SEED : accountId;
     }
 
     /**
@@ -1247,7 +1255,7 @@ public class MessageService {
             // 这是根治「自己的消息不显示在右侧」的关键 —— 不依赖 cookie 解析，直接问闲鱼我是谁
             if (cookie != null && !cookie.isBlank()) {
                 try {
-                    XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(cookie);
+                    XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(cookie, accountId);
                     XianyuProfileApiService profileApi = new XianyuProfileApiService(mtopClient);
                     JsonNode loginInfo = profileApi.getLoginUserInfo();
                     if (loginInfo != null) {
@@ -1380,7 +1388,7 @@ public class MessageService {
             throw new IllegalStateException("无法确定对方 userId，请先同步该会话消息，或提供 buyerId");
         }
 
-        XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(acc.getCookieHeader());
+        XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(acc);
         // IM/滑块 cookie（x5sec）与登录 cookie 合并，用于 IM 连接与 MTOP 风控后重试
         if (acc.getImCookieHeader() != null && !acc.getImCookieHeader().isBlank()) {
             mtopClient.setImCookieHeader(acc.getImCookieHeader());
@@ -1416,7 +1424,7 @@ public class MessageService {
                             + truncate(msg, 300), ie);
                 }
                 // 滑块通过：用新 cookie 重建 mtopClient / msgApi，下一轮重试发送
-                mtopClient = new XianyuMtopApiClient(acc.getCookieHeader());
+                mtopClient = xianyuMtopClientFactory.create(acc);
                 mtopClient.setImCookieHeader(acc.getImCookieHeader());
                 msgApi = new XianyuMessageApiService(mtopClient);
             }

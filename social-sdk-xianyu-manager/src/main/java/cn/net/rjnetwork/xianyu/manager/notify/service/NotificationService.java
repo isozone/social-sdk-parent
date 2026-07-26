@@ -193,6 +193,8 @@ public class NotificationService {
             msg.setIsRead(false);
             msg.setCreatedAt(LocalDateTime.now());
             messageMapper.insert(msg);
+            logger.info("[NotifyLoop] IN_APP_SAVED scenario={} accountId={} title={}",
+                    event.getScenario(), event.getAccountId(), title);
         } catch (Exception e) {
             logger.error("保存站内通知失败", e);
         }
@@ -277,6 +279,8 @@ public class NotificationService {
             log.setCreatedAt(LocalDateTime.now());
             log.setSentAt(status.equals("SENT") ? LocalDateTime.now() : null);
             logMapper.insert(log);
+            logger.info("[NotifyLoop] DELIVERY_LOG_WRITTEN scenario={} channelId={} channelType={} status={} recipient={}",
+                    event.getScenario(), channel.getId(), channel.getType(), status, log.getRecipient());
         } catch (Exception ignored) {}
     }
 }

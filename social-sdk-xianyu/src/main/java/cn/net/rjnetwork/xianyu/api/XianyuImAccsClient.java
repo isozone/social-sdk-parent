@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -33,7 +35,7 @@ import javax.net.ssl.SSLSocketFactory;
  * <p>设计要点：</p>
  * <ul>
  *   <li>纯 Socket 实现，不依赖 Netty（避免 Netty WebSocket 编解码与 HTTP Upgrade 事件竞态问题）</li>
- *   <li>SSL/TLS 直连，不走 JVM 代理</li>
+ *   <li>优先复用 MTOP 账号绑定代理，代理不存在时才直连</li>
  *   <li>手工实现 WebSocket 握手（GET / HTTP/1.1 Upgrade）和文本帧收发</li>
  *   <li>自动重连：断线后重拉 token + 重连 WSS</li>
  *   <li>服务端推送帧异步回调业务监听器</li>
@@ -46,7 +48,8 @@ public class XianyuImAccsClient {
     private static final String WSS_HOST = "wss-goofish.dingtalk.com";
     private static final int WSS_PORT = 443;
     private static final String APP_KEY = "444e9908a51d1cb236a27862abc769c9";
-    private static final String UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36 DingTalk(2.1.5) OS(Windows/10) Browser(Chrome/146.0.0.0) DingWeb/2.1.5 IMPaaS DingWeb/2.1.5";
+    private static final String UA = XianyuRuntimeFingerprint.IM_USER_AGENT;
+    private static final int CONNECT_TIMEOUT_MS = 30_000;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final XianyuMtopApiClient apiClient;
@@ -67,7 +70,7 @@ public class XianyuImAccsClient {
     }
 
     /**
-     * 建立 WSS 长连接：MTOP 拿 token → TLS 直连 → WebSocket 08 升级 → 发送 /reg 注册。
+     * 建立 WSS 长连接：MTOP 拿 token → 账号代理/直连 TLS → WebSocket 08 升级 → 发送 /reg 注册。
      *
      * @throws Exception 连接失败或帧超时
      */
@@ -97,12 +100,11 @@ public class XianyuImAccsClient {
         this.accessToken = fetchedToken;
         System.err.println("[IM-WSS] got accessToken len=" + fetchedToken.length());
 
-        // 2. TLS 直连
-        SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-        socket = (SSLSocket) factory.createSocket(WSS_HOST, WSS_PORT);
+        // 2. TLS 连接：优先复用 MTOP 账号绑定代理，确保 Chrome / MTOP / IM WSS 出口一致。
+        socket = createTlsSocket();
         socket.setSoTimeout(0); // 设置框架读取超时，而非 socket timeout
         socket.setEnabledCipherSuites(socket.getSupportedCipherSuites());
-        ((javax.net.ssl.SSLSocket) socket).startHandshake();
+        socket.startHandshake();
         System.err.println("[IM-WSS] TLS handshake complete");
 
         // 3. WebSocket 08 升级握手
@@ -120,6 +122,62 @@ public class XianyuImAccsClient {
         try { Thread.sleep(3000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
 
         System.err.println("[IM-WSS] wss connected, /reg and sync initialized");
+    }
+
+    private SSLSocket createTlsSocket() throws Exception {
+        cn.net.rjnetwork.xianyu.proxy.config.ProxyInfo proxy = null;
+        if (apiClient.getProxyPoolManager() != null && apiClient.getAccountId() != null) {
+            proxy = apiClient.getProxyPoolManager().findBoundProxy(apiClient.getAccountId()).orElse(null);
+        }
+
+        SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+        if (proxy == null || proxy.isDirect() || proxy.getHost() == null || proxy.getHost().isBlank()) {
+            Socket tcp = new Socket();
+            tcp.connect(new InetSocketAddress(WSS_HOST, WSS_PORT), CONNECT_TIMEOUT_MS);
+            return (SSLSocket) factory.createSocket(tcp, WSS_HOST, WSS_PORT, true);
+        }
+
+        Socket tunnel = new Socket();
+        tunnel.connect(new InetSocketAddress(proxy.getHost(), proxy.getPort()), CONNECT_TIMEOUT_MS);
+        tunnel.setSoTimeout(CONNECT_TIMEOUT_MS);
+        establishHttpConnectTunnel(tunnel, proxy);
+        return (SSLSocket) factory.createSocket(tunnel, WSS_HOST, WSS_PORT, true);
+    }
+
+    private void establishHttpConnectTunnel(Socket tunnel, cn.net.rjnetwork.xianyu.proxy.config.ProxyInfo proxy) throws Exception {
+        StringBuilder req = new StringBuilder();
+        req.append("CONNECT ").append(WSS_HOST).append(':').append(WSS_PORT).append(" HTTP/1.1\r\n");
+        req.append("Host: ").append(WSS_HOST).append(':').append(WSS_PORT).append("\r\n");
+        req.append("Proxy-Connection: Keep-Alive\r\n");
+        if (proxy.getUsername() != null && !proxy.getUsername().isBlank()) {
+            String auth = proxy.getUsername() + ":" + (proxy.getPassword() != null ? proxy.getPassword() : "");
+            req.append("Proxy-Authorization: Basic ")
+                    .append(Base64.getEncoder().encodeToString(auth.getBytes(StandardCharsets.UTF_8)))
+                    .append("\r\n");
+        }
+        req.append("\r\n");
+        OutputStream out = tunnel.getOutputStream();
+        out.write(req.toString().getBytes(StandardCharsets.UTF_8));
+        out.flush();
+
+        InputStream in = tunnel.getInputStream();
+        byte[] buf = new byte[4096];
+        ByteArrayOutputStream headerBuf = new ByteArrayOutputStream();
+        while (headerBuf.size() < 8192) {
+            int n = in.read(buf);
+            if (n == -1) throw new java.io.IOException("Proxy CONNECT closed");
+            headerBuf.write(buf, 0, n);
+            byte[] all = headerBuf.toByteArray();
+            int end = findHeaderEnd(all);
+            if (end >= 0) {
+                String resp = new String(all, 0, end, StandardCharsets.UTF_8);
+                if (!resp.startsWith("HTTP/1.1 200") && !resp.startsWith("HTTP/1.0 200")) {
+                    throw new java.io.IOException("Proxy CONNECT failed: " + truncate(resp, 300));
+                }
+                return;
+            }
+        }
+        throw new java.io.IOException("Proxy CONNECT header too large");
     }
 
     /**
@@ -140,6 +198,7 @@ public class XianyuImAccsClient {
                 "Sec-WebSocket-Version: 13\r\n" +
                 "Origin: https://www.goofish.com\r\n" +
                 "User-Agent: " + UA + "\r\n" +
+                "Accept-Language: " + XianyuRuntimeFingerprint.ACCEPT_LANGUAGE + "\r\n" +
                 "Cookie: " + apiClient.getMergedCookie() + "\r\n" +
                 "\r\n";
 
@@ -236,9 +295,8 @@ public class XianyuImAccsClient {
             int offset = 0;
             int opcode = buf[offset] & 0x0F;
 
-            // 只处理文本帧（opcode=1）和关闭帧（opcode=8）
-            if (opcode != 1 && opcode != 8) {
-                // 二进制帧或非帧数据忽略
+            // 处理文本帧、关闭帧、ping/pong 控制帧；未知 opcode 只丢弃当前帧，不清空后续缓冲。
+            if (opcode != 1 && opcode != 8 && opcode != 9 && opcode != 10) {
                 fragmentBuffer.reset();
                 return;
             }
@@ -286,10 +344,19 @@ public class XianyuImAccsClient {
                 fragmentBuffer.write(buf, offset + payload.length, buf.length - offset - payload.length);
             }
 
-            // 处理帧
+            // 处理控制帧
             if (opcode == 8) {
                 System.err.println("[IM-WSS] server sent close frame");
+                closeQuietly();
+                connected = false;
                 return;
+            }
+            if (opcode == 9) {
+                try { writeControlFrame(0x8A, payload); } catch (Exception e) { System.err.println("[IM-WSS] pong failed: " + e.getMessage()); }
+                continue;
+            }
+            if (opcode == 10) {
+                continue;
             }
 
             // 文本帧处理
@@ -496,6 +563,22 @@ public class XianyuImAccsClient {
     public void sendRawFrame(String json) throws Exception {
         ensureConnected();
         writeFrame(json);
+    }
+
+    private void writeControlFrame(int firstByte, byte[] payload) throws Exception {
+        byte[] data = payload != null ? payload : new byte[0];
+        if (data.length > 125) throw new IllegalArgumentException("WebSocket control frame payload too large");
+        byte[] maskKey = new byte[4];
+        RANDOM.nextBytes(maskKey);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.write(firstByte);
+        out.write(0x80 | data.length);
+        out.write(maskKey);
+        for (int i = 0; i < data.length; i++) {
+            out.write(data[i] ^ maskKey[i % 4]);
+        }
+        socket.getOutputStream().write(out.toByteArray());
+        socket.getOutputStream().flush();
     }
 
     /**

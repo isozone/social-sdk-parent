@@ -35,7 +35,7 @@ import static org.mockito.Mockito.*;
  * NotifyEvent → 站内收件箱 + 站内广播 + 站外通道发送 + 投递日志。
  */
 @ExtendWith(MockitoExtension.class)
-class NotificationServiceTest {
+class NotificationServiceLoopSpec {
 
     @Mock private NotifyChannelMapper channelMapper;
     @Mock private NotifyTemplateMapper templateMapper;

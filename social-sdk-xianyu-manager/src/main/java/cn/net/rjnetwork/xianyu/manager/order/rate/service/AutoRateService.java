@@ -55,6 +55,8 @@ public class AutoRateService {
     private final ScheduledRateLogMapper logMapper;
     private final CircuitBreakerService circuitBreaker;
     private final BatchJobService batchJobService;
+    @org.springframework.beans.factory.annotation.Autowired
+    private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
 
     public AutoRateService(OrderMapper orderMapper,
                            AccountMapper accountMapper,
@@ -156,7 +158,7 @@ public class AutoRateService {
         String rateLevel = Optional.ofNullable(config.getRateLevel()).orElse("GOOD");
         String feedback = renderFeedback(config, order, account);
         try {
-            XianyuMtopApiClient apiClient = new XianyuMtopApiClient(account.getCookieHeader());
+            XianyuMtopApiClient apiClient = xianyuMtopClientFactory.create(account);
             if (account.getImCookieHeader() != null && !account.getImCookieHeader().isBlank()) {
                 apiClient.setImCookieHeader(account.getImCookieHeader());
             }

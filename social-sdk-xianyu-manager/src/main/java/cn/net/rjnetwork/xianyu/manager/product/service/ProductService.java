@@ -41,6 +41,8 @@ public class ProductService {
     private final ProductMapper productMapper;
     private final AccountService accountService;
     private final SyncProgressService syncProgressService;
+    @org.springframework.beans.factory.annotation.Autowired
+    private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
 
     @Value("${file.upload-dir:./data/uploads}")
     private String uploadDir;
@@ -157,7 +159,7 @@ public class ProductService {
         productMapper.insert(product);
 
         // 3. 构造 SDK：MtopApiClient + PublishApiService
-        XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+        XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
         XianyuPublishApiService publishApi = new XianyuPublishApiService(mtopClient);
 
         // 4. 步骤 A：AI 推荐分类（title + 图片信息；图片信息从本地 images URL 拼不出闲鱼 CDN 的 url/height/width，传空让 AI 只按标题推荐）
@@ -327,7 +329,7 @@ public class ProductService {
         XianyuAccount account = accountService.getById(accountId);
         if (account == null || account.getCookieHeader() == null || account.getCookieHeader().isBlank()) return;
 
-        XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+        XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
         XianyuProductApiService productApi = new XianyuProductApiService(mtopClient);
 
         try {
@@ -537,7 +539,7 @@ public class ProductService {
             if (account != null && account.getCookieHeader() != null && !account.getCookieHeader().isBlank()) {
                 String itemId = product.getItemId();
                 if (itemId != null && !itemId.isBlank()) {
-                    XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+                    XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
                     XianyuProductEditApiService editApi = new XianyuProductEditApiService(mtopClient);
                     JsonNode resp = editApi.deleteProduct(itemId);
                     // 闲鱼删除失败不阻塞本地删除（只 warn），否则用户无法清理本地脏数据
@@ -571,7 +573,7 @@ public class ProductService {
         if (account.getCookieHeader() == null || account.getCookieHeader().isBlank()) {
             throw new IllegalStateException("Account has no cookie, please re-login: " + accountId);
         }
-        XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+        XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
         XianyuPublishFormApiService formApi = new XianyuPublishFormApiService(mtopClient);
         return formApi.getCategoryTree("1");
     }
@@ -605,7 +607,7 @@ public class ProductService {
         }
 
         // 真打闲鱼上架接口
-        XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+        XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
         XianyuProductEditApiService editApi = new XianyuProductEditApiService(mtopClient);
         JsonNode resp = editApi.shelfOn(itemId);
         if (!isMtopSuccess(resp)) {
@@ -638,7 +640,7 @@ public class ProductService {
             throw new IllegalStateException("Product has no itemId, can not call Xianyu shelf-off API");
         }
 
-        XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+        XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
         XianyuProductEditApiService editApi = new XianyuProductEditApiService(mtopClient);
         JsonNode resp = editApi.shelfOff(itemId);
         if (!isMtopSuccess(resp)) {
@@ -704,7 +706,7 @@ public class ProductService {
         }
 
         // 2. 构造 SDK（三参数构造函数，支持改价改库存）
-        XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+        XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
         XianyuProductApiService productApi = new XianyuProductApiService(mtopClient);
         XianyuPublishApiService publishApi = new XianyuPublishApiService(mtopClient);
         XianyuProductEditApiService editApi = new XianyuProductEditApiService(mtopClient, productApi, publishApi);
@@ -769,7 +771,7 @@ public class ProductService {
         }
 
         // 2. 构造 SDK（三参数构造函数，支持改价改库存）
-        XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+        XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
         XianyuProductApiService productApi = new XianyuProductApiService(mtopClient);
         XianyuPublishApiService publishApi = new XianyuPublishApiService(mtopClient);
         XianyuProductEditApiService editApi = new XianyuProductEditApiService(mtopClient, productApi, publishApi);
@@ -841,7 +843,7 @@ public class ProductService {
             throw new IllegalStateException("Account has no cookie, please re-login: " + accountId);
         }
 
-        XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+        XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
         XianyuProductApiService productApi = new XianyuProductApiService(mtopClient);
         List<JsonNode> cards = fetchAllProductCards(productApi, pageSize, null);
         List<XianyuProduct> toUpsert = collectFromDetail(accountId, productApi, cards, null, cards.size());
@@ -894,7 +896,7 @@ public class ProductService {
                 return;
             }
 
-            XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+            XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
             XianyuProductApiService productApi = new XianyuProductApiService(mtopClient);
             List<JsonNode> cards = fetchAllProductCards(productApi, 20, syncId);
             if (cards.isEmpty()) {

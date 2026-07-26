@@ -43,6 +43,8 @@ public class MonitorTaskRunner {
     private final PriceHistoryService priceHistoryService;
     private final MarketSnapshotMapper snapshotMapper;
     private final AiChatService aiChatService;
+    @org.springframework.beans.factory.annotation.Autowired
+    private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
 
     public MonitorTaskRunner(MonitorTaskMapper taskMapper, MonitorResultMapper resultMapper,
                               AccountMapper accountMapper, CircuitBreakerService circuitBreaker,
@@ -75,7 +77,7 @@ public class MonitorTaskRunner {
         }
 
         try {
-            XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(account.getCookieHeader());
+            XianyuMtopApiClient mtopClient = xianyuMtopClientFactory.create(account);
             XianyuProductApiService productApi = new XianyuProductApiService(mtopClient);
 
             // 1. 激活搜索
