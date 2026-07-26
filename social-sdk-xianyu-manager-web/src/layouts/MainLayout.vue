@@ -18,6 +18,45 @@
         text-color="var(--text-2)"
         active-text-color="#fff"
       >
+        <template v-if="isCommunityWorkspace">
+          <el-menu-item index="/app/community/home">
+            <span class="menu-icon-box"><el-icon><Connection /></el-icon></span>
+            <span>社区首页</span>
+          </el-menu-item>
+          <el-menu-item index="/app/community/profile">
+            <span class="menu-icon-box"><el-icon><User /></el-icon></span>
+            <span>我的身份</span>
+          </el-menu-item>
+          <el-menu-item index="/app/community/benefits">
+            <span class="menu-icon-box"><el-icon><Medal /></el-icon></span>
+            <span>我的权益</span>
+          </el-menu-item>
+          <el-menu-item index="/app/community/bindings">
+            <span class="menu-icon-box"><el-icon><Link /></el-icon></span>
+            <span>账户绑定</span>
+          </el-menu-item>
+          <el-menu-item index="/app/community/orders">
+            <span class="menu-icon-box"><el-icon><Money /></el-icon></span>
+            <span>支付订单</span>
+          </el-menu-item>
+          <el-menu-item index="/app/community/announcements">
+            <span class="menu-icon-box"><el-icon><Bell /></el-icon></span>
+            <span>社区公告</span>
+          </el-menu-item>
+          <el-menu-item index="/app/community/resources">
+            <span class="menu-icon-box"><el-icon><Document /></el-icon></span>
+            <span>资源中心</span>
+          </el-menu-item>
+          <el-menu-item index="/app/community/support">
+            <span class="menu-icon-box"><el-icon><Service /></el-icon></span>
+            <span>工单支持</span>
+          </el-menu-item>
+          <el-menu-item index="/app/dashboard">
+            <span class="menu-icon-box"><el-icon><Back /></el-icon></span>
+            <span>返回运营管理</span>
+          </el-menu-item>
+        </template>
+        <template v-else>
         <el-menu-item index="/app/dashboard">
           <span class="menu-icon-box"><el-icon><DataAnalysis /></el-icon></span>
           <span>仪表盘</span>
@@ -149,6 +188,7 @@
             <span>个人中心</span>
           </el-menu-item>
         </el-menu-item-group>
+        </template>
       </el-menu>
     </el-aside>
 
@@ -180,6 +220,26 @@
               <el-icon :size="18"><Bell /></el-icon>
             </el-button>
           </el-badge>
+          <el-dropdown v-if="vipHeader.state === 'active' || vipHeader.state === 'expired'" @command="handleCommunityCommand">
+            <el-button class="vip-entry active" round>
+              <el-icon><Connection /></el-icon>
+              {{ vipHeader.label || 'I 社区' }}
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="enter">进入 I 社区</el-dropdown-item>
+                <el-dropdown-item command="profile">我的身份</el-dropdown-item>
+                <el-dropdown-item command="benefits">我的权益</el-dropdown-item>
+                <el-dropdown-item command="bindings">账户绑定</el-dropdown-item>
+                <el-dropdown-item command="orders">支付订单</el-dropdown-item>
+                <el-dropdown-item divided command="renew">续费升级</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+          <el-button v-else class="vip-entry" round @click="openVipDialog">
+            <el-icon><Lock /></el-icon>
+            {{ vipHeader.label || '解锁 VIP' }}
+          </el-button>
           <el-dropdown @command="handleCommand">
             <span class="user-info">
               <span class="avatar">{{ (authStore.user?.displayName || '管').charAt(0) }}</span>
@@ -250,6 +310,49 @@
           <div class="inbox-meta">{{ scenarioLabel(m.scenario) }} · {{ m.createdAt }}</div>
         </div>
       </el-drawer>
+
+      <!-- VIP 解锁弹窗 -->
+      <el-dialog v-model="vipDialogVisible" title="解锁 I 社区 VIP" width="760px" class="vip-dialog">
+        <div class="vip-hero">
+          <div>
+            <h3>开通后获得唯一 I 社区身份</h3>
+            <p>支付成功后由 new-api 按真实支付渠道分配 ALIX / WXX / UX 前缀账户，并解锁专业版能力。</p>
+          </div>
+          <el-tag type="warning" size="large">{{ vipHeader.state === 'pending_payment' ? '待支付' : '未解锁' }}</el-tag>
+        </div>
+        <div class="vip-benefits">
+          <div v-for="benefit in vipBenefits" :key="benefit" class="vip-benefit">✓ {{ benefit }}</div>
+        </div>
+        <el-divider content-position="left">选择套餐</el-divider>
+        <div class="vip-plans">
+          <div
+            v-for="plan in vipPlans"
+            :key="plan.id"
+            class="vip-plan"
+            :class="{ selected: selectedPlan?.id === plan.id }"
+            @click="selectedPlan = plan"
+          >
+            <div class="vip-plan-title">{{ plan.name }}</div>
+            <div class="vip-plan-price">¥{{ formatCents(plan.price_cents) }}</div>
+            <div class="vip-plan-tag">{{ plan.discount_tag || `${plan.duration_days || '-'} 天` }}</div>
+          </div>
+        </div>
+        <el-divider content-position="left">支付方式</el-divider>
+        <el-radio-group v-model="selectedChannel" class="vip-channels">
+          <el-radio-button v-for="ch in vipChannels" :key="ch.code" :label="ch.code">
+            {{ ch.name }} · {{ ch.uid_prefix }}
+          </el-radio-button>
+        </el-radio-group>
+        <div v-if="currentPayInfo" class="pay-info-box">
+          <div class="pay-info-title">支付信息</div>
+          <pre>{{ currentPayInfo }}</pre>
+          <el-button v-if="currentLocalOrderNo" :loading="vipPolling" type="primary" @click="pollVipOrder">我已支付，刷新状态</el-button>
+        </div>
+        <template #footer>
+          <el-button @click="vipDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="vipLoading" @click="submitVipOrder">确认支付解锁</el-button>
+        </template>
+      </el-dialog>
 
       <!-- 浏览器配置抽屉 -->
       <el-drawer
@@ -429,10 +532,11 @@ import {
   Promotion, UploadFilled, Monitor, Document, Bell, UserFilled, ArrowDown, FullScreen,
   Medal, Connection, Service, Sunrise, Switch, Timer, Setting, Compass,
   Search, Download, Check, InfoFilled, Warning, Lock, SwitchButton,
-  Refresh, Avatar, ChatLineSquare
+  Refresh, Avatar, ChatLineSquare, Link, Back
 } from '@element-plus/icons-vue'
 import * as notify from '@/api/notification'
 import { getChromeConfig, detectChrome, saveChromeConfig, downloadChrome, validateChromePath } from '@/api/chrome'
+import { getVipHeaderStatus, getVipConfig, createVipOrder, getVipOrder } from '@/api/vip'
 
 const route = useRoute()
 const router = useRouter()
@@ -516,11 +620,110 @@ const titleMap = {
   '/app/profile': '个人中心'
 }
 
-const currentBreadcrumb = computed(() => breadcrumbMap[route.path] || ['管理后台'])
-const headerIconComponent = computed(() => headerIconMap[route.path] || 'Document')
-const currentTitle = computed(() => titleMap[route.path] || '管理后台')
+const isCommunityWorkspace = computed(() => route.path.startsWith('/app/community'))
+const currentBreadcrumb = computed(() => {
+  if (isCommunityWorkspace.value) return ['I 社区', titleMap[route.path] || '社区工作区']
+  return breadcrumbMap[route.path] || ['管理后台']
+})
+const headerIconComponent = computed(() => isCommunityWorkspace.value ? 'Connection' : (headerIconMap[route.path] || 'Document'))
+const currentTitle = computed(() => isCommunityWorkspace.value ? 'I 社区' : (titleMap[route.path] || '管理后台'))
 
 function openDataBoard() { window.open('/data-board', '_blank') }
+
+// ===== VIP / I 社区 =====
+const vipHeader = ref({ state: 'locked', label: '解锁 VIP', vipLevel: 'free' })
+const vipDialogVisible = ref(false)
+const vipLoading = ref(false)
+const vipPolling = ref(false)
+const vipPlans = ref([])
+const vipChannels = ref([])
+const selectedPlan = ref(null)
+const selectedChannel = ref('wechat')
+const currentLocalOrderNo = ref('')
+const currentPayInfo = ref('')
+const vipBenefits = [
+  '管理更多闲鱼账号，解锁多账号托管',
+  '使用 AI 自动回复、AI 客服和高级规则',
+  '创建批量运营任务，查看高级数据看板',
+  '获得带支付渠道前缀的唯一 I 社区 ID',
+  '进入 I 社区获取公告、教程、资源和工单支持'
+]
+
+async function loadVipHeader() {
+  try {
+    const res = await getVipHeaderStatus()
+    if (res.success && res.data) vipHeader.value = res.data
+  } catch (e) {}
+}
+
+async function openVipDialog() {
+  vipDialogVisible.value = true
+  currentPayInfo.value = ''
+  try {
+    const res = await getVipConfig()
+    if (res.success && res.data) {
+      vipPlans.value = res.data.plans || []
+      vipChannels.value = (res.data.channels || []).filter(ch => ch.enabled !== false)
+      selectedPlan.value = vipPlans.value[0] || null
+      selectedChannel.value = vipChannels.value[0]?.code || 'wechat'
+    }
+  } catch (e) {
+    ElMessage.error('加载 VIP 配置失败：' + (e.message || e))
+  }
+}
+
+function handleCommunityCommand(cmd) {
+  if (cmd === 'renew') openVipDialog()
+  else if (cmd === 'enter') router.push('/app/community/home')
+  else router.push(`/app/community/${cmd}`)
+}
+
+function formatCents(cents) {
+  const n = Number(cents || 0)
+  return (n / 100).toFixed(2)
+}
+
+async function submitVipOrder() {
+  if (!selectedPlan.value) { ElMessage.warning('请选择套餐'); return }
+  vipLoading.value = true
+  try {
+    const res = await createVipOrder({ planId: selectedPlan.value.id, channel: selectedChannel.value })
+    if (res.success && res.data) {
+      currentLocalOrderNo.value = res.data.local_order_no
+      currentPayInfo.value = JSON.stringify(res.data.pay_info || res.data, null, 2)
+      ElMessage.success('订单已创建，请按支付信息完成付款')
+    } else {
+      ElMessage.error(res.message || '创建订单失败')
+    }
+  } catch (e) {
+    ElMessage.error('创建订单失败：' + (e.message || e))
+  } finally {
+    vipLoading.value = false
+  }
+}
+
+async function pollVipOrder() {
+  if (!currentLocalOrderNo.value) return
+  vipPolling.value = true
+  try {
+    const res = await getVipOrder(currentLocalOrderNo.value)
+    if (res.success && res.data) {
+      currentPayInfo.value = JSON.stringify(res.data, null, 2)
+      if (res.data.status === 'paid' && res.data.entitlement) {
+        ElMessage.success('VIP 解锁成功，欢迎进入 I 社区')
+        vipDialogVisible.value = false
+        await loadVipHeader()
+        router.push('/app/community/home')
+      } else {
+        ElMessage.info('订单尚未完成，请稍后刷新')
+      }
+    }
+  } catch (e) {
+    ElMessage.error('刷新订单失败：' + (e.message || e))
+  } finally {
+    vipPolling.value = false
+  }
+}
 
 function handleCommand(cmd) {
   if (cmd === 'profile') router.push('/app/profile')
@@ -591,7 +794,7 @@ async function readAll() {
 }
 
 let pollTimer = null
-onMounted(() => { loadScenarios(); loadUnread(); pollTimer = setInterval(loadUnread, 30000) })
+onMounted(() => { loadScenarios(); loadUnread(); loadVipHeader(); pollTimer = setInterval(() => { loadUnread(); loadVipHeader() }, 30000) })
 onUnmounted(() => { if (pollTimer) clearInterval(pollTimer) })
 
 // ===== 浏览器配置 =====
@@ -772,6 +975,42 @@ async function handleBrowserReset() {
 .header-right .el-button:hover { color: var(--brand); }
 .bell-badge { margin-right: 2px; }
 .bell-badge :deep(.el-button) { color: var(--text-2); }
+.vip-entry {
+  border: 0;
+  color: #fff !important;
+  font-weight: 700;
+  background: linear-gradient(135deg, #f97316, #ef4444);
+  box-shadow: 0 8px 18px rgba(239, 68, 68, 0.22);
+}
+.vip-entry:hover { color: #fff !important; transform: translateY(-1px); }
+.vip-entry.active {
+  background: linear-gradient(135deg, #4f46e5, #06b6d4);
+  box-shadow: 0 8px 18px rgba(79, 70, 229, 0.22);
+}
+.vip-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fff7ed, #eef2ff);
+  margin-bottom: 14px;
+}
+.vip-hero h3 { margin: 0 0 8px; font-size: 20px; color: #111827; }
+.vip-hero p { margin: 0; color: #6b7280; line-height: 1.6; }
+.vip-benefits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.vip-benefit { padding: 10px 12px; border-radius: 10px; background: #f8fafc; color: #374151; font-size: 13px; }
+.vip-plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.vip-plan { border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px; cursor: pointer; transition: all .2s; background: #fff; }
+.vip-plan:hover, .vip-plan.selected { border-color: #4f46e5; box-shadow: 0 10px 24px rgba(79, 70, 229, .12); transform: translateY(-1px); }
+.vip-plan-title { font-weight: 700; color: #111827; }
+.vip-plan-price { font-size: 22px; font-weight: 800; color: #ef4444; margin: 8px 0 4px; }
+.vip-plan-tag { font-size: 12px; color: #6b7280; }
+.vip-channels { margin-bottom: 14px; }
+.pay-info-box { border: 1px solid #e5e7eb; background: #0f172a; color: #e5e7eb; border-radius: 12px; padding: 12px; }
+.pay-info-title { font-weight: 700; margin-bottom: 8px; color: #fff; }
+.pay-info-box pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; max-height: 180px; overflow: auto; }
 
 /* 用户头像下拉 */
 .user-info {

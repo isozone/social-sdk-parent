@@ -201,6 +201,12 @@ const routes = [
         meta: { title: '个人中心' }
       },
       {
+        path: 'community/:section?',
+        name: 'Community',
+        component: () => import('@/views/community/Index.vue'),
+        meta: { title: 'I 社区' }
+      },
+      {
         path: 'logs/cookies-refresh',
         name: 'CookiesRefreshLogs',
         component: () => import('@/views/logs/cookiesRefresh/Index.vue'),

@@ -166,6 +166,7 @@ public class DatabaseInitializer {
             ensureAdminUserColumns();
             ensureAiCsSessionStateColumns();
             ensureAutoReplyLogTable();
+            ensureVipTables();
             // ===== B9 批次日志框架：batch_job / batch_job_item 旧库补建 =====
             ensureBatchTables();
 
@@ -611,6 +612,39 @@ public class DatabaseInitializer {
             }
         } catch (Exception e) {
             logger.warn("ensureAutoReplyLogTable skipped: {}", e.getMessage());
+        }
+    }
+
+    private void ensureVipTables() {
+        try (java.sql.Connection conn = dataSource.getConnection(); java.sql.Statement st = conn.createStatement()) {
+            String d = dialect();
+            String idPk = "postgres".equals(d) ? "BIGSERIAL PRIMARY KEY" : "mysql".equals(d) ? "BIGINT AUTO_INCREMENT PRIMARY KEY" : "INTEGER PRIMARY KEY AUTOINCREMENT";
+            String timeDdl = "mysql".equals(d) || "postgres".equals(d) ? "TIMESTAMP" : "DATETIME";
+            String boolDdl = "mysql".equals(d) ? "TINYINT(1)" : "BOOLEAN";
+            st.execute("CREATE TABLE IF NOT EXISTS sdk_deployment ("
+                    + "id " + idPk + ", deployment_id VARCHAR(128) NOT NULL UNIQUE, install_time " + timeDdl + ", server_url VARCHAR(512), "
+                    + "created_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, updated_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, deleted INTEGER DEFAULT 0)");
+            st.execute("CREATE TABLE IF NOT EXISTS community_user_binding ("
+                    + "id " + idPk + ", local_user_id BIGINT NOT NULL, deployment_id VARCHAR(128) NOT NULL, community_user_id BIGINT, community_uid VARCHAR(64), "
+                    + "bind_id VARCHAR(128), bind_token VARCHAR(512), new_api_base_url VARCHAR(512), status VARCHAR(32), initial_pay_channel VARCHAR(32), initial_channel_prefix VARCHAR(16), "
+                    + "wechat_bound " + boolDdl + " DEFAULT FALSE, email_bound " + boolDdl + " DEFAULT FALSE, last_sync_at " + timeDdl + ", "
+                    + "created_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, updated_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, deleted INTEGER DEFAULT 0)");
+            st.execute("CREATE TABLE IF NOT EXISTS vip_subscription ("
+                    + "id " + idPk + ", local_user_id BIGINT NOT NULL, deployment_id VARCHAR(128) NOT NULL, community_user_id BIGINT, community_uid VARCHAR(64), "
+                    + "license_id VARCHAR(128), plan_code VARCHAR(64), vip_level VARCHAR(32), features_json TEXT, limits_json TEXT, started_at " + timeDdl + ", expired_at " + timeDdl + ", "
+                    + "status VARCHAR(32), source_order_no VARCHAR(128), signature TEXT, last_verified_at " + timeDdl + ", "
+                    + "created_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, updated_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, deleted INTEGER DEFAULT 0)");
+            st.execute("CREATE TABLE IF NOT EXISTS vip_order ("
+                    + "id " + idPk + ", local_user_id BIGINT NOT NULL, deployment_id VARCHAR(128) NOT NULL, community_user_id BIGINT, community_uid VARCHAR(64), "
+                    + "local_order_no VARCHAR(128) NOT NULL UNIQUE, new_api_order_no VARCHAR(128), plan_id VARCHAR(64), plan_code VARCHAR(64), plan_name VARCHAR(128), pay_channel VARCHAR(32), "
+                    + "pay_amount DECIMAL(12,2), currency VARCHAR(16), status VARCHAR(32), pay_info_json TEXT, entitlement_json TEXT, paid_at " + timeDdl + ", "
+                    + "created_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, updated_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, deleted INTEGER DEFAULT 0)");
+            st.execute("CREATE INDEX IF NOT EXISTS idx_community_user_binding_local ON community_user_binding(local_user_id, deployment_id)");
+            st.execute("CREATE INDEX IF NOT EXISTS idx_vip_subscription_local ON vip_subscription(local_user_id, deployment_id)");
+            st.execute("CREATE INDEX IF NOT EXISTS idx_vip_order_local ON vip_order(local_user_id, local_order_no)");
+            logger.info("VIP tables ensured");
+        } catch (Exception e) {
+            logger.warn("ensureVipTables skipped: {}", e.getMessage());
         }
     }
 

@@ -112,6 +112,15 @@ jwt:
   secret: ${XIANYU_JWT_SECRET:defaultSecretKeyForDevelopmentOnlyChangeInProduction}
   expiration: 86400000 # 24 hours in milliseconds
 
+# VIP / I 社区客户端配置
+vip:
+  community:
+    base-url: ${NEW_API_COMMUNITY_BASE_URL:http://127.0.0.1:3000}
+    app-id: ${NEW_API_COMMUNITY_APP_ID:social-sdk}
+    secret: ${NEW_API_COMMUNITY_SECRET:}
+    connect-timeout-seconds: ${NEW_API_COMMUNITY_CONNECT_TIMEOUT_SECONDS:5}
+    request-timeout-seconds: ${NEW_API_COMMUNITY_REQUEST_TIMEOUT_SECONDS:15}
+
 # Cookie Encryption Key (AES-256)
 crypto:
   secret: ${XIANYU_CRYPTO_SECRET:defaultCryptoSecretKeyForDevelopmentOnly}
