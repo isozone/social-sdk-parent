@@ -45,7 +45,8 @@ public class ChromePortPool {
         lock.lock();
         try {
             int clearIdx = portBits.nextClearBit(0);
-            if (clearIdx >= portBits.size()) {
+            int capacity = totalCapacity();
+            if (clearIdx >= capacity) {
                 throw ChromeException.noAvailablePort();
             }
             int port = rangeStart + clearIdx;
@@ -66,7 +67,7 @@ public class ChromePortPool {
         lock.lock();
         try {
             int idx = port - rangeStart;
-            if (idx < 0 || idx >= portBits.size()) {
+            if (idx < 0 || idx >= totalCapacity()) {
                 log.warn("[PORT_POOL] 释放端口超出范围: {}", port);
                 return;
             }
@@ -89,7 +90,7 @@ public class ChromePortPool {
         lock.lock();
         try {
             int idx = port - rangeStart;
-            if (idx < 0 || idx >= portBits.size()) {
+            if (idx < 0 || idx >= totalCapacity()) {
                 throw new IllegalArgumentException("端口超出管理范围: " + port);
             }
             if (portBits.get(idx)) {
@@ -109,7 +110,8 @@ public class ChromePortPool {
     public int availableCount() {
         lock.lock();
         try {
-            return portBits.size() - portBits.cardinality();
+            int capacity = totalCapacity();
+            return capacity - portBits.get(0, capacity).cardinality();
         } finally {
             lock.unlock();
         }
@@ -134,7 +136,7 @@ public class ChromePortPool {
         lock.lock();
         try {
             int idx = port - rangeStart;
-            return idx >= 0 && idx < portBits.size() && portBits.get(idx);
+            return idx >= 0 && idx < totalCapacity() && portBits.get(idx);
         } finally {
             lock.unlock();
         }
