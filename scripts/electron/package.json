@@ -7,9 +7,11 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "build:mac": "../build.sh mac",
-    "build:win": "../build.sh win",
-    "build:all": "../build.sh all"
+    "build:mac": "./build.sh mac",
+    "build:mas": "ELECTRON_DISTRIBUTION=mas electron-builder --mac mas",
+    "build:win": "./build.sh win",
+    "build:all": "./build.sh all",
+    "check": "node --check main.js && node --check preload.js && find src -name '*.js' -print0 | xargs -0 -n1 node --check"
   },
   "dependencies": {
     "electron-store": "^8.2.0",
@@ -30,28 +32,42 @@
       "main.js",
       "preload.js",
       "renderer/**/*",
-      "icons/**/*"
+      "icons/**/*",
+      "src/**/*",
+      "entitlements/**/*"
     ],
     "extraResources": [
       {
         "from": "../../social-sdk-xianyu-manager/target/",
         "to": "app/",
         "filter": ["*.jar"]
+      },
+      {
+        "from": "resources/jre/",
+        "to": "jre/",
+        "filter": ["**/*"]
       }
     ],
     "mac": {
       "category": "public.app-category.productivity",
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "icon": "icons/icon.icns"
+      "target": ["dmg", "zip"],
+      "icon": "icons/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "entitlements/mac.plist",
+      "entitlementsInherit": "entitlements/mac.inherit.plist"
+    },
+    "mas": {
+      "type": "distribution",
+      "category": "public.app-category.productivity",
+      "target": ["mas"],
+      "icon": "icons/icon.icns",
+      "entitlements": "entitlements/mas.plist",
+      "entitlementsInherit": "entitlements/mas.inherit.plist",
+      "provisioningProfile": "embedded.provisionprofile"
     },
     "win": {
-      "target": [
-        "nsis",
-        "portable"
-      ],
+      "target": ["nsis", "portable"],
       "icon": "icons/icon.ico"
     },
     "nsis": {

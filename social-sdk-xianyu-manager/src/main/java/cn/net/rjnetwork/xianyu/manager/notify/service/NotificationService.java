@@ -111,10 +111,18 @@ public class NotificationService {
         saveInApp(event, title, body);
         // 站内实时广播（前端若接 STOMP 即可即时收到）
         try {
-            broadcaster.broadcastAll(mapper.writeValueAsString(Map.of(
-                    "type", "notification", "scenario", event.getScenario(),
-                    "title", title, "body", body, "accountId", event.getAccountId())));
-        } catch (Exception ignored) {}
+            Map<String, Object> broadcastPayload = new LinkedHashMap<>();
+            broadcastPayload.put("type", "notification");
+            broadcastPayload.put("scenario", event.getScenario());
+            broadcastPayload.put("title", title);
+            broadcastPayload.put("body", body);
+            broadcastPayload.put("accountId", event.getAccountId());
+            broadcaster.broadcastAll(mapper.writeValueAsString(broadcastPayload));
+            logger.info("[NotifyLoop] IN_APP_BROADCAST scenario={} accountId={}", event.getScenario(), event.getAccountId());
+        } catch (Exception e) {
+            logger.warn("[NotifyLoop] IN_APP_BROADCAST_FAILED scenario={} accountId={} error={}",
+                    event.getScenario(), event.getAccountId(), e.getMessage());
+        }
 
         // 按订阅规则分发外部通道
         List<NotifySubscription> subs = subscriptionMapper.selectList(
@@ -122,7 +130,8 @@ public class NotificationService {
                         .eq(NotifySubscription::getScenario, event.getScenario())
                         .eq(NotifySubscription::getEnabled, true));
         if (subs.isEmpty()) {
-            logger.debug("场景 {} 无启用订阅，仅站内通知", event.getScenario());
+            logger.info("[NotifyLoop] EXTERNAL_SKIPPED_NO_SUBSCRIPTION scenario={} accountId={}",
+                    event.getScenario(), event.getAccountId());
             return;
         }
 
@@ -159,10 +168,15 @@ public class NotificationService {
                 if (adapter == null) {
                     throw new IllegalStateException("无对应通道适配器： " + channel.getType());
                 }
+                logger.info("[NotifyLoop] EXTERNAL_SEND_START scenario={} channelId={} channelType={} channelName={} recipients={}",
+                        event.getScenario(), channel.getId(), channel.getType(), channel.getName(), recipients);
                 adapter.send(channel, title, body, recipients, event.getVars());
                 writeLog(event, channel, recipients, "SENT", null);
+                logger.info("[NotifyLoop] EXTERNAL_SENT scenario={} channelId={} channelType={} channelName={} recipients={}",
+                        event.getScenario(), channel.getId(), channel.getType(), channel.getName(), recipients);
             } catch (Exception e) {
-                logger.error("通知发送失败 scenario={} channel={}", event.getScenario(), channel.getName(), e);
+                logger.warn("[NotifyLoop] EXTERNAL_FAILED scenario={} channelId={} channelType={} channelName={} error={}",
+                        event.getScenario(), channel.getId(), channel.getType(), channel.getName(), e.getMessage(), e);
                 writeLog(event, channel, recipients, "FAILED", e.getMessage());
                 retryService.enqueue(event, channel, recipients, title, body, e.getMessage());
             }

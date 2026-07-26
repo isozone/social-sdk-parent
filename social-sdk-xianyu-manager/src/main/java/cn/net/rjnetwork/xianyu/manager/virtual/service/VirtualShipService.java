@@ -1,8 +1,13 @@
 package cn.net.rjnetwork.xianyu.manager.virtual.service;
 
+import cn.net.rjnetwork.xianyu.api.XianyuMtopApiClient;
+import cn.net.rjnetwork.xianyu.api.XianyuTradeAuxApiService;
+import cn.net.rjnetwork.xianyu.manager.account.mapper.AccountMapper;
+import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
 import cn.net.rjnetwork.xianyu.manager.clouddisk.model.CloudStorageAccount;
 import cn.net.rjnetwork.xianyu.manager.clouddisk.model.CloudStorageFile;
 import cn.net.rjnetwork.xianyu.manager.clouddisk.service.CloudStorageService;
+import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
 import cn.net.rjnetwork.xianyu.manager.order.mapper.OrderMapper;
 import cn.net.rjnetwork.xianyu.manager.order.model.XianyuOrder;
 import cn.net.rjnetwork.xianyu.manager.product.mapper.ProductMapper;
@@ -10,25 +15,26 @@ import cn.net.rjnetwork.xianyu.manager.product.model.XianyuProduct;
 import cn.net.rjnetwork.xianyu.manager.virtual.mapper.VirtualCardPoolMapper;
 import cn.net.rjnetwork.xianyu.manager.virtual.mapper.VirtualShipConfigMapper;
 import cn.net.rjnetwork.xianyu.manager.virtual.mapper.VirtualShipTaskMapper;
-import cn.net.rjnetwork.xianyu.manager.virtual.mapper.CardItemRelationMapper;
-import cn.net.rjnetwork.xianyu.manager.virtual.mapper.ShipCardMapper;
-import cn.net.rjnetwork.xianyu.manager.virtual.mapper.DeliveryLogMapper;
 import cn.net.rjnetwork.xianyu.manager.virtual.model.VirtualCardPool;
 import cn.net.rjnetwork.xianyu.manager.virtual.model.VirtualShipConfig;
 import cn.net.rjnetwork.xianyu.manager.virtual.model.VirtualShipTask;
-import cn.net.rjnetwork.xianyu.manager.virtual.model.CardItemRelation;
-import cn.net.rjnetwork.xianyu.manager.virtual.model.ShipCard;
-import cn.net.rjnetwork.xianyu.manager.virtual.model.DeliveryLog;
-import cn.net.rjnetwork.xianyu.manager.batch.service.BatchJobService;
-import cn.net.rjnetwork.xianyu.manager.order.ship.service.DeliveryRuleEngine;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -36,13 +42,15 @@ import java.util.regex.Pattern;
  * 自动发货引擎（虚拟商品）
  * 核心职责：
  * 1. 订单支付后创建虚拟发货任务
- * 2. 定时扫描并执行发货（发卡密/发内容到闲鱼聊天）
+ * 2. 定时扫描并执行发货（真实 IM 消息 + 闲鱼 dummyDelivery）
  * 3. 定时扫描并执行自动确认收货
  * 4. 卡密池扣减
+ * 5. 发货成功/失败发布站内/站外通知
  */
 @Service
 public class VirtualShipService {
 
+    private static final Logger log = LoggerFactory.getLogger(VirtualShipService.class);
     private static final Pattern CARD_PATTERN = Pattern.compile("^(.+?)(?:\\|(.+))?$");
 
     private final VirtualShipTaskMapper shipTaskMapper;
@@ -50,25 +58,45 @@ public class VirtualShipService {
     private final VirtualShipConfigMapper shipConfigMapper;
     private final ProductMapper productMapper;
     private final OrderMapper orderMapper;
-    /** 消息发送器（注入自定义消息发送器；真实场景对接 xianyu-sdk） */
+    private final AccountMapper accountMapper;
+    /** 真实消息发送器（DefaultVirtualMessageSender → MessageService.sendMessage） */
     private final VirtualMessageSender messageSender;
     /** 网盘存储服务（FILE 类型发货） */
     private final CloudStorageService cloudStorageService;
+    private final ApplicationEventPublisher eventPublisher;
+    /** 统一发货执行引擎：调度/补发/手动触发都收敛到 AutoShipService，避免双引擎重复发货。 */
+    private AutoShipService autoShipService;
+    /** self 代理，用于调用 REQUIRES_NEW 固化 MESSAGE_SENT 标记。 */
+    private VirtualShipService self;
 
     public VirtualShipService(VirtualShipTaskMapper shipTaskMapper,
                               VirtualCardPoolMapper cardPoolMapper,
                               VirtualShipConfigMapper shipConfigMapper,
                               ProductMapper productMapper,
                               OrderMapper orderMapper,
+                              AccountMapper accountMapper,
                               VirtualMessageSender messageSender,
-                              CloudStorageService cloudStorageService) {
+                              CloudStorageService cloudStorageService,
+                              ApplicationEventPublisher eventPublisher) {
         this.shipTaskMapper = shipTaskMapper;
         this.cardPoolMapper = cardPoolMapper;
         this.shipConfigMapper = shipConfigMapper;
         this.productMapper = productMapper;
         this.orderMapper = orderMapper;
+        this.accountMapper = accountMapper;
         this.messageSender = messageSender;
         this.cloudStorageService = cloudStorageService;
+        this.eventPublisher = eventPublisher;
+    }
+
+    @Autowired
+    public void setAutoShipService(@Lazy AutoShipService autoShipService) {
+        this.autoShipService = autoShipService;
+    }
+
+    @Autowired
+    public void setSelf(@Lazy VirtualShipService self) {
+        this.self = self;
     }
 
     // ======================================================================
@@ -137,24 +165,19 @@ public class VirtualShipService {
 
     /**
      * 扫描到期的待发货任务，由 ScheduledTasks 统一调度。
+     * <p>统一委托 AutoShipService，避免 VirtualShipService/AutoShipService 双引擎并发发货。</p>
      */
     public void scanAndShip() {
-        List<VirtualShipTask> pending = shipTaskMapper.selectList(
-                new LambdaQueryWrapper<VirtualShipTask>()
-                        .eq(VirtualShipTask::getStatus, "PENDING")
-                        .and(w -> w.isNull(VirtualShipTask::getExecuteAt)
-                                .or()
-                                .le(VirtualShipTask::getExecuteAt, LocalDateTime.now()))
-                        .orderByAsc(VirtualShipTask::getExecuteAt)
-                        .orderByAsc(VirtualShipTask::getCreatedAt)
-                        .last("LIMIT 20"));
-        for (VirtualShipTask task : pending) {
-            processShipTask(task);
+        if (autoShipService == null) {
+            log.warn("[VirtualShip] AutoShipService not ready, skip scanAndShip");
+            return;
         }
+        autoShipService.runBatch("SCHEDULE");
     }
 
     /**
      * 扫描失败任务重试（最多重试 3 次），由 ScheduledTasks 统一调度。
+     * <p>统一委托 AutoShipService，保持 MESSAGE_SENT 幂等标记语义一致。</p>
      */
     public void retryFailedShipTasks() {
         List<VirtualShipTask> failed = shipTaskMapper.selectList(
@@ -167,42 +190,195 @@ public class VirtualShipService {
         }
     }
 
-    @Transactional
+    /**
+     * 对外统一入口：所有发货执行收敛到 AutoShipService。
+     * 保留方法签名，兼容 Controller / 旧调用方。
+     */
     public void processShipTask(VirtualShipTask task) {
+        if (autoShipService == null) {
+            throw new IllegalStateException("AutoShipService not ready");
+        }
+        autoShipService.processShipTask(task);
+    }
+
+    /**
+     * 兼容保留：旧链路直发实现。当前运行时不再被调度直接调用。
+     */
+    @Transactional
+    public void processShipTaskLegacy(VirtualShipTask task) {
         task.setStatus("PROCESSING");
         shipTaskMapper.updateById(task);
 
+        // task.orderId 存的是本地 xianyu_order.id（由 OrderSyncService.tryCreateVirtualShipTask 写入）
         XianyuOrder order = orderMapper.selectById(task.getOrderId());
         XianyuProduct product = productMapper.selectById(task.getProductId());
         if (order == null || product == null) {
             failTask(task, "Order or product not found");
+            publishShipFailed(task, order, "Order or product not found");
             return;
         }
 
+        boolean messageAlreadySent = task.getErrorMessage() != null
+                && task.getErrorMessage().startsWith("MESSAGE_SENT:")
+                && order.getDeliverContent() != null && !order.getDeliverContent().isBlank();
+        String deliverContent = order.getDeliverContent();
         try {
-            String deliverContent = acquireDeliverContent(order, product);
-            if (deliverContent == null || deliverContent.isBlank()) {
-                failTask(task, "No available card/content in pool");
-                return;
+            if (!messageAlreadySent) {
+                deliverContent = acquireDeliverContent(order, product);
+                if (deliverContent == null || deliverContent.isBlank()) {
+                    failTask(task, "No available card/content in pool");
+                    publishShipFailed(task, order, "No available card/content in pool");
+                    return;
+                }
+
+                // 1) 真实发消息给买家（失败不标已发货，已预占卡密会释放）
+                boolean sent = messageSender.sendToBuyer(order, deliverContent);
+                if (!sent) {
+                    releaseVirtualCard(order.getId());
+                    failTask(task, "sendToBuyer returned false");
+                    publishShipFailed(task, order, "sendToBuyer returned false");
+                    return;
+                }
+
+                // 消息已发出后，独立事务固化发货内容与 MESSAGE_SENT 标记；
+                // 避免后续 dummyDelivery 失败回滚导致重试重复发卡/重复发 IM。
+                self.markMessageSent(order, task, deliverContent);
             }
 
-            // 发送到闲鱼聊天（真实场景通过 sdk 发消息）
-            messageSender.sendToBuyer(order, deliverContent);
+            // 2) 闲鱼侧无需物流确认发货（dummyDelivery）
+            confirmDummyDelivery(order);
 
-            // 更新订单发货状态
+            // 3) 本地订单/任务成功落库
             order.setVirtualShippedAt(LocalDateTime.now());
             order.setDeliverContent(deliverContent);
             order.setStatus("SHIPPED");
             orderMapper.updateById(order);
 
-            // 更新任务
             task.setStatus("SHIPPED");
+            task.setErrorMessage(null);
             task.setProcessedAt(LocalDateTime.now());
             shipTaskMapper.updateById(task);
 
+            publishShipSuccess(task, order, product);
+            log.info("[VirtualShip] shipped orderId={} localOrderId={} accountId={}",
+                    order.getOrderId(), order.getId(), order.getAccountId());
+
         } catch (Exception e) {
-            failTask(task, e.getMessage());
+            if (!messageAlreadySent && (task.getErrorMessage() == null || !task.getErrorMessage().startsWith("MESSAGE_SENT:"))) {
+                releaseVirtualCard(order.getId());
+            }
+            String reason = (task.getErrorMessage() != null && task.getErrorMessage().startsWith("MESSAGE_SENT:"))
+                    ? "MESSAGE_SENT: dummyDelivery failed: " + e.getMessage()
+                    : e.getMessage();
+            failTask(task, reason);
+            publishShipFailed(task, order, e.getMessage());
+            log.warn("[VirtualShip] processShipTask failed orderId={} err={}",
+                    order != null ? order.getOrderId() : task.getOrderId(), e.getMessage());
         }
+    }
+
+    /**
+     * 独立事务固化“消息已发出、等待 dummyDelivery”状态，避免外层事务回滚抹掉幂等标记。
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markMessageSent(XianyuOrder order, VirtualShipTask task, String deliverContent) {
+        if (order != null) {
+            order.setDeliverContent(deliverContent);
+            orderMapper.updateById(order);
+        }
+        if (task != null) {
+            task.setErrorMessage("MESSAGE_SENT: pending dummyDelivery");
+            shipTaskMapper.updateById(task);
+        }
+    }
+
+    private void releaseVirtualCard(Long orderId) {
+        if (orderId == null) return;
+        VirtualCardPool card = cardPoolMapper.selectOne(new LambdaQueryWrapper<VirtualCardPool>()
+                .eq(VirtualCardPool::getUsedOrderId, orderId)
+                .eq(VirtualCardPool::getStatus, "USED")
+                .last("LIMIT 1"));
+        if (card == null) return;
+        card.setStatus("AVAILABLE");
+        card.setUsedOrderId(null);
+        card.setUsedAt(null);
+        cardPoolMapper.updateById(card);
+    }
+
+    /**
+     * 调闲鱼 mtop.taobao.idle.logistic.consign.dummy 完成无需物流发货确认。
+     * 失败直接抛异常，由上层 failTask，避免本地假成功。
+     */
+    private void confirmDummyDelivery(XianyuOrder order) {
+        if (order.getAccountId() == null) {
+            throw new IllegalStateException("order.accountId is blank");
+        }
+        if (order.getOrderId() == null || order.getOrderId().isBlank()) {
+            throw new IllegalStateException("order.orderId is blank");
+        }
+        XianyuAccount acc = accountMapper.selectById(order.getAccountId());
+        if (acc == null || acc.getCookieHeader() == null || acc.getCookieHeader().isBlank()) {
+            throw new IllegalStateException("account cookie missing for dummyDelivery");
+        }
+        XianyuMtopApiClient mtop = new XianyuMtopApiClient(acc.getCookieHeader());
+        if (acc.getImCookieHeader() != null && !acc.getImCookieHeader().isBlank()) {
+            mtop.setImCookieHeader(acc.getImCookieHeader());
+        }
+        XianyuTradeAuxApiService tradeAux = new XianyuTradeAuxApiService(mtop);
+        JsonNode resp = tradeAux.dummyDelivery(order.getOrderId());
+        if (resp == null) {
+            throw new IllegalStateException("dummyDelivery returned null response");
+        }
+        String ret = resp.path("ret").toString();
+        if (ret.isBlank() || ret.contains("FAIL") || ret.contains("ERROR") || !ret.contains("SUCCESS")) {
+            throw new IllegalStateException("dummyDelivery failed: " + truncate(ret, 300));
+        }
+        log.info("[VirtualShip] dummyDelivery ok orderId={} ret={}", order.getOrderId(), truncate(ret, 120));
+    }
+
+    private void publishShipSuccess(VirtualShipTask task, XianyuOrder order, XianyuProduct product) {
+        try {
+            String accountName = accountName(order != null ? order.getAccountId() : task.getAccountId());
+            Map<String, Object> vars = new LinkedHashMap<>();
+            vars.put("accountName", accountName);
+            vars.put("orderId", order != null && order.getOrderId() != null ? order.getOrderId() : String.valueOf(task.getOrderId()));
+            vars.put("buyerName", order != null && order.getCounterpartyName() != null ? order.getCounterpartyName() : "");
+            vars.put("itemTitle", product != null && product.getTitle() != null ? product.getTitle()
+                    : (order != null && order.getItemTitle() != null ? order.getItemTitle() : ""));
+            eventPublisher.publishEvent(new NotifyEvent("VIRTUAL_SHIP_SUCCESS",
+                    order != null ? order.getAccountId() : task.getAccountId(),
+                    accountName, vars));
+        } catch (Exception e) {
+            log.warn("[VirtualShip] publish success notify failed: {}", e.getMessage());
+        }
+    }
+
+    private void publishShipFailed(VirtualShipTask task, XianyuOrder order, String reason) {
+        try {
+            Long accountId = order != null ? order.getAccountId() : (task != null ? task.getAccountId() : null);
+            String accountName = accountName(accountId);
+            Map<String, Object> vars = new LinkedHashMap<>();
+            vars.put("accountName", accountName);
+            vars.put("orderId", order != null && order.getOrderId() != null ? order.getOrderId()
+                    : (task != null ? String.valueOf(task.getOrderId()) : ""));
+            vars.put("itemTitle", order != null && order.getItemTitle() != null ? order.getItemTitle() : "");
+            vars.put("reason", reason != null ? reason : "");
+            eventPublisher.publishEvent(new NotifyEvent("VIRTUAL_SHIP_FAILED", accountId, accountName, vars));
+        } catch (Exception e) {
+            log.warn("[VirtualShip] publish fail notify failed: {}", e.getMessage());
+        }
+    }
+
+    private String accountName(Long accountId) {
+        if (accountId == null) return "";
+        XianyuAccount a = accountMapper.selectById(accountId);
+        if (a == null) return String.valueOf(accountId);
+        return a.getDisplayName() != null ? a.getDisplayName() : a.getAccountName();
+    }
+
+    private static String truncate(String s, int max) {
+        if (s == null) return "";
+        return s.length() <= max ? s : s.substring(0, max) + "...";
     }
 
     /**
@@ -226,19 +402,27 @@ public class VirtualShipService {
         vars.put("orderId", order.getOrderId() != null ? order.getOrderId() : "");
 
         if ("CARD".equals(type) || "ACCOUNT".equals(type)) {
-            // 从池子取一条
-            VirtualCardPool card = cardPoolMapper.selectOne(
+            // 原子抢占卡密：先查候选，再 CAS 更新 AVAILABLE→USED，避免并发双发同一卡。
+            List<VirtualCardPool> candidates = cardPoolMapper.selectList(
                     new LambdaQueryWrapper<VirtualCardPool>()
                             .eq(VirtualCardPool::getProductId, product.getId())
                             .eq(VirtualCardPool::getStatus, "AVAILABLE")
                             .orderByAsc(VirtualCardPool::getId)
-                            .last("LIMIT 1"));
+                            .last("LIMIT 20"));
+            VirtualCardPool card = null;
+            for (VirtualCardPool candidate : candidates) {
+                candidate.setStatus("USED");
+                candidate.setUsedOrderId(order.getId());
+                candidate.setUsedAt(LocalDateTime.now());
+                int claimed = cardPoolMapper.update(candidate, new LambdaQueryWrapper<VirtualCardPool>()
+                        .eq(VirtualCardPool::getId, candidate.getId())
+                        .eq(VirtualCardPool::getStatus, "AVAILABLE"));
+                if (claimed > 0) {
+                    card = candidate;
+                    break;
+                }
+            }
             if (card == null) return null;
-
-            card.setStatus("USED");
-            card.setUsedOrderId(order.getId());
-            card.setUsedAt(LocalDateTime.now());
-            cardPoolMapper.updateById(card);
 
             vars.put("cardCode", card.getCardCode() != null ? card.getCardCode() : "");
             vars.put("cardPassword", card.getCardPassword() != null ? card.getCardPassword() : "");

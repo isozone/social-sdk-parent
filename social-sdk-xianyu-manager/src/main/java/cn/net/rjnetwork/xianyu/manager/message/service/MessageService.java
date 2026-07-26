@@ -978,7 +978,10 @@ public class MessageService {
 
         messageMapper.insert(entity);
         if ("INCOMING".equals(entity.getDirection())) {
-            eventPublisher.publishEvent(new NotifyEvent(this, entity, "NEW_MESSAGE"));
+            publishIncomingMessage(entity);
+            if (shouldAutoReplySyncedMessage(entity)) {
+                autoReplyIfNeeded(accountId, entity);
+            }
         }
         log.info("[MESSAGE] pulled msg {} in session {} from account {}", msgId, sessionId, accountId);
     }
@@ -1079,7 +1082,10 @@ public class MessageService {
 
         messageMapper.insert(entity);
         if ("INCOMING".equals(entity.getDirection())) {
-            eventPublisher.publishEvent(new NotifyEvent(this, entity, "NEW_MESSAGE"));
+            publishIncomingMessage(entity);
+            if (shouldAutoReplySyncedMessage(entity)) {
+                autoReplyIfNeeded(accountId, entity);
+            }
         }
         log.info("[MESSAGE] pulled lwp msg {} in session {} from account {} (dir={}, type={})",
                 msgId, cid, accountId, entity.getDirection(), entity.getMsgType());
@@ -1352,19 +1358,26 @@ public class MessageService {
         if (selfUserId.isBlank()) {
             throw new IllegalStateException("无法从账号 cookie 提取 selfUserId，请重新登录");
         }
-        XianyuMessage peerMsg = messageMapper.selectLatestPeerMessage(
-                request.getAccountId(), request.getSessionId(), stripGoofishSuffix(selfUserId), ensureGoofishSuffix(selfUserId));
-        // 废弃 selectLatestIncoming 兜底：历史数据 direction 全是 INCOMING，
-        // 会让「自己发的消息」被误判为对方，发送时 actualReceivers 把自己的 id 当对方塞进去，被服务端拒绝。
-        String peerUserId = peerMsg != null ? peerMsg.getSenderId() : "";
+        String sessionId = request.getSessionId();
+        String buyerId = request.getBuyerId();
+        if ((sessionId == null || sessionId.isBlank()) && buyerId != null && !buyerId.isBlank()) {
+            sessionId = normalizeCid(buyerId);
+            request.setSessionId(sessionId);
+        }
+
+        XianyuMessage peerMsg = sessionId == null || sessionId.isBlank() ? null : messageMapper.selectLatestPeerMessage(
+                request.getAccountId(), sessionId, stripGoofishSuffix(selfUserId), ensureGoofishSuffix(selfUserId));
+        // 系统链路（虚拟发货/自动回复）传入 buyerId 时，以业务明确买家为准，避免历史会话误配导致发错人。
+        // 前端手动发送未传 buyerId 时，再使用会话最新对方消息兜底。
+        String peerUserId = buyerId != null && !buyerId.isBlank() ? buyerId : (peerMsg != null ? peerMsg.getSenderId() : "");
         if (peerUserId.isBlank()) {
             // 该会话还没收到过对方消息（刚发起的会话），用 sessionId 兜底
             // sessionId 形如 "57783854401@goofish"，去掉 @goofish 后缀就是对方 userId
-            String sid = request.getSessionId() != null ? request.getSessionId() : "";
+            String sid = sessionId != null ? sessionId : "";
             peerUserId = sid.contains("@") ? sid.substring(0, sid.indexOf('@')) : sid;
         }
         if (peerUserId.isBlank()) {
-            throw new IllegalStateException("无法确定对方 userId，请先同步该会话消息");
+            throw new IllegalStateException("无法确定对方 userId，请先同步该会话消息，或提供 buyerId");
         }
 
         XianyuMtopApiClient mtopClient = new XianyuMtopApiClient(acc.getCookieHeader());
@@ -1427,7 +1440,7 @@ public class MessageService {
         msg.setContent(request.getContent());
         msg.setMsgType("TEXT");
         msg.setDirection("OUTGOING");
-        msg.setAutoReply(false);
+        msg.setAutoReply(Boolean.TRUE.equals(request.getAutoReply()));
         msg.setMessageTime(LocalDateTime.now());
         msg.setCreatedAt(LocalDateTime.now());
         msg.setUpdatedAt(LocalDateTime.now());
@@ -1441,13 +1454,27 @@ public class MessageService {
         messageMapper.insert(msg);
         // 仅对"收到的买家消息"发布通知（自动回复的 OUTGOING 不触发）
         if ("INCOMING".equals(msg.getDirection())) {
-            Long accountId = msg.getAccountId();
-            String accountName = accountName(accountId);
-            eventPublisher.publishEvent(new NotifyEvent("NEW_MESSAGE", accountId, accountName,
-                    Map.of("accountName", accountName,
-                            "content", msg.getContent() != null ? msg.getContent() : "",
-                            "sessionId", msg.getSessionId() != null ? msg.getSessionId() : "")));
+            publishIncomingMessage(msg);
         }
+    }
+
+    /**
+     * 新买家消息站内/站外通知统一入口。
+     * 定时同步、LWP 落库、WebSocket 入口都走这里，保证 NEW_MESSAGE 事件变量完整。
+     */
+    private void publishIncomingMessage(XianyuMessage msg) {
+        if (msg == null || !"INCOMING".equals(msg.getDirection())) {
+            return;
+        }
+        Long accountId = msg.getAccountId();
+        String accountName = accountName(accountId);
+        Map<String, Object> vars = new LinkedHashMap<>();
+        vars.put("accountName", accountName != null ? accountName : "");
+        vars.put("content", msg.getContent() != null ? msg.getContent() : "");
+        vars.put("sessionId", msg.getSessionId() != null ? msg.getSessionId() : "");
+        vars.put("senderId", msg.getSenderId() != null ? msg.getSenderId() : "");
+        vars.put("senderName", msg.getSenderName() != null ? msg.getSenderName() : "");
+        eventPublisher.publishEvent(new NotifyEvent("NEW_MESSAGE", accountId, accountName, vars));
     }
 
     private String accountName(Long accountId) {
@@ -1458,23 +1485,55 @@ public class MessageService {
     }
 
     /**
-     * 自动回复：检查消息是否命中规则，如果命中则保存回复并返回回复内容
+     * 同步/轮询链路只自动回复新近消息，避免首次同步历史消息时批量刷屏。
+     */
+    private boolean shouldAutoReplySyncedMessage(XianyuMessage msg) {
+        if (msg == null || msg.getMessageTime() == null) {
+            return false;
+        }
+        return !msg.getMessageTime().isBefore(LocalDateTime.now().minusMinutes(3));
+    }
+
+    /**
+     * 自动回复：检查消息是否命中规则，命中后真实调用闲鱼 IM 发送并发布站内/站外通知。
      */
     public String autoReplyIfNeeded(Long accountId, XianyuMessage incomingMessage) {
-        String reply = ruleService.autoReply(accountId, incomingMessage.getContent());
-        if (reply != null) {
-            XianyuMessage replyMsg = new XianyuMessage();
-            replyMsg.setAccountId(accountId);
-            replyMsg.setSessionId(incomingMessage.getSessionId());
-            replyMsg.setSenderId("system");
-            replyMsg.setSenderName("Auto Bot");
-            replyMsg.setContent(reply);
-            replyMsg.setMsgType("TEXT");
-            replyMsg.setDirection("OUTGOING");
-            replyMsg.setAutoReply(true);
-            replyMsg.setMessageTime(LocalDateTime.now());
-            saveIncomingMessage(replyMsg);
+        if (incomingMessage == null || !"INCOMING".equals(incomingMessage.getDirection())) {
+            return null;
         }
-        return reply;
+        String reply = ruleService.autoReply(accountId, incomingMessage.getContent());
+        if (reply == null || reply.isBlank()) {
+            return reply;
+        }
+        String accountName = safe(accountName(accountId));
+        try {
+            MessageSendRequest req = new MessageSendRequest();
+            req.setAccountId(accountId);
+            req.setSessionId(incomingMessage.getSessionId());
+            req.setBuyerId(stripGoofishSuffix(incomingMessage.getSenderId()));
+            req.setContent(reply);
+            req.setAutoReply(true);
+            sendMessage(req);
+
+            Map<String, Object> vars = new LinkedHashMap<>();
+            vars.put("accountName", accountName);
+            vars.put("sessionId", safe(incomingMessage.getSessionId()));
+            vars.put("content", reply);
+            eventPublisher.publishEvent(new NotifyEvent("AUTO_REPLY_SENT", accountId, accountName, vars));
+            return reply;
+        } catch (Exception e) {
+            Map<String, Object> vars = new LinkedHashMap<>();
+            vars.put("accountName", accountName);
+            vars.put("sessionId", safe(incomingMessage.getSessionId()));
+            vars.put("content", safe(incomingMessage.getContent()));
+            vars.put("reason", e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            eventPublisher.publishEvent(new NotifyEvent("AUTO_REPLY_FAILED", accountId, accountName, vars));
+            log.warn("[MESSAGE] auto reply failed account={} session={}: {}", accountId, incomingMessage.getSessionId(), e.getMessage());
+            return null;
+        }
+    }
+
+    private static String safe(String s) {
+        return s == null ? "" : s;
     }
 }

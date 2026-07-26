@@ -1,4 +1,4 @@
-import { api } from './request'
+import { api, buildApiUrl, getToken } from './request'
 import type { ProductItem, CategoryNode, PolishResult } from '@/types/product'
 import type { PageResponse } from '@/types/common'
 
@@ -53,17 +53,13 @@ export function updateStock(id: number | string, stock: number) {
 export function uploadImage(fileUrl: string): Promise<{ url: string }> {
   return new Promise((resolve, reject) => {
     const headers: Record<string, string> = {}
-    const token = (() => {
-      try {
-        const t = uni.getStorageSync('mini_token')
-        return String(t || '').replace(/^Bearer\s+/i, '')
-      } catch { return '' }
-    })()
+    const token = getToken()
     if (token) headers['Authorization'] = `Bearer ${token}`
     headers['X-App-Type'] = 'mini-program'
 
     uni.uploadFile({
-      url: '/api/mini/products/upload',
+      // 与 request 共用后台 base URL：只配一次即可贯通上传链路
+      url: buildApiUrl('/api/mini/products/upload'),
       filePath: fileUrl,
       name: 'file',
       header: headers,

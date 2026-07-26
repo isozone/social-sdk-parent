@@ -167,6 +167,12 @@
             "root": "packages/ai",
             "pages": [
                 {
+                    "path": "index/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                },
+                {
                     "path": "providers/index",
                     "style": {
                         "navigationStyle": "custom"
@@ -186,6 +192,153 @@
                 },
                 {
                     "path": "ops/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                }
+            ]
+        },
+        {
+            "root": "packages/virtualShip",
+            "pages": [
+                {
+                    "path": "tasks/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                }
+            ]
+        },
+        {
+            "root": "packages/market",
+            "pages": [
+                {
+                    "path": "index/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                }
+            ]
+        },
+        {
+            "root": "packages/buyer",
+            "pages": [
+                {
+                    "path": "detail/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                }
+            ]
+        },
+        {
+            "root": "packages/storage",
+            "pages": [
+                {
+                    "path": "cloud-storage/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                },
+                {
+                    "path": "chrome-config/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                }
+            ]
+        },
+        {
+            "root": "packages/monitor",
+            "pages": [
+                {
+                    "path": "index/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                },
+                {
+                    "path": "circuit-breaker/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                },
+                {
+                    "path": "audit-logs/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                },
+                {
+                    "path": "proxy-management/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                }
+            ]
+        },
+        {
+            "root": "packages/polish",
+            "pages": [
+                {
+                    "path": "index/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                }
+            ]
+        },
+        {
+            "root": "packages/tasks",
+            "pages": [
+                {
+                    "path": "index/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                }
+            ]
+        },
+        {
+            "root": "packages/logs",
+            "pages": [
+                {
+                    "path": "cookies-refresh/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                },
+                {
+                    "path": "login-renew/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                }
+            ]
+        },
+        {
+            "root": "packages/bot",
+            "pages": [
+                {
+                    "path": "delivery-rules/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                },
+                {
+                    "path": "comment-templates/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                },
+                {
+                    "path": "item-reply/index",
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                },
+                {
+                    "path": "close-notice/index",
                     "style": {
                         "navigationStyle": "custom"
                     }

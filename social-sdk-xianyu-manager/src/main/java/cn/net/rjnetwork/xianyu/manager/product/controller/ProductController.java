@@ -126,13 +126,21 @@ public class ProductController {
     }
 
     @PutMapping("/{id}/price")
-    public ApiResponse<XianyuProduct> updatePrice(@PathVariable Long id, @RequestParam String price) {
-        return ApiResponse.ok(productService.updatePrice(id, new java.math.BigDecimal(price)));
+    public ApiResponse<XianyuProduct> updatePrice(@PathVariable Long id,
+                                                   @RequestParam(required = false) String price,
+                                                   @RequestBody(required = false) Map<String, Object> body) {
+        String value = price != null ? price : stringValue(body, "price");
+        if (value == null || value.isBlank()) return ApiResponse.fail("BAD_REQUEST", "price is required");
+        return ApiResponse.ok(productService.updatePrice(id, new java.math.BigDecimal(value)));
     }
 
     @PutMapping("/{id}/stock")
-    public ApiResponse<XianyuProduct> updateStock(@PathVariable Long id, @RequestParam int stock) {
-        return ApiResponse.ok(productService.updateStock(id, stock));
+    public ApiResponse<XianyuProduct> updateStock(@PathVariable Long id,
+                                                   @RequestParam(required = false) Integer stock,
+                                                   @RequestBody(required = false) Map<String, Object> body) {
+        Integer value = stock != null ? stock : intValue(body, "stock");
+        if (value == null) return ApiResponse.fail("BAD_REQUEST", "stock is required");
+        return ApiResponse.ok(productService.updateStock(id, value));
     }
 
     /**
@@ -179,7 +187,17 @@ public class ProductController {
         return ApiResponse.ok(progress);
     }
 
-    // ======================== 商品擦亮（对齐前端 /api/products/polish）========================
+    // ======================== 商品擦亮（对齐前端 /api/products/polish + 小程序 /api/products/{id}/polish）========================
+
+    @PostMapping("/{id}/polish")
+    public ApiResponse<Map<String, Object>> polishByProductId(@PathVariable Long id) {
+        XianyuProduct product = productService.getById(id);
+        if (product == null) return ApiResponse.fail("NOT_FOUND", "Product not found");
+        if (product.getAccountId() == null || product.getItemId() == null || product.getItemId().isBlank()) {
+            return ApiResponse.fail("BAD_REQUEST", "商品缺少 accountId 或 itemId，无法擦亮");
+        }
+        return polish(product.getAccountId(), product.getItemId());
+    }
 
     @PostMapping("/polish")
     public ApiResponse<Map<String, Object>> polish(@RequestParam Long accountId, @RequestParam String itemId) {
@@ -258,5 +276,16 @@ public class ProductController {
                 request.getDeliverType(),
                 request.getDeliverContentTemplate()
         ));
+    }
+
+    private String stringValue(Map<String, Object> body, String key) {
+        if (body == null || !body.containsKey(key) || body.get(key) == null) return null;
+        return String.valueOf(body.get(key));
+    }
+
+    private Integer intValue(Map<String, Object> body, String key) {
+        String value = stringValue(body, key);
+        if (value == null || value.isBlank()) return null;
+        return Integer.valueOf(value);
     }
 }

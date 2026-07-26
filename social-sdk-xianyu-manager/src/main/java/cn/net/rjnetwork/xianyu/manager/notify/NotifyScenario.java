@@ -78,7 +78,37 @@ public enum NotifyScenario {
     MARKET_PRICE_DROP("市场价格下降",
             "关键词 {keyword} 市场均价下降",
             "关键词 {keyword} 今日均价 {avgPrice} 元，较昨日变化 {changePercent}%。最低价 {minPrice} 元，最高价 {maxPrice} 元，成交量 {volume}。",
-            86400);
+            86400),
+
+    // 自动回复 / 虚拟发货闭环
+    AUTO_REPLY_SENT("自动回复已发送",
+            "账号 {accountName} 已自动回复买家",
+            "账号 {accountName} 已向会话 {sessionId} 自动回复：{content}",
+            30),
+    AUTO_REPLY_FAILED("自动回复失败",
+            "账号 {accountName} 自动回复失败",
+            "账号 {accountName} 向会话 {sessionId} 自动回复失败：{reason}。原消息：{content}",
+            60),
+    VIRTUAL_SHIP_SUCCESS("虚拟发货成功",
+            "订单 {orderId} 虚拟发货成功",
+            "账号 {accountName} 的订单 {orderId} 已向买家 {buyerName} 发送发货内容，并完成闲鱼无需物流发货确认。商品：{itemTitle}",
+            60),
+    VIRTUAL_SHIP_FAILED("虚拟发货失败",
+            "订单 {orderId} 虚拟发货失败",
+            "账号 {accountName} 的订单 {orderId} 虚拟发货失败：{reason}。商品：{itemTitle}",
+            60),
+    AUTO_SHIP_BLOCKED("自动发货被规则拦截",
+            "订单 {orderId} 自动发货被拦截",
+            "订单 {orderId} 商品 {productId} 被发货规则拦截：{reason}",
+            60),
+    AUTO_SHIP_NOTIFY_ONLY("自动发货命中提醒规则",
+            "订单 {orderId} 自动发货命中提醒规则",
+            "订单 {orderId} 商品 {productId} 命中提醒规则：{reason}。系统将继续尝试发货。",
+            60),
+    AUTO_SHIP_NO_CARD("自动发货缺少卡券",
+            "订单 {orderId} 自动发货缺少卡券",
+            "订单 {orderId} 商品 {productId} 无可用卡券：{reason}，请及时补充卡券池。",
+            60);
 
     private final String label;
     private final String defaultTitle;

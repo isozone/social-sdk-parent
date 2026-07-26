@@ -99,15 +99,20 @@ public class RedeliveryService {
     public RenewOutcome retryOne(VirtualShipTask task) {
         int retry = Optional.ofNullable(task.getRetryCount()).orElse(0);
         int maxRetry = Optional.ofNullable(task.getMaxRetry()).orElse(DEFAULT_MAX_RETRY);
+        // 保留 MESSAGE_SENT 前缀：消息已发出时后续只补 dummyDelivery，禁止补发链路抹掉幂等标记。
+        String previousError = task.getErrorMessage();
+        boolean messageAlreadySent = previousError != null && previousError.startsWith("MESSAGE_SENT:");
         if (retry >= maxRetry) {
             task.setStatus("RETRY_EXHAUSTED");
-            task.setErrorMessage("重试耗尽（" + retry + "/" + maxRetry + "），转人工介入");
+            task.setErrorMessage(messageAlreadySent
+                    ? previousError + " | 重试耗尽（" + retry + "/" + maxRetry + "），转人工介入"
+                    : "重试耗尽（" + retry + "/" + maxRetry + "），转人工介入");
             task.setProcessedAt(LocalDateTime.now());
             taskMapper.updateById(task);
             log.warn("[A9] order {} retry exhausted ({}/{})", task.getOrderId(), retry, maxRetry);
             return RenewOutcome.EXHAUSTED;
         }
-        // retryCount++ 后重跑主链路
+        // retryCount++ 后重跑主链路（不清理 MESSAGE_SENT 标记）
         task.setRetryCount(retry + 1);
         task.setStatus("PENDING");
         taskMapper.updateById(task);
@@ -115,27 +120,44 @@ public class RedeliveryService {
             autoShipService.processShipTask(task);
         } catch (Exception e) {
             task.setStatus("FAILED");
-            task.setErrorMessage(e.getMessage());
+            String err = e.getMessage();
+            if (messageAlreadySent && (err == null || !err.startsWith("MESSAGE_SENT:"))) {
+                err = previousError + (err == null || err.isBlank() ? "" : " | " + err);
+            }
+            task.setErrorMessage(err);
             taskMapper.updateById(task);
         }
+        // 重新读取，防止 processShipTask 独立事务更新后本地对象过期
+        VirtualShipTask latest = taskMapper.selectById(task.getId());
+        if (latest != null) {
+            task = latest;
+        }
         String st = Optional.ofNullable(task.getStatus()).orElse("FAILED");
-        if ("SUCCESS".equals(st)) {
+        if ("SUCCESS".equals(st) || "SHIPPED".equals(st)) {
             task.setErrorMessage(null);
             taskMapper.updateById(task);
             return RenewOutcome.SUCCESS;
         }
-        // 仍失败：按指数退避排下次重试（未超上限）
+        // 仍失败：按指数退避排下次重试（未超上限），并保留 MESSAGE_SENT 标记
+        String currentError = task.getErrorMessage();
+        boolean stillMessageSent = currentError != null && currentError.startsWith("MESSAGE_SENT:");
         if (retry + 1 < maxRetry) {
             int backoffIdx = Math.min(retry, BACKOFF_SECONDS.length - 1);
             LocalDateTime next = LocalDateTime.now().plusSeconds(BACKOFF_SECONDS[backoffIdx]);
             task.setExecuteAt(next);
             task.setStatus("FAILED");
+            if (stillMessageSent) {
+                // 不覆盖 MESSAGE_SENT 前缀
+                task.setErrorMessage(currentError);
+            }
             taskMapper.updateById(task);
             return RenewOutcome.RESCHEDULED;
         }
         // 超上限
         task.setStatus("RETRY_EXHAUSTED");
-        task.setErrorMessage("重试耗尽（" + (retry + 1) + "/" + maxRetry + "），转人工介入");
+        task.setErrorMessage(stillMessageSent
+                ? currentError + " | 重试耗尽（" + (retry + 1) + "/" + maxRetry + "），转人工介入"
+                : "重试耗尽（" + (retry + 1) + "/" + maxRetry + "），转人工介入");
         task.setProcessedAt(LocalDateTime.now());
         taskMapper.updateById(task);
         return RenewOutcome.EXHAUSTED;

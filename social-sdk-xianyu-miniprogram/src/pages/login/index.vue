@@ -135,31 +135,36 @@ async function quickDemoLogin() {
   })
 }
 
+function normalizeServerBase(input: string): string {
+  const raw = String(input || '').trim()
+  if (!raw || raw === '默认（同源）') return ''
+  return raw.replace(/\/+$/, '')
+}
+
 function showServerSwitch() {
-  // 服务器地址切换闭环：支持多环境部署，写入本地存储供 request.ts 启动读取
-  const current = uni.getStorageSync('aiyudb_server_base') || '默认（同源）'
+  // 服务器地址切换闭环：写入 aiyudb_server_base 后，request/upload 实时读取，无需重启
+  const current = normalizeServerBase(uni.getStorageSync('aiyudb_server_base')) || '默认（同源）'
   uni.showActionSheet({
-    itemList: ['默认（同源）', '本地开发 http://localhost:8080', '自定义地址'],
+    itemList: ['默认（同源）', '自定义后台基础 URL'],
     success: (r) => {
-      if (r.tapIndex === 2) {
-        // 自定义地址：uni 本身不支持 prompt，用 edit 给个简化方案
+      if (r.tapIndex === 1) {
         uni.showModal({
-          title: '自定义服务器地址',
+          title: '自定义后台基础 URL',
           editable: true,
           placeholderText: 'https://your-server.com',
+          content: current === '默认（同源）' ? '' : current,
           success: (m) => {
             if (m.confirm && m.content) {
-              uni.setStorageSync('aiyudb_server_base', m.content)
-              uni.showToast({ title: '已保存，重启小程序生效', icon: 'none' })
+              const base = normalizeServerBase(m.content)
+              if (base) uni.setStorageSync('aiyudb_server_base', base)
+              else uni.removeStorageSync('aiyudb_server_base')
+              uni.showToast({ title: '已保存，立即生效', icon: 'none' })
             }
           }
         })
       } else if (r.tapIndex === 0) {
         uni.removeStorageSync('aiyudb_server_base')
-        uni.showToast({ title: '已切回同源', icon: 'none' })
-      } else if (r.tapIndex === 1) {
-        uni.setStorageSync('aiyudb_server_base', 'http://localhost:8080')
-        uni.showToast({ title: '已切换到本地开发', icon: 'none' })
+        uni.showToast({ title: '已切回同源，立即生效', icon: 'none' })
       }
     }
   })

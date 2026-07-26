@@ -1,16 +1,26 @@
 import { encryptPayload, decryptResponse } from './encrypt'
 import { useAuthStore } from '@/store/modules/auth'
 
-// 服务器地址闭环：登录页「服务器」切换写入 aiyudb_server_base，启动时读取拼到所有请求前
-// 默认空串 = 同源（小程序与后端同域），自定义地址 = 跨域部署
-function readServerBase(): string {
-  try { return uni.getStorageSync('aiyudb_server_base') || '' } catch { return '' }
+// 服务器地址闭环：登录页「服务器」切换写入 aiyudb_server_base，所有请求/上传实时读取。
+// 默认空串 = 同源；自定义地址 = 跨域部署。配置一次后台基础 URL 即可贯通业务。
+export function readServerBase(): string {
+  try {
+    const raw = String(uni.getStorageSync('aiyudb_server_base') || '').trim()
+    if (!raw || raw === '默认（同源）') return ''
+    return raw.replace(/\/+$/, '')
+  } catch { return '' }
 }
-const BASE = readServerBase()
 
-function getToken(): string {
+export function buildApiUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) return path
+  const normalized = path.startsWith('/') ? path : `/${path}`
+  return `${readServerBase()}${normalized}`
+}
+
+export function getToken(): string {
   const auth = useAuthStore()
-  return auth.token || ''
+  if (auth.token) return auth.token
+  try { return String(uni.getStorageSync('aiyudb_token') || '') } catch { return '' }
 }
 
 interface ReqConfig {
@@ -56,7 +66,7 @@ export async function request<T = any>(cfg: ReqConfig): Promise<T> {
 
     const res: any = await new Promise((resolve, reject) => {
       uni.request({
-        url: BASE + url,
+        url: buildApiUrl(url),
         method: isGet ? 'GET' : (cfg.method || 'POST'),
         data: body,
         header: headers,

@@ -1,94 +1,203 @@
 # 闲鱼管理器 · Electron 桌面版
 
-基于 Electron 28 的跨平台桌面应用，自动管理后端 Spring Boot 进程。
+基于 Electron 28 的跨平台桌面应用，支持两种完整分发形态：
+
+| 形态 | 模式 | 适用渠道 | 后端运行方式 |
+|---|---|---|---|
+| 官网版 | `local` | 官网 DMG/ZIP/Windows 安装包 | Electron 启动内置 Spring Boot JAR，可内嵌 JRE |
+| App Store 版 | `cloud` | Mac App Store | Electron 只连接云端后台基础 URL，不启动本地 Java/Chrome/OpenList |
 
 ## 功能特性
 
-- 🚀 **自动管理后端** — 启动时自动拉起 Spring Boot JAR，关闭时清理进程
-- 📌 **系统托盘** — 最小化到托盘，双击打开主界面
-- 🌐 **内嵌 WebView** — 直接在内嵌浏览器中显示 Vue 前端
-- 🔄 **自动重连** — 后端就绪后自动加载 Web UI
-- 📝 **日志管理** — 内置日志查看，一键打开日志目录
-- ⚙️ **设置面板** — 端口、Java 路径、自启等可视化配置
+- 🚀 **双模式后台** — `local` 本地后端 / `cloud` 云端后台 URL
+- 📌 **系统托盘** — 官网版支持最小化到托盘（MAS 自动禁用）
+- 🌐 **内嵌 Web UI** — local 加载 `127.0.0.1:{port}`，cloud 加载远程后台 URL
+- 🔄 **健康检查** — 启动后等待后台就绪再加载 UI
+- 📝 **日志管理** — Electron 日志与后端日志写入用户数据目录
+- ⚙️ **设置面板** — 后台模式、云端 URL、本地端口、Java 路径、自启等配置
+- 🍎 **App Store 准备** — 已提供 `mas` target 与 sandbox entitlements
 
 ## 目录结构
 
-```
+```text
 scripts/electron/
-├── build.sh              # 打包入口脚本
-├── package.json          # Electron 依赖 & 打包配置
-├── main.js               # Electron 主进程
-├── preload.js            # 预加载脚本（IPC 桥）
-├── launch.sh             # 后端启动脚本（macOS/Linux）
-├── launch.bat            # 后端启动脚本（Windows）
-├── renderer/             # 渲染进程页面
-│   ├── loading.html      # 启动 loading 页
-│   └── settings.html     # 设置面板
-├── icons/                # 应用图标
-├── build/                # electron-builder 资源
-└── dist_electron/        # 打包输出目录
+├── build.sh
+├── package.json
+├── main.js
+├── preload.js
+├── renderer/
+│   ├── loading.html
+│   └── settings.html
+├── src/
+│   ├── backend/
+│   │   ├── backend-mode.js
+│   │   └── cloud-backend.js
+│   ├── config/
+│   │   ├── defaults.js
+│   │   └── store.js
+│   ├── ipc/
+│   │   └── config-ipc.js
+│   └── window/
+│       └── main-window.js
+├── entitlements/
+│   ├── mac.plist
+│   ├── mac.inherit.plist
+│   ├── mas.plist
+│   └── mas.inherit.plist
+├── resources/
+│   └── jre/                 # 可选：官网版内嵌 JRE
+├── icons/
+└── dist_electron/
 ```
 
 ## 快速开始
 
-### 开发模式
+### 开发模式（local）
 
 ```bash
-# 先构建 JAR
-cd ../..
-mvn clean package -DskipTests
-
-# 启动 Electron
+cd /path/to/social-sdk-parent
+mvn -pl social-sdk-xianyu-manager package -DskipTests
 cd scripts/electron
 npm install
 npm run start
 ```
 
-### 打包发布
+### 官网版打包
 
 ```bash
-# macOS
-./build.sh mac    # → dist_electron/闲鱼管理器-0.0.1.dmg
-
-# Windows
-./build.sh win    # → dist_electron/闲鱼管理器-Setup-0.0.1.exe
-
-# 双平台
-./build.sh all
+cd scripts/electron
+npm run build:mac
+npm run build:win
 ```
 
-### 跳过 JAR 构建（后端已构建时）
+官网版默认 `backendMode=local`：
+
+1. Electron 启动内置 JAR
+2. 后端监听 `127.0.0.1:{lastPort}`
+3. Web UI 加载本地地址
+4. Chrome/CDP/OpenList 等本地能力保留
+
+如果要避免用户安装 Java，把 JRE 放入：
+
+```text
+scripts/electron/resources/jre/
+```
+
+macOS 期望：
+
+```text
+resources/jre/Contents/Home/bin/java
+```
+
+Windows 期望：
+
+```text
+resources/jre/bin/java.exe
+```
+
+### App Store 版打包
 
 ```bash
-SKIP_JAR=true ./build.sh mac
+cd scripts/electron
+ELECTRON_DISTRIBUTION=mas npm run build:mas
 ```
 
-## 构建产物说明
+App Store 版强制使用 `backendMode=cloud`：
 
-| 平台 | 产物 | 说明 |
-|------|------|------|
-| macOS | `.dmg` | 标准安装镜像 |
-| macOS | `.zip` | 便携压缩包 |
-| Windows | `-Setup-.exe` | NSIS 安装向导 |
-| Windows | `-Portable-.exe` | 免安装便携版 |
+1. 不启动本地 JAR
+2. 不启动本地 Chrome/CDP/OpenList
+3. 只连接云端后台基础 URL
+4. 使用 `entitlements/mas.plist` 与 `entitlements/mas.inherit.plist`
+
+> 上架前需要替换真实 `embedded.provisionprofile`，并使用 Apple Distribution / Mac App Store 证书签名。
+
+## 双模式配置项
+
+配置保存在 `electron-store`：
+
+| key | 说明 |
+|---|---|
+| `backendMode` | `local` 或 `cloud` |
+| `cloudBaseUrl` | 云端后台基础 URL，例如 `https://api.example.com` |
+| `lastPort` | local 模式监听端口，默认 8080 |
+| `javaPath` | local 模式 Java 路径；若 resources/jre 存在则优先内嵌 JRE |
+| `autoStart` | 开机自启 |
+| `minimizeToTray` | 关闭窗口最小化到托盘（MAS 禁用） |
+| `startInTray` | 启动时隐藏窗口 |
 
 ## 数据目录
 
-- **macOS**: `~/Library/Application Support/xianyu-manager-desktop/`
-- **Windows**: `%APPDATA%\xianyu-manager-desktop\`
+| 平台 | 路径 |
+|---|---|
+| macOS | `~/Library/Application Support/xianyu-manager-desktop/` |
+| Windows | `%APPDATA%/xianyu-manager-desktop/` |
 
-## 自定义配置
+local 模式会在该目录下创建：
 
-编辑 `package.json` > `build` 可自定义：
-- `appId` — 应用标识
-- `productName` — 显示名称
-- `icon` — 应用图标路径
-- `nsis` — 安装向导行为
-- `target` — 打包目标格式
+```text
+data/
+logs/
+uploads/
+chrome-profiles/
+config/
+```
 
-## 前置要求
+并向后端传入：
 
-- Java 17+
-- Maven 3.6+
-- Node.js 18+
-- (Windows) Visual Studio Build Tools 或 electron-builder 自动下载
+```text
+-Duser.dir=<userData>
+-DDB_PATH=<userData>/data/xianyu-manager.db
+-Dlogging.file.path=<userData>/logs
+```
+
+## 分发建议
+
+### 官网版
+
+适合完整本地能力：
+
+- Spring Boot 本地后端
+- SQLite / 本地数据目录
+- Chrome/CDP 指纹隔离
+- OpenList / 本地文件能力
+- 托盘常驻
+
+需要：
+
+- Developer ID 签名
+- Notarization
+- 可选内嵌 JRE
+- Windows 代码签名
+
+### App Store 版
+
+适合云端 SaaS 客户端：
+
+- 只连接云端后台
+- 不启动本地后端
+- 不控制本地 Chrome/CDP
+- 不运行 OpenList 可执行文件
+- 走 sandbox + network.client entitlement
+
+需要：
+
+- `mas` target
+- App Sandbox entitlements
+- Provisioning Profile
+- App Store 隐私说明
+- 云端多租户后台
+
+## 静态校验
+
+```bash
+cd scripts/electron
+npm run check
+```
+
+该命令会检查：
+
+- `main.js`
+- `preload.js`
+- `src/**/*.js`
+
+是否存在语法错误。

@@ -1,10 +1,13 @@
 package cn.net.rjnetwork.xianyu.manager.virtual.service;
 
+import cn.net.rjnetwork.xianyu.api.XianyuMtopApiClient;
+import cn.net.rjnetwork.xianyu.api.XianyuTradeAuxApiService;
 import cn.net.rjnetwork.xianyu.manager.account.mapper.AccountMapper;
 import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
 import cn.net.rjnetwork.xianyu.manager.batch.service.BatchJobService;
 import cn.net.rjnetwork.xianyu.manager.message.dto.MessageSendRequest;
 import cn.net.rjnetwork.xianyu.manager.message.service.MessageService;
+import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
 import cn.net.rjnetwork.xianyu.manager.order.mapper.OrderMapper;
 import cn.net.rjnetwork.xianyu.manager.order.model.XianyuOrder;
 import cn.net.rjnetwork.xianyu.manager.order.ship.service.DeliveryRuleEngine;
@@ -17,17 +20,21 @@ import cn.net.rjnetwork.xianyu.manager.virtual.model.DeliveryLog;
 import cn.net.rjnetwork.xianyu.manager.virtual.model.ShipCard;
 import cn.net.rjnetwork.xianyu.manager.virtual.model.VirtualShipTask;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * 自动发货主链路 —— A8。
@@ -43,8 +50,10 @@ import java.util.stream.Collectors;
  *   <li>A6 多卡券匹配：按 card_item_relation.priority 升序拿首个 AVAILABLE 的 ship_card，
  *       拿不到则 SKIPPED+记「无可用卡券」触发 A9 补发；</li>
  *   <li>延迟窗口：若 ship_config 配置了 delaySeconds，写 task.nextRunAt 延后执行；</li>
- *   <li>发送：调 MessageService.sendMessage 把卡券内容发给买家；</li>
- *   <li>落库：写 DeliveryLog 审计 + 标 ship_card USED + 标 task SUCCESS。</li>
+ *   <li>发送：调 MessageService.sendMessage（buyerId 兜底 session）把卡券内容发给买家；</li>
+ *   <li>闲鱼确认：调 dummyDelivery（无需物流）完成平台侧发货；</li>
+ *   <li>落库：写 DeliveryLog 审计 + 标 ship_card USED + 标订单 SHIPPED + 标 task SUCCESS；</li>
+ *   <li>通知：VIRTUAL_SHIP_SUCCESS / VIRTUAL_SHIP_FAILED / AUTO_SHIP_* 站内站外事件。</li>
  * </ol>
  *
  * <p>批次日志复用 B9 BatchJobService（job_type=auto_ship）。</p>
@@ -65,6 +74,8 @@ public class AutoShipService {
     private final MessageService messageService;
     private final BatchJobService batchJobService;
     private final ApplicationEventPublisher eventPublisher;
+    /** self 代理，用于调用 REQUIRES_NEW 固化 MESSAGE_SENT 标记。 */
+    private AutoShipService self;
 
     public AutoShipService(OrderMapper orderMapper,
                            ShipCardMapper shipCardMapper,
@@ -86,6 +97,11 @@ public class AutoShipService {
         this.messageService = messageService;
         this.batchJobService = batchJobService;
         this.eventPublisher = eventPublisher;
+    }
+
+    @Autowired
+    public void setSelf(@Lazy AutoShipService self) {
+        this.self = self;
     }
 
     /**
@@ -140,71 +156,256 @@ public class AutoShipService {
                 publishNotify(task, order, "AUTO_SHIP_NOTIFY_ONLY", decision.reason);
             }
 
-            // 2. A6 多卡券匹配：按 priority 升序拿首个 AVAILABLE
-            List<CardItemRelation> rels = relationMapper.selectEnabledByProductId(task.getProductId());
+            // 消息已发成功但 dummyDelivery 失败时：重试只补平台确认，不再重复匹配卡券/重发 IM。
+            boolean messageAlreadySent = task.getErrorMessage() != null
+                    && task.getErrorMessage().startsWith("MESSAGE_SENT:")
+                    && order.getDeliverContent() != null && !order.getDeliverContent().isBlank();
+
             ShipCard matched = null;
-            for (CardItemRelation rel : rels) {
-                ShipCard card = shipCardMapper.selectById(rel.getCardId());
-                if (card != null && "AVAILABLE".equals(card.getStatus())) {
-                    matched = card;
-                    break;
+            String deliverText = order.getDeliverContent();
+            if (!messageAlreadySent) {
+                // 2. A6 多卡券匹配：按 priority 升序原子抢占 AVAILABLE→USED
+                List<CardItemRelation> rels = relationMapper.selectEnabledByProductId(task.getProductId());
+                for (CardItemRelation rel : rels) {
+                    ShipCard card = shipCardMapper.selectById(rel.getCardId());
+                    if (card == null || !"AVAILABLE".equals(card.getStatus())) {
+                        continue;
+                    }
+                    // 先 CAS 预占，成功后再发送，避免并发双发同一卡
+                    card.setStatus("USED");
+                    card.setUsedOrderId(task.getOrderId());
+                    card.setUsedAt(LocalDateTime.now());
+                    int claimed = shipCardMapper.update(card, new LambdaQueryWrapper<ShipCard>()
+                            .eq(ShipCard::getId, card.getId())
+                            .eq(ShipCard::getStatus, "AVAILABLE"));
+                    if (claimed > 0) {
+                        matched = card;
+                        break;
+                    }
                 }
-            }
-            if (matched == null) {
-                finalizeSkip(task, audit, "无可用卡券，触发 A9 补发");
-                // 推通知让运营补卡券池；A9 补发任务也会扫到本 task 重试
-                publishNotify(task, order, "AUTO_SHIP_NO_CARD", "productId=" + task.getProductId() + " 无可用卡券");
-                return;
-            }
-            audit.setShipCardId(matched.getId());
-            audit.setDeliverContent(buildDeliverContent(matched));
+                if (matched == null) {
+                    finalizeSkip(task, audit, "无可用卡券，触发 A9 补发");
+                    // 推通知让运营补卡券池；A9 补发任务也会扫到本 task 重试
+                    publishNotify(task, order, "AUTO_SHIP_NO_CARD", "productId=" + task.getProductId() + " 无可用卡券");
+                    return;
+                }
+                deliverText = buildDeliverContent(matched);
+                audit.setShipCardId(matched.getId());
+                audit.setDeliverContent(deliverText);
 
-            // 3. 延迟窗口（executeAt 未到则延后执行，防被风控盯上）
-            if (task.getExecuteAt() != null && task.getExecuteAt().isAfter(LocalDateTime.now())) {
-                task.setStatus("PENDING");
-                taskMapper.updateById(task);
-                audit.setStatus("DELAYED");
-                audit.setFailureReason("延迟至 " + task.getExecuteAt() + " 后发");
-                deliveryLogMapper.insert(audit);
-                return;
+                // 3. 延迟窗口（executeAt 未到则延后执行，防被风控盯上）
+                if (task.getExecuteAt() != null && task.getExecuteAt().isAfter(LocalDateTime.now())) {
+                    // 延迟执行：释放刚抢占的卡券，避免被长时间占用
+                    releaseShipCard(matched.getId());
+                    task.setStatus("PENDING");
+                    taskMapper.updateById(task);
+                    audit.setStatus("DELAYED");
+                    audit.setFailureReason("延迟至 " + task.getExecuteAt() + " 后发");
+                    deliveryLogMapper.insert(audit);
+                    return;
+                }
+
+                // 4. 真实发消息：buyerId 兜底生成会话，禁止 sessionId=null 假发送
+                XianyuAccount account = accountMapper.selectById(task.getAccountId());
+                if (account == null) {
+                    releaseShipCard(matched.getId());
+                    finalizeFail(task, audit, "FAILED", "账号不存在");
+                    publishShipFailed(task, order, "账号不存在");
+                    return;
+                }
+                String buyerId = stripGoofishSuffix(order.getBuyerId());
+                if (buyerId.isBlank()) {
+                    releaseShipCard(matched.getId());
+                    finalizeFail(task, audit, "FAILED", "订单缺少 buyerId，无法发送发货消息");
+                    publishShipFailed(task, order, "订单缺少 buyerId，无法发送发货消息");
+                    return;
+                }
+                try {
+                    MessageSendRequest req = new MessageSendRequest();
+                    req.setAccountId(account.getId());
+                    req.setBuyerId(buyerId);
+                    req.setSessionId(normalizeCid(buyerId));
+                    req.setContent(deliverText);
+                    req.setAutoReply(false);
+                    messageService.sendMessage(req);
+                } catch (Exception e) {
+                    releaseShipCard(matched.getId());
+                    finalizeFail(task, audit, "FAILED", "发送失败：" + e.getMessage());
+                    publishShipFailed(task, order, "发送失败：" + e.getMessage());
+                    return;
+                }
+
+                // 消息已发出：独立事务固化内容 + MESSAGE_SENT 标记（卡券已在发送前 CAS 预占）。
+                // dummyDelivery 失败时重试只补平台确认，不重复发卡/重发 IM。
+                self.markMessageSent(matched, order, task, deliverText);
+            } else {
+                audit.setDeliverContent(deliverText);
             }
 
-            // 4. 发送：调 MessageService.sendMessage 把卡券内容发给买家
+            // 5. 闲鱼侧无需物流确认发货（失败不标本地成功；已发消息的重试只补这一步）
             XianyuAccount account = accountMapper.selectById(task.getAccountId());
             if (account == null) {
                 finalizeFail(task, audit, "FAILED", "账号不存在");
+                publishShipFailed(task, order, "账号不存在");
                 return;
             }
-            String deliverText = buildDeliverContent(matched);
             try {
-                MessageSendRequest req = new MessageSendRequest();
-                req.setAccountId(account.getId());
-                req.setSessionId(null); // sessionId 暂不存于 VirtualShipTask，由 MessageService 按 buyerId 拿会话
-                req.setContent(deliverText);
-                messageService.sendMessage(req);
+                confirmDummyDelivery(account, order);
             } catch (Exception e) {
-                finalizeFail(task, audit, "FAILED", "发送失败：" + e.getMessage());
+                String reason = "MESSAGE_SENT: dummyDelivery 失败：" + e.getMessage();
+                finalizeFail(task, audit, "FAILED", reason);
+                publishShipFailed(task, order, reason);
                 return;
             }
 
-            // 5. 落库 + 标 USED + 标 task SUCCESS
-            matched.setStatus("USED");
-            matched.setUsedOrderId(task.getOrderId());
-            matched.setUsedAt(LocalDateTime.now());
-            shipCardMapper.updateById(matched);
+            // 6. 落库 + 标订单 SHIPPED + 标 task SUCCESS
+            if (matched != null && !"USED".equals(matched.getStatus())) {
+                matched.setStatus("USED");
+                matched.setUsedOrderId(task.getOrderId());
+                matched.setUsedAt(LocalDateTime.now());
+                shipCardMapper.updateById(matched);
+            }
+
+            order.setVirtualShippedAt(LocalDateTime.now());
+            order.setDeliverContent(deliverText);
+            order.setStatus("SHIPPED");
+            order.setUpdatedAt(LocalDateTime.now());
+            orderMapper.updateById(order);
 
             audit.setStatus("SUCCESS");
             audit.setDurationMs(System.currentTimeMillis() - t0);
             deliveryLogMapper.insert(audit);
 
             task.setStatus("SUCCESS");
+            task.setErrorMessage(null);
             task.setProcessedAt(LocalDateTime.now());
             taskMapper.updateById(task);
-            log.info("[A8] order {} shipped via card {}", task.getOrderId(), matched.getId());
+            publishShipSuccess(task, order, deliverText);
+            log.info("[A8] order {} shipped{}", task.getOrderId(),
+                    matched != null ? " via card " + matched.getId() : " (retry dummyDelivery only)");
         } catch (Exception e) {
             finalizeFail(task, audit, "FAILED", e.getClass().getSimpleName() + ": " + e.getMessage());
+            publishShipFailed(task, null, e.getClass().getSimpleName() + ": " + e.getMessage());
             log.warn("[A8] processShipTask order {} failed: {}", task.getOrderId(), e.getMessage());
         }
+    }
+
+    /**
+     * 独立事务固化“消息已发出”状态，避免外层 processShipTask 事务回滚抹掉幂等标记。
+     * 卡券已在发送前 CAS 预占，这里只固化订单内容与 task 标记。
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void markMessageSent(ShipCard matched, XianyuOrder order, VirtualShipTask task, String deliverText) {
+        if (order != null) {
+            order.setDeliverContent(deliverText);
+            order.setUpdatedAt(LocalDateTime.now());
+            orderMapper.updateById(order);
+        }
+        if (task != null) {
+            task.setErrorMessage("MESSAGE_SENT: pending dummyDelivery");
+            taskMapper.updateById(task);
+        }
+    }
+
+    /** 发送失败时释放已 CAS 预占但未实际发出的卡券。 */
+    private void releaseShipCard(Long cardId) {
+        if (cardId == null) {
+            return;
+        }
+        ShipCard card = shipCardMapper.selectById(cardId);
+        if (card == null || !"USED".equals(card.getStatus())) {
+            return;
+        }
+        card.setStatus("AVAILABLE");
+        card.setUsedOrderId(null);
+        card.setUsedAt(null);
+        shipCardMapper.updateById(card);
+    }
+
+    private void confirmDummyDelivery(XianyuAccount account, XianyuOrder order) {
+        if (order.getOrderId() == null || order.getOrderId().isBlank()) {
+            throw new IllegalStateException("order.orderId is blank");
+        }
+        if (account.getCookieHeader() == null || account.getCookieHeader().isBlank()) {
+            throw new IllegalStateException("account cookie missing for dummyDelivery");
+        }
+        XianyuMtopApiClient mtop = new XianyuMtopApiClient(account.getCookieHeader());
+        if (account.getImCookieHeader() != null && !account.getImCookieHeader().isBlank()) {
+            mtop.setImCookieHeader(account.getImCookieHeader());
+        }
+        XianyuTradeAuxApiService tradeAux = new XianyuTradeAuxApiService(mtop);
+        JsonNode resp = tradeAux.dummyDelivery(order.getOrderId());
+        if (resp == null) {
+            throw new IllegalStateException("dummyDelivery returned null response");
+        }
+        String ret = resp.path("ret").toString();
+        if (ret.isBlank() || ret.contains("FAIL") || ret.contains("ERROR") || !ret.contains("SUCCESS")) {
+            throw new IllegalStateException(truncate(ret, 300));
+        }
+    }
+
+    private void publishShipSuccess(VirtualShipTask task, XianyuOrder order, String deliverText) {
+        try {
+            String accountName = accountName(task.getAccountId());
+            Map<String, Object> vars = new LinkedHashMap<>();
+            vars.put("accountName", accountName);
+            vars.put("orderId", order != null && order.getOrderId() != null ? order.getOrderId() : String.valueOf(task.getOrderId()));
+            vars.put("buyerName", order != null && order.getCounterpartyName() != null ? order.getCounterpartyName() : "");
+            vars.put("itemTitle", order != null && order.getItemTitle() != null ? order.getItemTitle() : "");
+            vars.put("content", deliverText != null ? deliverText : "");
+            eventPublisher.publishEvent(new NotifyEvent("VIRTUAL_SHIP_SUCCESS", task.getAccountId(), accountName, vars));
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void publishShipFailed(VirtualShipTask task, XianyuOrder order, String reason) {
+        try {
+            Long accountId = task != null ? task.getAccountId() : (order != null ? order.getAccountId() : null);
+            String accountName = accountName(accountId);
+            Map<String, Object> vars = new LinkedHashMap<>();
+            vars.put("accountName", accountName);
+            vars.put("orderId", order != null && order.getOrderId() != null ? order.getOrderId()
+                    : (task != null ? String.valueOf(task.getOrderId()) : ""));
+            vars.put("itemTitle", order != null && order.getItemTitle() != null ? order.getItemTitle() : "");
+            vars.put("reason", reason != null ? reason : "");
+            eventPublisher.publishEvent(new NotifyEvent("VIRTUAL_SHIP_FAILED", accountId, accountName, vars));
+        } catch (Exception ignored) {
+        }
+    }
+
+    private String accountName(Long accountId) {
+        if (accountId == null) {
+            return "";
+        }
+        XianyuAccount a = accountMapper.selectById(accountId);
+        if (a == null) {
+            return String.valueOf(accountId);
+        }
+        return a.getDisplayName() != null ? a.getDisplayName() : a.getAccountName();
+    }
+
+    private static String stripGoofishSuffix(String userId) {
+        if (userId == null) {
+            return "";
+        }
+        String trimmed = userId.trim();
+        int at = trimmed.indexOf('@');
+        return at > 0 ? trimmed.substring(0, at) : trimmed;
+    }
+
+    private static String normalizeCid(String userId) {
+        String bare = stripGoofishSuffix(userId);
+        if (bare.isBlank()) {
+            return "";
+        }
+        return bare.contains("@") ? bare : bare + "@goofish";
+    }
+
+    private static String truncate(String s, int max) {
+        if (s == null) {
+            return "";
+        }
+        return s.length() <= max ? s : s.substring(0, max) + "...";
     }
 
     /** 拼卡券发货文本（四类型各自格式）。 */
@@ -247,13 +448,16 @@ public class AutoShipService {
 
     private void publishNotify(VirtualShipTask task, XianyuOrder order, String type, String reason) {
         try {
-            eventPublisher.publishEvent(new cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent(
-                    type, task.getAccountId(),
-                    Optional.ofNullable(order).map(o -> o.getCounterpartyName()).orElse(""),
-                    java.util.Map.of("orderId", String.valueOf(task.getOrderId()),
-                            "productId", String.valueOf(task.getProductId()),
-                            "reason", reason == null ? "" : reason)));
-        } catch (Exception ignored) {}
+            String accountName = accountName(task.getAccountId());
+            Map<String, Object> vars = new LinkedHashMap<>();
+            vars.put("accountName", accountName);
+            vars.put("orderId", order != null && order.getOrderId() != null ? order.getOrderId() : String.valueOf(task.getOrderId()));
+            vars.put("productId", task.getProductId() != null ? String.valueOf(task.getProductId()) : "");
+            vars.put("itemTitle", order != null && order.getItemTitle() != null ? order.getItemTitle() : "");
+            vars.put("reason", reason == null ? "" : reason);
+            eventPublisher.publishEvent(new NotifyEvent(type, task.getAccountId(), accountName, vars));
+        } catch (Exception ignored) {
+        }
     }
 
     /** 批次入口：扫所有 PENDING task 跑一遍，给 VirtualShipService.scanAndShip 调。 */
