@@ -55,6 +55,9 @@ public class ChromeProfile {
     /** 最后健康检测时间 */
     private LocalDateTime lastHealthCheckAt;
 
+    /** 最后被业务访问/复用时间，用于空闲回收；跨请求线程/调度线程读取，需保证可见性。 */
+    private volatile LocalDateTime lastAccessAt;
+
     /** 容器当前状态 */
     private ContainerStatus status;
 

@@ -60,6 +60,15 @@ public class ChromeConfig {
     /** 是否在 stderr/stdout 输出 Chrome 进程日志（调试用） */
     private boolean logChromeOutput = false;
 
+    /** 最多同时常驻的账号 Chrome 容器数，防止多账号长时间运行拖垮机器。 */
+    private int maxActiveProfiles = 3;
+
+    /** Chrome 容器空闲回收时间（毫秒），默认 30 分钟。 */
+    private long idleTimeoutMs = 30 * 60 * 1000L;
+
+    /** Chrome 容器空闲回收扫描间隔（毫秒），默认 5 分钟。 */
+    private long idleCleanupDelayMs = 5 * 60 * 1000L;
+
     /**
      * 构建指定账号的目标 userDataDir 路径。
      */

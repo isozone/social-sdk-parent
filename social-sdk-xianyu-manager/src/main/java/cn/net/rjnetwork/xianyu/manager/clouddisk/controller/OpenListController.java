@@ -83,7 +83,7 @@ public class OpenListController {
 
     @GetMapping("/events")
     public SseEmitter events() {
-        SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
+        SseEmitter emitter = new SseEmitter(OpenListTaskService.SSE_TIMEOUT_MS);
         taskService.subscribe(emitter);
         return emitter;
     }

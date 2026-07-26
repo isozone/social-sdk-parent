@@ -41,6 +41,9 @@ public class OpenListTaskService {
     private volatile String initialPassword;
     private volatile boolean initialCredsCaptured;
 
+    public static final long SSE_TIMEOUT_MS = TimeUnit.MINUTES.toMillis(10);
+    private static final int MAX_SSE_EMITTERS = 32;
+
     private final ConcurrentHashMap<String, SseEmitter> emitters = new ConcurrentHashMap<>();
 
     public OpenListTaskService(OpenListProperties properties, OpenListInstallerService installerService, OpenlistInstanceMapper instanceMapper) {
@@ -408,8 +411,8 @@ public class OpenListTaskService {
         this.currentPhase = phase;
         this.currentMessage = message;
         this.progress = pr;
-        // 推送给所有 SSE 监听者
-        emitters.values().forEach(emitter -> {
+        // 推送给所有 SSE 监听者；发送失败立即移除，避免坏连接长期占用内存。
+        emitters.forEach((id, emitter) -> {
             try {
                 emitter.send(Map.of(
                     "phase", phase,
@@ -417,16 +420,27 @@ public class OpenListTaskService {
                     "progress", pr
                 ));
             } catch (Exception e) {
-                // ignore
+                emitters.remove(id);
+                try { emitter.complete(); } catch (Exception ignored) {}
             }
         });
     }
 
     public void subscribe(SseEmitter emitter) {
+        if (emitters.size() >= MAX_SSE_EMITTERS) {
+            String oldest = emitters.keys().hasMoreElements() ? emitters.keys().nextElement() : null;
+            if (oldest != null) {
+                SseEmitter removed = emitters.remove(oldest);
+                if (removed != null) {
+                    try { removed.complete(); } catch (Exception ignored) {}
+                }
+            }
+        }
         String id = UUID.randomUUID().toString();
         emitters.put(id, emitter);
         emitter.onCompletion(() -> emitters.remove(id));
         emitter.onTimeout(() -> emitters.remove(id));
+        emitter.onError(e -> emitters.remove(id));
     }
 
     public Map<String, Object> getCurrentProgress() {

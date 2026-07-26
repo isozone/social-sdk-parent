@@ -2,6 +2,7 @@ package cn.net.rjnetwork.xianyu.manager.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
@@ -15,12 +16,12 @@ import java.util.concurrent.ThreadPoolExecutor;
  */
 @Configuration
 @EnableAsync
-public class AsyncConfig {
+public class AsyncConfig implements AsyncConfigurer {
 
     public static final String SYNC_EXECUTOR = "syncTaskExecutor";
 
-    @Bean(name = SYNC_EXECUTOR)
-    public Executor syncTaskExecutor() {
+    @Bean(name = {SYNC_EXECUTOR, "taskExecutor"})
+    public ThreadPoolTaskExecutor syncTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         // 核心线程数：保持常驻的线程
         executor.setCorePoolSize(4);
@@ -39,5 +40,13 @@ public class AsyncConfig {
         executor.setAwaitTerminationSeconds(30);
         executor.initialize();
         return executor;
+    }
+
+    /**
+     * 关键：@Async 未指定 executor 时走这里，避免 Spring 回退到 SimpleAsyncTaskExecutor 无限创建线程。
+     */
+    @Override
+    public Executor getAsyncExecutor() {
+        return syncTaskExecutor();
     }
 }

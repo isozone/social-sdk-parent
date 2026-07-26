@@ -119,6 +119,9 @@ crypto:
 # ======================== 通知模块 ========================
 notify:
   rate-limit-per-minute: 60                  # 单通道默认每分钟发送上限（0=不限制）
+  rate-limit-max-buckets: 512                # 限流桶最大数量，防止通道异常增长造成内存泄漏
+  rate-limit-idle-millis: 1800000            # 限流桶空闲 30 分钟回收
+  rate-limit-cleanup-delay-ms: 300000        # 每 5 分钟清理一次限流桶
   rate-limit-retry-delay-seconds: 30        # 触发限频后转入重试队列的短延时
   retry:
     enabled: true
@@ -133,6 +136,9 @@ notify:
 chrome:
   headless: ${CHROME_HEADLESS:false}
   headless-mode: ${CHROME_HEADLESS_MODE:new}
+  max-active-profiles: ${CHROME_MAX_ACTIVE_PROFILES:3}      # 最多常驻 Chrome 容器数，防止多账号拖垮机器
+  idle-timeout-ms: ${CHROME_IDLE_TIMEOUT_MS:1800000}        # 空闲 30 分钟回收 Chrome 容器
+  idle-cleanup-delay-ms: ${CHROME_IDLE_CLEANUP_DELAY_MS:300000}
 
 # CDP 滑块验证配置 - 远程控制浏览器自动化处理闲鱼风控拦截
 cdp:

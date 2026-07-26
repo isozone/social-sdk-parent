@@ -8,6 +8,7 @@ import cn.net.rjnetwork.xianyu.proxy.config.ProxyInfo;
 import cn.net.rjnetwork.xianyu.proxy.core.ProxyAcquireRequest;
 import cn.net.rjnetwork.xianyu.proxy.core.ProxyException;
 import cn.net.rjnetwork.xianyu.proxy.core.ProxyPoolManager;
+import jakarta.annotation.PreDestroy;
 import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +16,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -108,10 +111,11 @@ public class ChromeProfileManager {
      * @return 创建的 ChromeProfile
      * @throws ChromeException 启动失败
      */
-    public ChromeProfile launchAccount(long accountId, String accountName) {
+    public synchronized ChromeProfile launchAccount(long accountId, String accountName) {
         if (activeProfiles.containsKey(accountId)) {
             ChromeProfile existing = activeProfiles.get(accountId);
             if (existing.isAlive()) {
+                existing.setLastAccessAt(LocalDateTime.now());
                 log.info("[LAUNCH] 容器已在运行, accountId={}", accountId);
                 return existing;
             } else {
@@ -119,6 +123,8 @@ public class ChromeProfileManager {
                 stopAccount(accountId);
             }
         }
+
+        enforceProfileLimit(accountId);
 
         // 1. 派生 seed
         long seed = deriveSeed(accountId);
@@ -153,6 +159,7 @@ public class ChromeProfileManager {
                 .proxyLeaseId(proxyLeaseId)
                 .seed(seed)
                 .status(ChromeProfile.ContainerStatus.INITIALIZING)
+                .lastAccessAt(LocalDateTime.now())
                 .crashCount(0)
                 .build();
 
@@ -187,7 +194,7 @@ public class ChromeProfileManager {
      *
      * @param accountId 账号 ID
      */
-    public void stopAccount(long accountId) {
+    public synchronized void stopAccount(long accountId) {
         ChromeProfile profile = activeProfiles.remove(accountId);
         if (profile == null) {
             log.debug("[STOP] 无对应容器, accountId={}", accountId);
@@ -215,7 +222,8 @@ public class ChromeProfileManager {
     /**
      * 销毁所有容器（应用关闭时调用）。
      */
-    public void shutdown() {
+    @PreDestroy
+    public synchronized void shutdown() {
         log.info("[SHUTDOWN] 关闭所有 Chrome 容器, count={}", activeProfiles.size());
         List<Long> ids = new ArrayList<>(activeProfiles.keySet());
         for (Long accountId : ids) {
@@ -226,6 +234,7 @@ public class ChromeProfileManager {
             }
         }
         activeProfiles.clear();
+        recoveryScheduler.shutdownNow();
     }
 
     // ==================== 指纹注入 ====================
@@ -271,7 +280,11 @@ public class ChromeProfileManager {
      * 获取指定账号的容器状态。
      */
     public Optional<ChromeProfile> getProfile(long accountId) {
-        return Optional.ofNullable(activeProfiles.get(accountId));
+        ChromeProfile profile = activeProfiles.get(accountId);
+        if (profile != null) {
+            profile.setLastAccessAt(LocalDateTime.now());
+        }
+        return Optional.ofNullable(profile);
     }
 
     /**
@@ -302,7 +315,11 @@ public class ChromeProfileManager {
      */
     public boolean isAlive(long accountId) {
         ChromeProfile p = activeProfiles.get(accountId);
-        return p != null && p.isAlive();
+        if (p != null && p.isAlive()) {
+            p.setLastAccessAt(LocalDateTime.now());
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -320,6 +337,45 @@ public class ChromeProfileManager {
     }
 
     // ==================== 崩溃恢复 ====================
+
+    /**
+     * 定时回收空闲 Chrome 容器，避免多账号长期常驻导致机器内存耗尽。
+     */
+    @Scheduled(fixedDelayString = "${chrome.idle-cleanup-delay-ms:300000}")
+    public synchronized void cleanupIdleProfiles() {
+        long idleTimeoutMs = Math.max(60_000L, config.getIdleTimeoutMs());
+        LocalDateTime threshold = LocalDateTime.now().minusNanos(idleTimeoutMs * 1_000_000L);
+        List<Long> idleIds = activeProfiles.values().stream()
+                .filter(p -> p.getLastAccessAt() != null && p.getLastAccessAt().isBefore(threshold))
+                .sorted(Comparator.comparing(ChromeProfile::getLastAccessAt))
+                .map(ChromeProfile::getAccountId)
+                .toList();
+        for (Long accountId : idleIds) {
+            log.info("[CLEANUP] 回收空闲 Chrome 容器, accountId={}, idleTimeoutMs={}", accountId, idleTimeoutMs);
+            stopAccount(accountId);
+        }
+        enforceProfileLimit(-1L);
+    }
+
+    private void enforceProfileLimit(long incomingAccountId) {
+        int maxActive = Math.max(1, config.getMaxActiveProfiles());
+        int current = activeProfiles.size();
+        boolean beforeLaunch = incomingAccountId > 0;
+        int needToStop = beforeLaunch ? current - maxActive + 1 : current - maxActive;
+        if (needToStop <= 0) {
+            return;
+        }
+        List<ChromeProfile> candidates = activeProfiles.values().stream()
+                .filter(p -> !p.getAccountId().equals(incomingAccountId))
+                .sorted(Comparator.comparing(p -> p.getLastAccessAt() != null ? p.getLastAccessAt() : p.getLaunchedAt()))
+                .toList();
+        for (ChromeProfile profile : candidates) {
+            if (needToStop-- <= 0) break;
+            log.info("[CLEANUP] 达到 Chrome 容器上限, 回收最久未使用容器 accountId={}, maxActive={}",
+                    profile.getAccountId(), maxActive);
+            stopAccount(profile.getAccountId());
+        }
+    }
 
     /**
      * 定时健康检测（每 N 秒，由 Spring Scheduling 或外部调度器调用）。
