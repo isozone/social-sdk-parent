@@ -67,13 +67,19 @@ export async function request<T = any>(cfg: ReqConfig): Promise<T> {
     })
 
     const data = res.data as any
-    if (data?.code === 401 || res.statusCode === 401) {
+    if (data?.code === 401 || data?.code === '401' || res.statusCode === 401) {
       const auth = useAuthStore()
       auth.logout()
       uni.redirectTo({ url: '/pages/login/index' })
       throw new Error('登录已过期，请重新登录')
     }
-    if (data?.code !== 0) {
+    // 后端 ApiResponse: success=true + code="OK"；兼容 code=0 / 数字 0
+    const ok = data?.success === true
+      || data?.code === 0
+      || data?.code === '0'
+      || data?.code === 'OK'
+      || data?.code === 'ok'
+    if (!ok) {
       throw new Error(data?.message || '请求失败')
     }
 

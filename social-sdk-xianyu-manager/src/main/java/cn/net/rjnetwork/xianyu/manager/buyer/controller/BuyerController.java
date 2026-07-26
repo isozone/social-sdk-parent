@@ -1,5 +1,7 @@
 package cn.net.rjnetwork.xianyu.manager.buyer.controller;
 
+import cn.net.rjnetwork.xianyu.manager.buyer.dto.BuyerNotesRequest;
+import cn.net.rjnetwork.xianyu.manager.buyer.dto.BuyerTagRequest;
 import cn.net.rjnetwork.xianyu.manager.buyer.model.BuyerProfile;
 import cn.net.rjnetwork.xianyu.manager.buyer.service.BuyerProfileService;
 import cn.net.rjnetwork.xianyu.manager.common.ApiResponse;
@@ -32,9 +34,30 @@ public class BuyerController {
         return ApiResponse.success(service.get(buyerId));
     }
 
+    /**
+     * 追加标签（兼容 query 与 JSON body）
+     * POST /api/buyer/{buyerId}/tag?tag=xxx
+     * POST /api/buyer/{buyerId}/tag  body: { "tag": "xxx" } 或 { "tags": ["a","b"] }
+     */
     @PostMapping("/{buyerId}/tag")
-    public ApiResponse<String> addTag(@PathVariable String buyerId, @RequestParam String tag) {
-        service.addTag(buyerId, tag);
+    public ApiResponse<String> addTag(@PathVariable String buyerId,
+                                      @RequestParam(required = false) String tag,
+                                      @RequestBody(required = false) BuyerTagRequest body) {
+        if (tag != null && !tag.isBlank()) {
+            service.addTag(buyerId, tag.trim());
+        }
+        if (body != null) {
+            if (body.getTag() != null && !body.getTag().isBlank()) {
+                service.addTag(buyerId, body.getTag().trim());
+            }
+            if (body.getTags() != null) {
+                for (String t : body.getTags()) {
+                    if (t != null && !t.isBlank()) {
+                        service.addTag(buyerId, t.trim());
+                    }
+                }
+            }
+        }
         return ApiResponse.success("ok");
     }
 
@@ -44,9 +67,23 @@ public class BuyerController {
         return ApiResponse.success("ok");
     }
 
+    /**
+     * 设置备注（兼容 query 与 JSON body）
+     * POST /api/buyer/{buyerId}/notes?notes=xxx
+     * POST /api/buyer/{buyerId}/notes  body: { "notes": "xxx" } 或 { "note": "xxx" }
+     */
     @PostMapping("/{buyerId}/notes")
-    public ApiResponse<String> setNotes(@PathVariable String buyerId, @RequestParam String notes) {
-        service.setNotes(buyerId, notes);
+    public ApiResponse<String> setNotes(@PathVariable String buyerId,
+                                        @RequestParam(required = false) String notes,
+                                        @RequestBody(required = false) BuyerNotesRequest body) {
+        String value = notes;
+        if ((value == null || value.isBlank()) && body != null) {
+            value = body.resolveNotes();
+        }
+        if (value == null) {
+            value = "";
+        }
+        service.setNotes(buyerId, value);
         return ApiResponse.success("ok");
     }
 

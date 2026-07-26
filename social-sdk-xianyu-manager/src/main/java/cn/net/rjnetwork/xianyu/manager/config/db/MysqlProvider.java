@@ -7,7 +7,7 @@ import javax.annotation.PostConstruct;
 import java.util.Arrays;
 
 /**
- * MySQL8 方言实现 — profile=mysql。
+ * MySQL8 方言实现 — bitefu.wall.db-type=mysql。
  * <p>连接池可并发（maxActive=20），SET 注入 utf8mb4 + 严格 SQL 模式 + 时区。</p>
  */
 @Component

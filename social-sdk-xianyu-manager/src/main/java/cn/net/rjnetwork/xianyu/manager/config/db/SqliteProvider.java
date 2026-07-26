@@ -7,9 +7,9 @@ import javax.annotation.PostConstruct;
 import java.util.Arrays;
 
 /**
- * SQLite 方言实现 — 默认 profile。
+ * SQLite 方言实现 — 默认数据库类型。
  * <p>连接池单连接最优（SQLite 文件锁限制），PRAGMA 注入 WAL/synchronous/cache_size/busy_timeout。</p>
- * <p>激活条件：{@code spring.profiles.active=sqlite} 或缺失（兜底默认）。</p>
+ * <p>激活条件：{@code bitefu.wall.db-type=sqlite} 或缺失（兜底默认）。</p>
  */
 @Component
 @ConditionalOnProperty(prefix = "bitefu.wall", name = "db-type", havingValue = "sqlite", matchIfMissing = true)

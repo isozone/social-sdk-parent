@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestController
@@ -34,24 +35,12 @@ public class AuthController {
      */
     @GetMapping("/profile")
     public ApiResponse<Map<String, Object>> getProfile(Authentication authentication) {
-        if (authentication == null || authentication.getName() == null) {
-            return ApiResponse.fail("AUTH_REQUIRED", "Authentication required");
-        }
-
-        String username = authentication.getName();
+        String username = requireUsername(authentication);
         AdminUser user = authService.findByUsername(username).orElse(null);
         if (user == null) {
             return ApiResponse.fail("USER_NOT_FOUND", "User not found");
         }
-        Map<String, Object> data = Map.of(
-                "id", user.getId(),
-                "username", user.getUsername(),
-                "displayName", user.getDisplayName(),
-                "email", user.getEmail() != null ? user.getEmail() : "",
-                "phone", user.getPhone() != null ? user.getPhone() : "",
-                "roleLevel", user.getRoleLevel()
-        );
-        return ApiResponse.ok(data);
+        return ApiResponse.ok(toProfileMap(user));
     }
 
     /**
@@ -63,14 +52,7 @@ public class AuthController {
             @Valid @RequestBody UpdateProfileRequest request) {
         String username = requireUsername(authentication);
         AdminUser user = authService.updateProfile(username, request);
-        return ApiResponse.ok(Map.of(
-                "id", user.getId(),
-                "username", user.getUsername(),
-                "displayName", user.getDisplayName(),
-                "email", user.getEmail(),
-                "phone", user.getPhone(),
-                "roleLevel", user.getRoleLevel()
-        ));
+        return ApiResponse.ok(toProfileMap(user));
     }
 
     /**
@@ -92,5 +74,20 @@ public class AuthController {
             throw new IllegalArgumentException("请先登录");
         }
         return authentication.getName();
+    }
+
+    /**
+     * Map.of 不允许 null value，admin 未填 email/phone/displayName 时会直接 NPE 成 500。
+     * 统一转成空串，保证 GET/PUT /profile 返回结构稳定。
+     */
+    private Map<String, Object> toProfileMap(AdminUser user) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("id", user.getId());
+        data.put("username", user.getUsername());
+        data.put("displayName", user.getDisplayName() != null ? user.getDisplayName() : "");
+        data.put("email", user.getEmail() != null ? user.getEmail() : "");
+        data.put("phone", user.getPhone() != null ? user.getPhone() : "");
+        data.put("roleLevel", user.getRoleLevel() != null ? user.getRoleLevel() : 0);
+        return data;
     }
 }

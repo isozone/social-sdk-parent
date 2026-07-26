@@ -2,39 +2,53 @@ import { api } from './request'
 import type { PageResponse } from '@/types/common'
 
 export interface BuyerItem {
-  id: number
-  buyerName: string
+  id?: number | string
+  buyerId?: string
+  buyerName?: string
   avatar?: string
-  orderCount: number
-  totalAmount: number
+  orderCount?: number
+  totalAmount?: number
+  tags?: string
+  notes?: string
+  credibilityScore?: number
   lastContactAt?: string
 }
 
-// 后端无独立 BuyerController（仅在 /openapi/v1/buyer 厂商接口）
-// 前端改走 monitor dashboard 聚合：buyer 画像数据从 dashboard 的 buyerStats 字段取
+// 后端 BuyerController: /api/buyer/*
 export function getList(params?: any) {
-  return api.get<PageResponse<BuyerItem>>('/api/mini/monitor/dashboard', { ...params, scope: 'buyers' })
+  return api.get<BuyerItem[] | PageResponse<BuyerItem>>('/api/mini/buyer/list', params)
 }
 
 export function getDetail(id: number | string) {
-  return api.get<BuyerItem>('/api/mini/monitor/dashboard', { buyerId: id })
+  return api.get<BuyerItem>(`/api/mini/buyer/${id}`)
 }
 
 export interface TagParams {
-  buyerId: number
-  tags: string[]
+  buyerId: number | string
+  tags?: string[]
+  tag?: string
 }
 
-// 后端暂无独立写入端点：前端本地确认，避免产生不可达请求
 export function tag(data: TagParams) {
-  return Promise.resolve({ success: true, ...data })
+  const body: any = {}
+  if (data.tag) body.tag = data.tag
+  if (data.tags?.length) body.tags = data.tags
+  return api.post(`/api/mini/buyer/${data.buyerId}/tag`, body)
 }
 
 export interface NoteParams {
-  buyerId: number
-  note: string
+  buyerId: number | string
+  note?: string
+  notes?: string
 }
 
 export function updateNote(data: NoteParams) {
-  return Promise.resolve({ success: true, ...data })
+  return api.post(`/api/mini/buyer/${data.buyerId}/notes`, {
+    notes: data.notes ?? data.note ?? '',
+    note: data.note ?? data.notes ?? '',
+  })
+}
+
+export function getCredibility(buyerId: number | string) {
+  return api.get<number>(`/api/mini/buyer/${buyerId}/credibility`)
 }

@@ -1,9 +1,11 @@
 server:
   port: 8080
 
+bitefu:
+  wall:
+    db-type: sqlite
+
 spring:
-  profiles:
-    active: local
   application:
     name: xianyu-manager
   web:
@@ -14,15 +16,12 @@ spring:
     throw-exception-if-no-handler-found: false
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
-    # datasource 的 driver/url/username/password 由各 profile 文件提供：
-    #   application-sqlite.yml  (默认)
-    #   application-mysql.yml
-    #   application-postgres.yml
-    # 三选一：--spring.profiles.active=mysql 切换
-    driver-class-name: ${DB_DRIVER:org.sqlite.JDBC}
-    url: ${DB_URL:jdbc:sqlite:./data/xianyu-manager.db}
-    username: ${DB_USERNAME:}
-    password: ${DB_PASSWORD:}
+    # 默认走 SQLite 本地文件；MySQL/PostgreSQL 由对应配置文件覆盖。
+    # 数据库方言判断只看 bitefu.wall.db-type，不从 spring.profiles.active 推断。
+    driver-class-name: org.sqlite.JDBC
+    url: jdbc:sqlite:${DB_PATH:./data/xianyu-manager.db}
+    username:
+    password:
     druid:
       # ===== 连接池核心参数 =====
       initial-size: 5

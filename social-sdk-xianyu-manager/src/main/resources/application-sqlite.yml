@@ -1,9 +1,19 @@
-# SQLite profile — 默认三选一实现
-# 启动：java -jar xianyu-manager.jar --spring.profiles.active=sqlite
+# SQLite 配置 — 三选一实现之一。
+# 数据库方言判断只看 bitefu.wall.db-type，不从 spring.profiles.active 推断。
+# 如需显式加载本文件，可启动：java -jar xianyu-manager.jar --spring.profiles.active=sqlite
+bitefu:
+  wall:
+    db-type: sqlite
+
 spring:
   datasource:
     driver-class-name: org.sqlite.JDBC
-    url: ${DB_URL:jdbc:sqlite:${DB_PATH:./data/xianyu-manager.db}}
+    # 注意：不要用 ${DB_URL}。本机 shell 常驻的 DB_URL 往往是 MySQL/PG 连接串，
+    # 会把 sqlite profile 的驱动/URL 拼错（driver=sqlite + url=jdbc:mysql://...）。
+    # SQLite 只用 DB_PATH 指定本地文件。
+    url: jdbc:sqlite:${DB_PATH:./data/xianyu-manager.db}
+    username:
+    password:
 
 # SQLite 单连接最优：max-active 由 SqliteProvider 控制（=1）
 # 用户无需手动调，见 SqliteProvider.maxActive()

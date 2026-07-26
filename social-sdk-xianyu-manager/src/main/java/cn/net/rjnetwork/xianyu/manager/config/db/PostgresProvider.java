@@ -7,7 +7,7 @@ import javax.annotation.PostConstruct;
 import java.util.Arrays;
 
 /**
- * PostgreSQL 方言实现 — profile=postgres。
+ * PostgreSQL 方言实现 — bitefu.wall.db-type=postgres。
  * <p>连接池可并发（maxActive=20），SET 注入 standard_conforming_strings + 时区。</p>
  */
 @Component

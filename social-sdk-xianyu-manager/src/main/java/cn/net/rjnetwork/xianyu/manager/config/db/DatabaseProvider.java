@@ -2,11 +2,11 @@ package cn.net.rjnetwork.xianyu.manager.config.db;
 
 /**
  * 数据库方言抽象 — 支持 SQLite（默认）/ MySQL8 / PostgreSQL 三选一。
- * <p>由 Spring profile 激活对应实现：{@code @Profile("sqlite")}/@Profile("mysql")/@Profile("postgres")}。
+ * <p>由显式配置 {@code bitefu.wall.db-type=sqlite|mysql|postgres} 激活对应实现。
  * 调用方通过 {@link #current()} 拿到当前实现，获取方言专属的初始化 SQL / schema 文件名 / 验证查询。</p>
  *
- * <p>三选一规则：用户在 {@code application.yml} 或启动参数 {@code --spring.profiles.active=mysql} 指定一个，
- * 默认 sqlite。不允许同时启用多个实现（Spring 会拒绝注入冲突）。</p>
+ * <p>三选一规则：数据库类型只看 {@code bitefu.wall.db-type}，默认 sqlite。
+ * {@code spring.profiles.active} 只负责加载配置文件，不作为数据库类型判断标准。</p>
  */
 public interface DatabaseProvider {
 

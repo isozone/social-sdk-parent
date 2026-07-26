@@ -4,9 +4,9 @@
 
 ## 切换方式
 
-通过 Spring profile 切换，对应三个配置文件：
+数据库类型只由显式配置 `bitefu.wall.db-type` 判断；`spring.profiles.active` 只负责加载对应配置文件，不能作为数据库类型判断标准。
 
-| profile | 配置文件 | schema 文件 | 适用场景 |
+| db-type | 可选配置文件 | schema 文件 | 适用场景 |
 |---|---|---|---|
 | `sqlite`（默认） | `application-sqlite.yml` | `db/schema-sqlite.sql` | 单机/开发/小规模 |
 | `mysql` | `application-mysql.yml` | `db/schema-mysql.sql` | 中大规模生产 |
@@ -54,25 +54,25 @@ java -jar xianyu-manager.jar \
   --DB_PASSWORD=xianyu123
 ```
 
-## 环境变量兜底
+## 环境变量
 
-`application.yml` 里的 datasource 用 `${DB_*:-default}` 占位，三种方式都可覆盖：
+默认 SQLite 不读取 `DB_URL`，避免本机常驻 MySQL/PG 环境变量污染默认启动；只用 `DB_PATH` 指定本地库文件。
 
 | 变量 | 默认值（SQLite） | 作用 |
 |---|---|---|
-| `DB_DRIVER` | `org.sqlite.JDBC` | JDBC 驱动类 |
-| `DB_URL` | `jdbc:sqlite:./data/xianyu-manager.db` | 数据库 URL |
-| `DB_USERNAME` | 空 | 用户名 |
-| `DB_PASSWORD` | 空 | 密码 |
+| `DB_PATH` | `./data/xianyu-manager.db` | SQLite 数据库文件路径 |
+| `DB_URL` | 仅 MySQL/PostgreSQL 配置文件使用 | JDBC URL |
+| `DB_USERNAME` | 仅 MySQL/PostgreSQL 配置文件使用 | 用户名 |
+| `DB_PASSWORD` | 仅 MySQL/PostgreSQL 配置文件使用 | 密码 |
 
-> profile 文件会自动设好 `DB_DRIVER` / `DB_URL`，用户只需补 `DB_USERNAME` / `DB_PASSWORD`。
+> MySQL/PostgreSQL 启动时需加载对应配置文件，并由该文件显式设置 `bitefu.wall.db-type`。
 
 ## 内部实现
 
 - **`DatabaseProvider` 接口**（`config/db/`）：方言抽象，定义 `schemaFile()` / `connectionInitSqls()` / `maxActive()` / `validationQuery()` 等。
-- **三实现**：`SqliteProvider`（`@Profile("sqlite")`）/ `MysqlProvider`（`@Profile("mysql")`）/ `PostgresProvider`（`@Profile("postgres")`）。
+- **三实现**：`SqliteProvider` / `MysqlProvider` / `PostgresProvider` 均通过 `@ConditionalOnProperty(prefix="bitefu.wall", name="db-type")` 激活。
 - **`DruidConfig`**：从 `DatabaseProvider` 拿连接初始化 SQL 和 maxActive，SQLite 单连接最优，MySQL/PG 并发 20。
-- **`DatabaseInitializer`**：按 profile 加载对应 schema 文件，启动时自动建表。
+- **`DatabaseInitializer`**：按当前 `DatabaseProvider.schemaFile()` 加载对应 schema 文件，启动时自动建表。
 - **三套 schema**：方言差异已处理（SQLite `INTEGER PRIMARY KEY` / MySQL `BIGINT AUTO_INCREMENT` / PG `BIGSERIAL`；`DATETIME` → `TIMESTAMP`；外键引用列类型对齐）。
 
 ## 已实测

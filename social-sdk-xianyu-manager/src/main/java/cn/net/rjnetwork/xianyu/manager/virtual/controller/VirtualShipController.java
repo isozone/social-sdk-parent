@@ -6,6 +6,7 @@ import cn.net.rjnetwork.xianyu.manager.virtual.dto.VirtualShipConfigRequest;
 import cn.net.rjnetwork.xianyu.manager.virtual.dto.VirtualShipConfigUpdateRequest;
 import cn.net.rjnetwork.xianyu.manager.virtual.dto.CardPoolImportRequest;
 import cn.net.rjnetwork.xianyu.manager.virtual.dto.ShipTaskRetryRequest;
+import cn.net.rjnetwork.xianyu.manager.virtual.dto.VirtualShipSendCardRequest;
 import cn.net.rjnetwork.xianyu.manager.virtual.model.VirtualCardPool;
 import cn.net.rjnetwork.xianyu.manager.virtual.model.VirtualShipConfig;
 import cn.net.rjnetwork.xianyu.manager.virtual.model.VirtualShipTask;
@@ -128,6 +129,40 @@ public class VirtualShipController {
     public ApiResponse<Void> triggerTask(@PathVariable Long id) {
         shipService.triggerTask(id);
         return ApiResponse.ok(null);
+    }
+
+    /**
+     * 手动发卡 / 触发发货（小程序 sendCard 对齐）
+     * POST /api/virtual-ship/cards/send
+     * { "taskId": 1 } 或 { "orderId": 1 }
+     */
+    @PostMapping("/cards/send")
+    @Audit("手动触发虚拟发货")
+    public ApiResponse<Map<String, Object>> sendCard(@RequestBody VirtualShipSendCardRequest request) {
+        if (request == null) {
+            return ApiResponse.fail("BAD_REQUEST", "request body required");
+        }
+        if (request.getTaskId() != null) {
+            shipService.triggerTask(request.getTaskId());
+            return ApiResponse.ok(Map.of("taskId", request.getTaskId(), "triggered", true));
+        }
+        if (request.getOrderId() != null) {
+            VirtualShipTask task = shipService.createShipTaskIfVirtual(request.getOrderId());
+            if (task == null) {
+                return ApiResponse.fail("NOT_VIRTUAL", "订单无需虚拟发货或商品非虚拟类型");
+            }
+            // 新建任务可能仍是 PENDING（有 delay），立即触发一次
+            if ("PENDING".equals(task.getStatus())) {
+                shipService.triggerTask(task.getId());
+            }
+            return ApiResponse.ok(Map.of(
+                    "taskId", task.getId(),
+                    "orderId", request.getOrderId(),
+                    "status", task.getStatus() != null ? task.getStatus() : "PENDING",
+                    "triggered", true
+            ));
+        }
+        return ApiResponse.fail("BAD_REQUEST", "taskId 或 orderId 必填其一");
     }
 
     // ==================== 配置 ====================

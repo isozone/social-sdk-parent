@@ -71,7 +71,12 @@ export function uploadImage(fileUrl: string): Promise<{ url: string }> {
       success: res => {
         try {
           const data = JSON.parse(res.data)
-          if (data.code === 0) {
+          const ok = data?.success === true
+            || data?.code === 0
+            || data?.code === '0'
+            || data?.code === 'OK'
+            || data?.code === 'ok'
+          if (ok) {
             resolve(data.data)
           } else {
             reject(new Error(data.message || '上传失败'))
