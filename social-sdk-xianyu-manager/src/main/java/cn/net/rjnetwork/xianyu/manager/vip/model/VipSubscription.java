@@ -12,6 +12,7 @@ public class VipSubscription extends BaseEntity {
     private String deploymentId;
     private Long communityUserId;
     private String communityUid;
+    private String email;
     private String licenseId;
     private String planCode;
     private String vipLevel;
@@ -54,6 +55,14 @@ public class VipSubscription extends BaseEntity {
 
     public void setCommunityUid(String communityUid) {
         this.communityUid = communityUid;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
     }
 
     public String getLicenseId() {

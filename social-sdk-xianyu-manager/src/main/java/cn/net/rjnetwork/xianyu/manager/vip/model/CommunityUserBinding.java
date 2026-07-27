@@ -20,6 +20,11 @@ public class CommunityUserBinding extends BaseEntity {
     private String initialChannelPrefix;
     private Boolean wechatBound;
     private Boolean emailBound;
+    private String email;
+    private Boolean emailVerified;
+    private LocalDateTime emailVerifiedAt;
+    private String identityStatus;
+    private LocalDateTime lastRestoreAt;
     private LocalDateTime lastSyncAt;
 
     public Long getLocalUserId() {
@@ -116,6 +121,46 @@ public class CommunityUserBinding extends BaseEntity {
 
     public void setEmailBound(Boolean emailBound) {
         this.emailBound = emailBound;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public Boolean getEmailVerified() {
+        return emailVerified;
+    }
+
+    public void setEmailVerified(Boolean emailVerified) {
+        this.emailVerified = emailVerified;
+    }
+
+    public LocalDateTime getEmailVerifiedAt() {
+        return emailVerifiedAt;
+    }
+
+    public void setEmailVerifiedAt(LocalDateTime emailVerifiedAt) {
+        this.emailVerifiedAt = emailVerifiedAt;
+    }
+
+    public String getIdentityStatus() {
+        return identityStatus;
+    }
+
+    public void setIdentityStatus(String identityStatus) {
+        this.identityStatus = identityStatus;
+    }
+
+    public LocalDateTime getLastRestoreAt() {
+        return lastRestoreAt;
+    }
+
+    public void setLastRestoreAt(LocalDateTime lastRestoreAt) {
+        this.lastRestoreAt = lastRestoreAt;
     }
 
     public LocalDateTime getLastSyncAt() {

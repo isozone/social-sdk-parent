@@ -367,8 +367,29 @@
         <div class="vip-benefits">
           <div v-for="benefit in vipBenefits" :key="benefit" class="vip-benefit">✓ {{ benefit }}</div>
         </div>
-        <el-divider content-position="left">选择套餐</el-divider>
-        <div class="vip-plans">
+        <el-divider content-position="left">步骤 1：绑定邮箱身份</el-divider>
+        <el-alert
+          class="vip-identity-alert"
+          :type="vipIdentity.emailVerified ? 'success' : 'warning'"
+          :closable="false"
+          :title="vipIdentity.emailVerified ? `已验证邮箱：${vipIdentity.email}` : '购买或恢复 VIP 前，请先绑定邮箱验证码。后续重装/换机器可用该邮箱恢复 VIP。'"
+        />
+        <el-form class="vip-email-form" inline>
+          <el-form-item label="邮箱">
+            <el-input v-model="vipEmailForm.email" :disabled="vipIdentity.emailVerified" placeholder="user@example.com" style="width:260px" />
+          </el-form-item>
+          <el-form-item label="验证码">
+            <el-input v-model="vipEmailForm.code" :disabled="vipIdentity.emailVerified" maxlength="6" placeholder="6 位验证码" style="width:150px" />
+          </el-form-item>
+          <el-form-item>
+            <el-button :disabled="vipIdentity.emailVerified || emailCooldown > 0" :loading="emailSending" @click="sendVipCode">
+              {{ emailCooldown > 0 ? `${emailCooldown}s 后重发` : '发送验证码' }}
+            </el-button>
+            <el-button type="primary" :disabled="vipIdentity.emailVerified" :loading="emailVerifying" @click="verifyVipCode">验证并继续</el-button>
+          </el-form-item>
+        </el-form>
+        <el-divider content-position="left">步骤 2：选择套餐</el-divider>
+        <div class="vip-plans" :class="{ disabled: !vipIdentity.emailVerified }">
           <div
             v-for="plan in vipPlans"
             :key="plan.id"
@@ -394,24 +415,18 @@
           title="当前套餐没有配置可用支付方式，请到 I 社区套餐配置中启用支付渠道"
         />
         <div v-if="currentPayInfoObj" class="pay-info-box">
-          <div class="pay-info-title">支付信息</div>
-          <div v-if="currentPayInfoObj.mode === 'redirect'" class="pay-action-row">
-            <div>支付宝订单已创建，请跳转到支付宝完成支付。</div>
-            <el-button type="success" @click="openPayUrl(currentPayInfoObj.pay_url || currentPayInfoObj.form)">打开支付宝支付</el-button>
-          </div>
-          <div v-else-if="currentPayInfoObj.mode === 'native_qr'" class="pay-qr-wrap">
-            <img v-if="currentPayQr" :src="currentPayQr" class="pay-qr" alt="微信支付二维码" />
-            <div>请使用微信扫码支付，完成后点击刷新状态。</div>
-          </div>
-          <div v-else-if="currentPayInfoObj.mode === 'h5'" class="pay-action-row">
-            <div>微信 H5 支付订单已创建，请打开支付链接。</div>
-            <el-button type="success" @click="openPayUrl(currentPayInfoObj.pay_url || currentPayInfoObj.h5_url)">打开微信支付</el-button>
+          <div class="pay-info-title">扫码支付</div>
+          <div v-if="currentPayInfoObj.provider === 'alipay' || currentPayInfoObj.provider === 'wechat'" class="pay-qr-wrap">
+            <img v-if="currentPayQr" :src="currentPayQr" class="pay-qr" :alt="currentPayInfoObj.provider === 'alipay' ? '支付宝支付二维码' : '微信支付二维码'" />
+            <div class="pay-qr-provider">{{ currentPayInfoObj.provider === 'alipay' ? '请使用支付宝扫码支付' : '请使用微信扫码支付' }}</div>
+            <div class="pay-qr-hint">订单 10 分钟内有效，支付成功后将自动解锁 VIP。</div>
+            <div v-if="vipPayRemainSeconds > 0" class="pay-countdown">剩余 {{ formatPayRemain(vipPayRemainSeconds) }}</div>
+            <div v-else class="pay-expired">订单已超时，请重新创建订单</div>
           </div>
           <div v-else-if="currentPayInfoObj.mode === 'crypto_transfer'" class="pay-action-row">
             <div>{{ currentPayInfoObj.message || '请按 U 支付信息完成转账。' }}</div>
           </div>
-          <pre>{{ currentPayInfo }}</pre>
-          <el-button v-if="currentLocalOrderNo" :loading="vipPolling" type="primary" @click="pollVipOrder">我已支付，刷新状态</el-button>
+          <el-button v-if="currentLocalOrderNo" :loading="vipPolling" type="primary" @click="pollVipOrder(true)">刷新支付状态</el-button>
         </div>
         <template #footer>
           <el-button @click="vipDialogVisible = false">取消</el-button>
@@ -602,7 +617,7 @@ import {
 } from '@element-plus/icons-vue'
 import * as notify from '@/api/notification'
 import { getChromeConfig, detectChrome, saveChromeConfig, downloadChrome, validateChromePath } from '@/api/chrome'
-import { getVipHeaderStatus, getVipConfig, createVipOrder, getVipOrder } from '@/api/vip'
+import { getVipHeaderStatus, getVipConfig, createVipOrder, getVipOrder, getVipIdentity, sendVipEmailCode, verifyVipEmail } from '@/api/vip'
 import QRCode from 'qrcode'
 
 const route = useRoute()
@@ -710,6 +725,15 @@ const currentLocalOrderNo = ref('')
 const currentPayInfo = ref('')
 const currentPayInfoObj = ref(null)
 const currentPayQr = ref('')
+const vipPayRemainSeconds = ref(0)
+let vipPayTimer = null
+let vipPayPollTimer = null
+const vipIdentity = ref({ email: '', emailVerified: false, hasActiveVip: false })
+const vipEmailForm = ref({ email: '', code: '' })
+const emailSending = ref(false)
+const emailVerifying = ref(false)
+const emailCooldown = ref(0)
+let emailCooldownTimer = null
 const vipBenefits = [
   '管理更多闲鱼账号，解锁多账号托管',
   '使用 AI 自动回复、AI 客服和高级规则',
@@ -728,11 +752,14 @@ async function loadVipHeader() {
 async function openVipDialog() {
   vipDialogVisible.value = true
   currentPayInfo.value = ''
+  currentPayInfoObj.value = null
+  currentPayQr.value = ''
+  await loadVipIdentity()
   try {
     const res = await getVipConfig()
     if (res.success && res.data) {
       vipPlans.value = (res.data.plans || []).filter(plan => plan.product_type === 'social_sdk_vip' && plan.app_code === 'social-sdk')
-      vipChannels.value = (res.data.channels || []).filter(ch => ch.enabled !== false && ch.code !== 'upay')
+      vipChannels.value = (res.data.channels || []).filter(ch => ch.enabled !== false)
       selectedPlan.value = vipPlans.value[0] || null
       selectedChannel.value = availableVipChannels.value[0]?.code || ''
     }
@@ -756,12 +783,28 @@ const availableVipChannels = computed(() => {
 })
 
 watch(selectedPlan, () => {
+  stopVipPayTimers()
   currentPayInfo.value = ''
   currentPayInfoObj.value = null
   currentPayQr.value = ''
+  vipPayRemainSeconds.value = 0
   const available = availableVipChannels.value
   if (!available.some(ch => ch.code === selectedChannel.value)) {
     selectedChannel.value = available[0]?.code || ''
+  }
+})
+
+watch(selectedChannel, async (newVal, oldVal) => {
+  if (!oldVal || newVal === oldVal) return
+  const hadPayment = !!currentPayInfoObj.value
+  stopVipPayTimers()
+  currentLocalOrderNo.value = ''
+  currentPayInfo.value = ''
+  currentPayInfoObj.value = null
+  currentPayQr.value = ''
+  vipPayRemainSeconds.value = 0
+  if (hadPayment && selectedPlan.value && vipIdentity.value.emailVerified) {
+    await submitVipOrder()
   }
 })
 
@@ -771,13 +814,41 @@ function formatCents(cents) {
 }
 
 async function setPayInfo(payInfo) {
+  stopVipPayTimers()
   currentPayInfoObj.value = payInfo || null
-  currentPayInfo.value = payInfo ? JSON.stringify(payInfo, null, 2) : ''
+  currentPayInfo.value = ''
   currentPayQr.value = ''
-  const qrText = payInfo?.code_url || (payInfo?.qr_code ? payInfo?.pay_url : '')
+  vipPayRemainSeconds.value = Number(payInfo?.expires_in || 600)
+  const qrText = payInfo?.code_url || payInfo?.pay_url || payInfo?.h5_url || ''
   if (qrText) {
-    currentPayQr.value = await QRCode.toDataURL(qrText, { width: 220, margin: 1 })
+    currentPayQr.value = await QRCode.toDataURL(qrText, { width: 260, margin: 1 })
   }
+  if (payInfo?.provider === 'alipay' || payInfo?.provider === 'wechat') {
+    startVipPayTimers()
+  }
+}
+
+function stopVipPayTimers() {
+  if (vipPayTimer) clearInterval(vipPayTimer)
+  if (vipPayPollTimer) clearInterval(vipPayPollTimer)
+  vipPayTimer = null
+  vipPayPollTimer = null
+}
+
+function startVipPayTimers() {
+  stopVipPayTimers()
+  vipPayTimer = setInterval(() => {
+    vipPayRemainSeconds.value = Math.max(0, vipPayRemainSeconds.value - 1)
+    if (vipPayRemainSeconds.value <= 0) stopVipPayTimers()
+  }, 1000)
+  vipPayPollTimer = setInterval(() => pollVipOrder(false), 3000)
+}
+
+function formatPayRemain(seconds) {
+  const s = Math.max(0, Number(seconds || 0))
+  const m = Math.floor(s / 60)
+  const r = s % 60
+  return `${m}:${String(r).padStart(2, '0')}`
 }
 
 function openPayUrl(url) {
@@ -785,7 +856,80 @@ function openPayUrl(url) {
   window.open(url, '_blank')
 }
 
+async function loadVipIdentity() {
+  try {
+    const res = await getVipIdentity()
+    if (res.success && res.data) {
+      vipIdentity.value = res.data
+      if (res.data.email) vipEmailForm.value.email = res.data.email
+      if (res.data.hasActiveVip) {
+        await loadVipHeader()
+      }
+    }
+  } catch (e) {}
+}
+
+function startEmailCooldown(seconds = 60) {
+  emailCooldown.value = seconds
+  if (emailCooldownTimer) clearInterval(emailCooldownTimer)
+  emailCooldownTimer = setInterval(() => {
+    emailCooldown.value -= 1
+    if (emailCooldown.value <= 0) {
+      clearInterval(emailCooldownTimer)
+      emailCooldownTimer = null
+      emailCooldown.value = 0
+    }
+  }, 1000)
+}
+
+async function sendVipCode() {
+  const email = (vipEmailForm.value.email || '').trim()
+  if (!email) { ElMessage.warning('请输入邮箱'); return }
+  emailSending.value = true
+  try {
+    const res = await sendVipEmailCode({ email, scene: 'vip_bind' })
+    if (res.success) {
+      ElMessage.success('验证码已发送，请查收邮箱')
+      startEmailCooldown(res.data?.cooldown || 60)
+    } else {
+      ElMessage.error(res.message || '发送失败')
+    }
+  } catch (e) {
+    ElMessage.error('发送验证码失败：' + (e.message || e))
+  } finally {
+    emailSending.value = false
+  }
+}
+
+async function verifyVipCode() {
+  const email = (vipEmailForm.value.email || '').trim()
+  const code = (vipEmailForm.value.code || '').trim()
+  if (!email || !code) { ElMessage.warning('请输入邮箱和验证码'); return }
+  emailVerifying.value = true
+  try {
+    const res = await verifyVipEmail({ email, code, scene: 'vip_bind' })
+    if (res.success && res.data) {
+      vipIdentity.value = res.data
+      vipEmailForm.value.email = res.data.email || email
+      vipEmailForm.value.code = ''
+      ElMessage.success(res.data.hasActiveVip ? '邮箱验证成功，VIP 已恢复' : '邮箱验证成功，请继续选择套餐')
+      if (res.data.hasActiveVip) {
+        vipDialogVisible.value = false
+        await loadVipHeader()
+        router.push('/app/community/home')
+      }
+    } else {
+      ElMessage.error(res.message || '验证失败')
+    }
+  } catch (e) {
+    ElMessage.error('验证邮箱失败：' + (e.message || e))
+  } finally {
+    emailVerifying.value = false
+  }
+}
+
 async function submitVipOrder() {
+  if (!vipIdentity.value.emailVerified) { ElMessage.warning('请先绑定并验证邮箱'); return }
   if (!selectedPlan.value) { ElMessage.warning('请选择套餐'); return }
   vipLoading.value = true
   try {
@@ -805,24 +949,28 @@ async function submitVipOrder() {
   }
 }
 
-async function pollVipOrder() {
-  if (!currentLocalOrderNo.value) return
+async function pollVipOrder(manual = false) {
+  if (!currentLocalOrderNo.value || vipPolling.value) return
   vipPolling.value = true
   try {
     const res = await getVipOrder(currentLocalOrderNo.value)
     if (res.success && res.data) {
-      currentPayInfo.value = JSON.stringify(res.data, null, 2)
       if (res.data.status === 'paid' && res.data.entitlement) {
+        stopVipPayTimers()
         ElMessage.success('VIP 解锁成功，欢迎进入 I 社区')
         vipDialogVisible.value = false
         await loadVipHeader()
         router.push('/app/community/home')
-      } else {
-        ElMessage.info('订单尚未完成，请稍后刷新')
+      } else if (res.data.status === 'timeout' || res.data.status === 'cancelled' || res.data.status === 'failed') {
+        stopVipPayTimers()
+        vipPayRemainSeconds.value = 0
+        if (manual) ElMessage.warning('订单已超时，请重新创建订单')
+      } else if (manual) {
+        ElMessage.info('订单尚未完成，系统会自动轮询')
       }
     }
   } catch (e) {
-    ElMessage.error('刷新订单失败：' + (e.message || e))
+    if (manual) ElMessage.error('刷新订单失败：' + (e.message || e))
   } finally {
     vipPolling.value = false
   }
@@ -898,7 +1046,11 @@ async function readAll() {
 
 let pollTimer = null
 onMounted(() => { loadScenarios(); loadUnread(); loadVipHeader(); pollTimer = setInterval(() => { loadUnread(); loadVipHeader() }, 30000) })
-onUnmounted(() => { if (pollTimer) clearInterval(pollTimer) })
+onUnmounted(() => {
+  if (pollTimer) clearInterval(pollTimer)
+  stopVipPayTimers()
+  if (emailCooldownTimer) clearInterval(emailCooldownTimer)
+})
 
 // ===== 浏览器配置 =====
 const browserConfigVisible = ref(false)

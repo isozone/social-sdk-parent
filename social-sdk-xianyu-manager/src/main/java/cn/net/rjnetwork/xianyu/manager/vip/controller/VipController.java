@@ -4,6 +4,7 @@ import cn.net.rjnetwork.xianyu.manager.auth.model.AdminUser;
 import cn.net.rjnetwork.xianyu.manager.auth.service.AuthService;
 import cn.net.rjnetwork.xianyu.manager.common.ApiResponse;
 import cn.net.rjnetwork.xianyu.manager.vip.dto.VipCreateOrderRequest;
+import cn.net.rjnetwork.xianyu.manager.vip.dto.VipEmailCodeRequest;
 import cn.net.rjnetwork.xianyu.manager.vip.service.VipService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.Authentication;
@@ -34,6 +35,11 @@ public class VipController {
         return ApiResponse.ok(vipService.status(currentUser(authentication)));
     }
 
+    @PostMapping("/vip/verify")
+    public ApiResponse<Map<String, Object>> verify(Authentication authentication) {
+        return ApiResponse.ok(vipService.verify(currentUser(authentication)));
+    }
+
     @GetMapping("/vip/config")
     public ApiResponse<Map<String, Object>> config(Authentication authentication) {
         return ApiResponse.ok(vipService.config(currentUser(authentication)));
@@ -42,6 +48,21 @@ public class VipController {
     @PostMapping("/vip/community/bind")
     public ApiResponse<Map<String, Object>> bind(Authentication authentication) {
         return ApiResponse.ok(vipService.bind(currentUser(authentication)));
+    }
+
+    @GetMapping("/vip/identity")
+    public ApiResponse<Map<String, Object>> identity(Authentication authentication) {
+        return ApiResponse.ok(vipService.identity(currentUser(authentication)));
+    }
+
+    @PostMapping("/vip/email/send-code")
+    public ApiResponse<Map<String, Object>> sendEmailCode(Authentication authentication, @RequestBody VipEmailCodeRequest request) {
+        return ApiResponse.ok(vipService.sendEmailCode(currentUser(authentication), request));
+    }
+
+    @PostMapping("/vip/email/verify")
+    public ApiResponse<Map<String, Object>> verifyEmail(Authentication authentication, @RequestBody VipEmailCodeRequest request) {
+        return ApiResponse.ok(vipService.verifyEmail(currentUser(authentication), request));
     }
 
     @PostMapping("/vip/orders")
