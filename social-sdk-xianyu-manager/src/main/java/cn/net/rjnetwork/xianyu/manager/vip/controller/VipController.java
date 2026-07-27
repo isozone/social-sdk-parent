@@ -5,9 +5,11 @@ import cn.net.rjnetwork.xianyu.manager.auth.service.AuthService;
 import cn.net.rjnetwork.xianyu.manager.common.ApiResponse;
 import cn.net.rjnetwork.xianyu.manager.vip.dto.VipCreateOrderRequest;
 import cn.net.rjnetwork.xianyu.manager.vip.service.VipService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 @RestController
@@ -55,6 +57,18 @@ public class VipController {
     @GetMapping("/community/menu")
     public ApiResponse<Map<String, Object>> communityMenu(Authentication authentication) {
         return ApiResponse.ok(vipService.communityMenu(currentUser(authentication)));
+    }
+
+    @RequestMapping(value = "/community/client/**", method = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE})
+    public ApiResponse<Object> communityClientProxy(Authentication authentication, HttpServletRequest request, @RequestBody(required = false) byte[] body) {
+        String prefix = "/api/community/client";
+        String uri = request.getRequestURI();
+        String path = uri.length() > prefix.length() ? uri.substring(prefix.length()) : "/topics";
+        if (request.getQueryString() != null && !request.getQueryString().isBlank()) {
+            path += "?" + request.getQueryString();
+        }
+        String rawBody = body == null ? "" : new String(body, StandardCharsets.UTF_8);
+        return ApiResponse.ok(vipService.communityClientProxy(currentUser(authentication), request.getMethod(), path, rawBody));
     }
 
     private AdminUser currentUser(Authentication authentication) {

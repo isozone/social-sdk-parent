@@ -206,12 +206,35 @@ public class VipService {
                         menu("profile", "我的身份", "/community/profile"),
                         menu("benefits", "我的权益", "/community/benefits"),
                         menu("bindings", "账户绑定", "/community/bindings"),
+                        menu("topics", "帖子广场", "/community/topics"),
+                        menu("composer", "发布帖子", "/community/composer"),
+                        menu("wallet", "社区钱包", "/community/wallet"),
                         menu("orders", "支付订单", "/community/orders"),
                         menu("announcements", "社区公告", "/community/announcements"),
                         menu("resources", "资源中心", "/community/resources"),
                         menu("support", "工单支持", "/community/support")
                 )
         );
+    }
+
+    @SuppressWarnings("unchecked")
+    public Object communityClientProxy(AdminUser user, String method, String pathWithQuery, String body) {
+        Long localUserId = localUserId(user);
+        CommunityUserBinding binding = getBinding(localUserId);
+        if (binding == null || binding.getDeploymentId() == null || binding.getBindToken() == null || binding.getBindToken().isBlank()) {
+            throw new IllegalStateException("I 社区账户尚未绑定，无法访问社区客户端功能");
+        }
+        try {
+            String path = "/api/community" + normalizeProxyPath(pathWithQuery);
+            HttpRequest request = signedCommunityRequest(method, path, body == null ? "" : body, binding).build();
+            Map<String, Object> payload = sendRaw(request);
+            if (payload.containsKey("data")) {
+                return payload.get("data");
+            }
+            return payload;
+        } catch (Exception e) {
+            throw new IllegalStateException("访问 I 社区失败：" + e.getMessage(), e);
+        }
     }
 
     private void syncPaidOrder(AdminUser user, VipOrder order, Map<String, Object> result) {
@@ -376,6 +399,54 @@ public class VipService {
             builder.header("X-Signature", hmacSha256Hex(properties.getSecret(), canonical));
         }
         return builder;
+    }
+
+    private HttpRequest.Builder signedCommunityRequest(String method, String path, String body, CommunityUserBinding binding) throws Exception {
+        String baseUrl = properties.getBaseUrl() == null ? "" : properties.getBaseUrl().replaceAll("/+$", "");
+        String timestamp = String.valueOf(Instant.now().getEpochSecond());
+        String nonce = UUID.randomUUID().toString().replace("-", "");
+        String bodyHash = sha256Hex(body == null ? "" : body);
+        String signaturePayload = binding.getDeploymentId() + "\n" + nonce + "\n" + timestamp + "\n" + bodyHash;
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + path))
+                .timeout(Duration.ofSeconds(Math.max(1, properties.getRequestTimeoutSeconds())))
+                .header("X-Tentacle-OpenId", binding.getDeploymentId())
+                .header("X-Tentacle-ClientId", "social-sdk")
+                .header("X-Tentacle-Timestamp", timestamp)
+                .header("X-Tentacle-Nonce", nonce)
+                .header("X-Tentacle-Body-SHA256", bodyHash)
+                .header("X-Tentacle-Signature", hmacSha256Hex(binding.getBindToken(), signaturePayload));
+        if ("POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method)) {
+            builder.header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(body == null ? "" : body));
+        } else if ("DELETE".equalsIgnoreCase(method)) {
+            builder.DELETE();
+        } else {
+            builder.GET();
+        }
+        return builder;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> sendRaw(HttpRequest request) throws Exception {
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new IllegalStateException("new-api 返回异常: " + response.statusCode());
+        }
+        return objectMapper.readValue(response.body(), new TypeReference<>() {});
+    }
+
+    private String normalizeProxyPath(String path) {
+        if (path == null || path.isBlank()) {
+            return "/topics";
+        }
+        String p = path.trim();
+        if (!p.startsWith("/")) {
+            p = "/" + p;
+        }
+        if (p.contains("..") || p.startsWith("/admin") || p.startsWith("/external")) {
+            throw new IllegalArgumentException("非法社区路径");
+        }
+        return p;
     }
 
     private void validateChannelPrefix(String communityUid, String channel) {

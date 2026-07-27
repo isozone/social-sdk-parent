@@ -35,6 +35,18 @@
             <span class="menu-icon-box"><el-icon><Link /></el-icon></span>
             <span>账户绑定</span>
           </el-menu-item>
+          <el-menu-item index="/app/community/topics">
+            <span class="menu-icon-box"><el-icon><ChatLineSquare /></el-icon></span>
+            <span>帖子广场</span>
+          </el-menu-item>
+          <el-menu-item index="/app/community/composer">
+            <span class="menu-icon-box"><el-icon><Edit /></el-icon></span>
+            <span>发布帖子</span>
+          </el-menu-item>
+          <el-menu-item index="/app/community/wallet">
+            <span class="menu-icon-box"><el-icon><Wallet /></el-icon></span>
+            <span>社区钱包</span>
+          </el-menu-item>
           <el-menu-item index="/app/community/orders">
             <span class="menu-icon-box"><el-icon><Money /></el-icon></span>
             <span>支付订单</span>
@@ -532,7 +544,7 @@ import {
   Promotion, UploadFilled, Monitor, Document, Bell, UserFilled, ArrowDown, FullScreen,
   Medal, Connection, Service, Sunrise, Switch, Timer, Setting, Compass,
   Search, Download, Check, InfoFilled, Warning, Lock, SwitchButton,
-  Refresh, Avatar, ChatLineSquare, Link, Back
+  Refresh, Avatar, ChatLineSquare, Link, Back, Edit, Wallet
 } from '@element-plus/icons-vue'
 import * as notify from '@/api/notification'
 import { getChromeConfig, detectChrome, saveChromeConfig, downloadChrome, validateChromePath } from '@/api/chrome'
