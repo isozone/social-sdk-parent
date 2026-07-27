@@ -15,15 +15,19 @@
 
     <template v-if="section === 'home'">
       <el-row :gutter="16" class="section-row">
-        <el-col :xs="24" :md="8"><metric-card title="我的身份" :value="vipStatus.communityUid || profile.community_uid || '未分配'" :desc="`支付渠道：${vipChannelLabel}`" /></el-col>
-        <el-col :xs="24" :md="8"><metric-card title="我的权益" :value="vipLevelLabel" :desc="homeVipDesc" /></el-col>
-        <el-col :xs="24" :md="8"><metric-card title="社区钱包" :value="wallet.balance ?? wallet.coins ?? 0" desc="可用于购买、打赏、兑换与资源消费" /></el-col>
+        <el-col :xs="24" :md="8"><metric-card title="我的身份" :icon="User" accent="#6366f1" :value="vipStatus.communityUid || profile.community_uid || '未分配'" :desc="`支付渠道：${vipChannelLabel}`" /></el-col>
+        <el-col :xs="24" :md="8"><metric-card title="我的权益" :icon="Medal" accent="#f59e0b" :value="vipLevelLabel" :desc="homeVipDesc" /></el-col>
+        <el-col :xs="24" :md="8"><metric-card title="社区钱包" :icon="Wallet" accent="#10b981" :value="wallet.balance ?? wallet.coins ?? 0" desc="可用于购买、打赏、兑换与资源消费" /></el-col>
       </el-row>
       <el-card shadow="never" class="feature-card">
         <template #header>客户端功能闭环</template>
         <el-row :gutter="12">
           <el-col v-for="item in features" :key="item.title" :xs="24" :sm="12" :md="6">
-            <div class="feature-item" @click="$router.push(item.path)"><strong>{{ item.title }}</strong><span>{{ item.desc }}</span></div>
+            <div class="feature-item" @click="$router.push(item.path)">
+              <el-icon class="feature-icon"><component :is="item.icon" class="feature-svg" /></el-icon>
+              <strong>{{ item.title }}</strong>
+              <span>{{ item.desc }}</span>
+            </div>
           </el-col>
         </el-row>
       </el-card>
@@ -57,8 +61,8 @@
           <el-form-item label="标题"><el-input v-model="composer.title" maxlength="120" show-word-limit placeholder="请输入帖子标题" /></el-form-item>
           <el-form-item label="内容"><div ref="topicEditorEl" class="community-editor"></div></el-form-item>
           <el-row :gutter="12">
-            <el-col :xs="24" :md="8"><el-form-item label="分类"><el-select v-model="composer.category_id" :disabled="composer.circle_id > 0" style="width:100%"><el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" /></el-select><div v-if="composer.circle_id > 0" class="form-tip">选择圈子后，分类自动跟随圈子所属分类。</div></el-form-item></el-col>
-            <el-col :xs="24" :md="8"><el-form-item label="圈子"><el-select v-model="composer.circle_id" clearable style="width:100%"><el-option :value="0" label="不选择圈子" /><el-option v-for="c in filteredCircles" :key="c.id" :label="c.name" :value="c.id" /></el-select></el-form-item></el-col>
+            <el-col :xs="24" :md="8"><el-form-item label="圈子"><el-select v-model="composer.circle_id" clearable style="width:100%"><el-option :value="0" label="不选择圈子" /><el-option v-for="c in circles" :key="c.id" :label="c.name" :value="c.id" /></el-select></el-form-item></el-col>
+            <el-col :xs="24" :md="8"><el-form-item label="分类"><el-select v-model="composer.category_id" :disabled="!composer.circle_id && globalCategories.length === 0" style="width:100%"><el-option v-for="c in filteredCategories" :key="c.id" :label="c.name" :value="c.id" /></el-select><div class="form-tip">{{ composer.circle_id > 0 ? '分类来自所选圈子。' : '不选择圈子时使用全站分类。' }}</div></el-form-item></el-col>
             <el-col :xs="24" :md="8"><el-form-item label="售价社区币"><el-input-number v-model="composer.price" :min="0" style="width:100%" /></el-form-item></el-col>
           </el-row>
           <el-form-item label="标签"><el-input v-model="composer.tagsText" placeholder="多个标签用逗号分隔" /></el-form-item>
@@ -69,12 +73,12 @@
 
     <template v-else-if="section === 'wallet'">
       <el-row :gutter="16">
-        <el-col :xs="24" :md="8"><metric-card title="社区钱包" :value="wallet.balance ?? wallet.coins ?? 0" :desc="`积分：${wallet.points ?? 0}`" /></el-col>
+        <el-col :xs="24" :md="8"><metric-card title="社区钱包" :icon="Wallet" accent="#10b981" :value="wallet.balance ?? wallet.coins ?? 0" :desc="`积分：${wallet.points ?? 0}`" /></el-col>
         <el-col :xs="24" :md="16">
           <el-card shadow="never"><template #header>充值套餐</template>
             <el-alert title="创建订单后可在支付订单页继续支付/查看状态；微信、支付宝、虚拟支付均由 I 社区后端完成。" type="info" :closable="false" class="mb12" />
             <el-radio-group v-model="rechargeChannel" class="mb12"><el-radio-button label="wechat">微信</el-radio-button><el-radio-button label="alipay">支付宝</el-radio-button><el-radio-button label="virtual-pay">虚拟支付</el-radio-button></el-radio-group>
-            <el-space wrap><el-card v-for="plan in rechargePlans" :key="plan.id" shadow="hover" class="recharge-plan"><div class="vip-plan-title">{{ plan.name }}</div><div class="vip-plan-price">¥{{ formatCents(plan.price_cents) }}</div><div class="muted">{{ plan.coins }} 社区币</div><el-button size="small" type="primary" @click="createCreditOrder(plan)">创建并支付</el-button></el-card></el-space>
+            <div class="recharge-grid"><el-card v-for="plan in rechargePlans" :key="plan.id" shadow="hover" class="recharge-plan"><div class="vip-plan-title">{{ plan.name }}</div><div class="vip-plan-price">¥{{ formatCents(plan.price_cents) }}</div><div class="muted">{{ plan.coins }} 社区币</div><el-button size="small" type="primary" @click="createCreditOrder(plan)">创建并支付</el-button></el-card></div>
           </el-card>
         </el-col>
       </el-row>
@@ -82,7 +86,16 @@
     </template>
 
     <template v-else-if="section === 'orders'">
-      <data-table title="支付订单" :data="orders" :columns="orderColumns">
+      <data-table title="支付订单" :data="displayOrders" :columns="orderColumns">
+        <template #actions>
+          <el-select v-model="orderQuery.status" clearable placeholder="状态" style="width:130px">
+            <el-option label="待支付" value="pending" />
+            <el-option label="已支付" value="paid" />
+            <el-option label="已过期" value="expired" />
+            <el-option label="已取消" value="cancelled" />
+          </el-select>
+          <el-input v-model="orderQuery.keyword" clearable placeholder="搜索订单号" style="width:210px"><template #prefix><el-icon><Search /></el-icon></template></el-input>
+        </template>
         <template #row-actions="{ row }"><el-button size="small" @click="openOrder(row)">详情/支付</el-button></template>
       </data-table>
     </template>
@@ -90,20 +103,40 @@
     <template v-else-if="section === 'circles'">
       <el-card shadow="never" class="mb12">
         <template #header>创建圈子</template>
-        <el-form inline><el-form-item label="名称"><el-input v-model="circleForm.name" placeholder="圈子名称" /></el-form-item><el-form-item label="分类"><el-select v-model="circleForm.category_id" style="width:140px"><el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" /></el-select></el-form-item><el-form-item label="加入方式"><el-select v-model="circleForm.join_policy" style="width:120px"><el-option label="免费" value="free" /><el-option label="审批" value="approve" /><el-option label="付费" value="paid" /></el-select></el-form-item><el-form-item label="价格"><el-input-number v-model="circleForm.join_price" :min="0" /></el-form-item><el-button type="primary" @click="createCircle">创建</el-button></el-form>
+        <el-form inline class="circle-create-form"><el-form-item label="名称"><el-input v-model="circleForm.name" placeholder="圈子名称" /></el-form-item><el-form-item label="加入方式"><el-select v-model="circleForm.join_policy" style="width:120px"><el-option label="免费" value="free" /><el-option label="审批" value="approve" /><el-option label="付费" value="paid" /></el-select></el-form-item><el-form-item label="价格"><el-input-number v-model="circleForm.join_price" :min="0" /></el-form-item><el-button type="primary" @click="createCircle">创建</el-button></el-form>
       </el-card>
-      <simple-list title="社区圈子" :items="circles" name-key="name" desc-key="description" @reload="loadCircles"><template #item-actions="{ item }"><el-button size="small" type="primary" @click="joinCircle(item)">{{ item.joined ? '已加入' : item.join_policy === 'paid' ? `付费加入 ${item.join_price || 0}` : '加入' }}</el-button><el-button v-if="item.joined" size="small" @click="leaveCircle(item)">退出</el-button></template></simple-list>
+      <simple-list title="社区圈子" :icon="Compass" :items="circles" name-key="name" desc-key="description" @reload="loadCircles"><template #item-actions="{ item }"><el-button size="small" type="primary" @click="joinCircle(item)">{{ item.joined ? '已加入' : item.join_policy === 'paid' ? `付费加入 ${item.join_price || 0}` : '加入' }}</el-button><el-button v-if="item.joined" size="small" @click="leaveCircle(item)">退出</el-button></template></simple-list>
     </template>
 
-    <template v-else-if="section === 'my-topics'"><simple-list title="我的帖子" :items="myTopics" name-key="title" desc-key="summary" @reload="loadMyTopics"><template #item-actions="{ item }"><el-button size="small" @click="openTopic(item)">查看</el-button><el-button size="small" type="danger" @click="deleteTopic(item)">删除</el-button></template></simple-list></template>
-    <template v-else-if="section === 'favorites'"><simple-list title="我的收藏" :items="favorites" name-key="title" desc-key="summary" @reload="loadFavorites"><template #item-actions="{ item }"><el-button size="small" @click="openTopic(item)">查看</el-button><el-button size="small" @click="toggleFavorite(item)">取消收藏</el-button></template></simple-list></template>
-    <template v-else-if="section === 'drafts'"><simple-list title="草稿箱" :items="drafts" name-key="title" desc-key="content" @reload="loadDrafts"><template #item-actions="{ item }"><el-button size="small" @click="editDraft(item)">编辑</el-button><el-button size="small" type="danger" @click="deleteDraft(item)">删除</el-button></template></simple-list></template>
-    <template v-else-if="section === 'purchases'"><simple-list title="我的购买" :items="purchases" name-key="title" desc-key="summary" @reload="loadPurchases"><template #item-actions="{ item }"><el-button size="small" @click="openTopic(item)">查看</el-button></template></simple-list></template>
-    <template v-else-if="section === 'exchange'"><simple-list title="兑换商城" :items="exchangeItems" name-key="name" desc-key="description" @reload="loadExchangeItems"><template #item-actions="{ item }"><el-button size="small" type="primary" @click="exchange(item)">兑换 {{ item.price || 0 }} 币</el-button></template></simple-list></template>
-    <template v-else-if="section === 'notifications'"><simple-list title="社区通知" :items="notifications" name-key="title" desc-key="content" @reload="loadNotifications"><template #header-actions><el-button @click="markAllNotificationsRead">全部已读</el-button></template><template #item-actions="{ item }"><el-button size="small" @click="markNotificationRead(item)">{{ item.is_read ? '已读' : '标为已读' }}</el-button></template></simple-list></template>
-    <template v-else-if="section === 'leaderboard'"><simple-list title="排行榜" :items="leaderboard" name-key="username" desc-key="score" @reload="loadLeaderboard" /></template>
-    <template v-else-if="section === 'announcements'"><simple-list title="社区公告" :items="announcements" name-key="title" desc-key="content" @reload="loadAnnouncements" /></template>
-    <template v-else-if="section === 'resources'"><simple-list title="资源中心" :items="resources" name-key="title" desc-key="description" @reload="loadResources"><template #item-actions="{ item }"><el-button size="small" @click="openTopic(item)">查看资源</el-button></template></simple-list></template>
+    <template v-else-if="section === 'my-topics'"><simple-list title="我的帖子" :icon="Document" :items="myTopics" name-key="title" desc-key="summary" @reload="loadMyTopics"><template #item-actions="{ item }"><el-button size="small" @click="openTopic(item)">查看</el-button><el-button size="small" type="danger" @click="deleteTopic(item)">删除</el-button></template></simple-list></template>
+    <template v-else-if="section === 'favorites'"><simple-list title="我的收藏" :icon="Star" :items="favorites" name-key="title" desc-key="summary" @reload="loadFavorites"><template #item-actions="{ item }"><el-button size="small" @click="openTopic(item)">查看</el-button><el-button size="small" @click="toggleFavorite(item)">取消收藏</el-button></template></simple-list></template>
+    <template v-else-if="section === 'drafts'"><simple-list title="草稿箱" :icon="EditPen" :items="drafts" name-key="title" desc-key="content" @reload="loadDrafts"><template #item-actions="{ item }"><el-button size="small" @click="editDraft(item)">编辑</el-button><el-button size="small" type="danger" @click="deleteDraft(item)">删除</el-button></template></simple-list></template>
+    <template v-else-if="section === 'purchases'"><simple-list title="我的购买" :icon="ShoppingBag" :items="purchases" name-key="title" desc-key="summary" @reload="loadPurchases"><template #item-actions="{ item }"><el-button size="small" @click="openTopic(item)">查看</el-button></template></simple-list></template>
+    <template v-else-if="section === 'exchange'"><simple-list title="兑换商城" :icon="Present" :items="exchangeItems" name-key="name" desc-key="description" @reload="loadExchangeItems"><template #item-actions="{ item }"><el-button size="small" type="primary" @click="exchange(item)">兑换 {{ item.price || 0 }} 币</el-button></template></simple-list></template>
+    <template v-else-if="section === 'notifications'"><simple-list title="社区通知" :icon="Message" :items="notifications" name-key="title" desc-key="content" @reload="loadNotifications"><template #header-actions><el-button @click="markAllNotificationsRead">全部已读</el-button></template><template #item-actions="{ item }"><el-button size="small" @click="markNotificationRead(item)">{{ item.is_read ? '已读' : '标为已读' }}</el-button></template></simple-list></template>
+    <template v-else-if="section === 'leaderboard'">
+      <el-card shadow="never" class="leaderboard-card">
+        <template #header>
+          <div class="card-header">
+            <span>排行榜</span>
+            <el-button size="small" text @click="loadLeaderboard">刷新</el-button>
+          </div>
+        </template>
+        <div v-if="leaderboard.length === 0" class="empty-box">暂无数据</div>
+        <div v-else class="lb-list">
+          <div v-for="(u, i) in leaderboard" :key="u.id || u.username" class="lb-item" :class="'rank-' + (i + 1)">
+            <div class="lb-rank" :class="{ 'lb-rank-top': i < 3 }">{{ i + 1 }}</div>
+            <div class="lb-avatar">{{ String(u.username || '?').slice(0, 1).toUpperCase() }}</div>
+            <div class="lb-main">
+              <div class="lb-name">{{ u.username || '-' }}</div>
+              <div class="lb-score">{{ u.score || 0 }} 积分</div>
+            </div>
+          </div>
+        </div>
+      </el-card>
+    </template>
+    <template v-else-if="section === 'announcements'"><simple-list title="社区公告" :icon="Bell" :items="announcements" name-key="title" desc-key="content" @reload="loadAnnouncements" /></template>
+    <template v-else-if="section === 'resources'"><simple-list title="资源中心" :icon="Document" :items="resources" name-key="title" desc-key="description" @reload="loadResources"><template #item-actions="{ item }"><el-button size="small" @click="openTopic(item)">查看资源</el-button></template></simple-list></template>
 
     <template v-else-if="section === 'profile'">
       <el-row :gutter="16">
@@ -148,9 +181,9 @@
       <template #footer><el-button @click="topicDialogVisible = false">关闭</el-button><el-button v-if="currentTopic?.price > 0 && !currentTopic?.purchased" type="warning" :loading="submitting" @click="purchaseTopic(currentTopic)">购买后查看全文</el-button><el-button type="primary" :loading="submitting" @click="submitReply">回复</el-button></template>
     </el-dialog>
 
-    <el-dialog v-model="orderDialogVisible" title="支付订单" width="680px">
-      <div v-if="currentOrder"><el-descriptions :column="1" border><el-descriptions-item label="订单号">{{ currentOrder.order_no }}</el-descriptions-item><el-descriptions-item label="金额">¥{{ formatCents(currentOrder.pay_amount) }}</el-descriptions-item><el-descriptions-item label="渠道">{{ currentOrder.pay_channel }}</el-descriptions-item><el-descriptions-item label="状态">{{ currentOrder.status }}</el-descriptions-item></el-descriptions><pre v-if="paymentInfo" class="pay-json">{{ paymentInfo }}</pre></div>
-      <template #footer><el-button @click="orderDialogVisible = false">关闭</el-button><el-button :loading="submitting" @click="refreshOrder">刷新状态</el-button><el-button v-if="currentOrder?.status === 'pending'" type="primary" :loading="submitting" @click="initiateOrderPayment">继续支付</el-button></template>
+    <el-dialog v-model="orderDialogVisible" title="社区币充值支付" width="680px" @closed="stopOrderPayTimers">
+      <div v-if="currentOrder"><el-descriptions :column="1" border><el-descriptions-item label="订单号">{{ currentOrder.order_no }}</el-descriptions-item><el-descriptions-item label="金额">¥{{ formatCents(currentOrder.pay_amount) }}</el-descriptions-item><el-descriptions-item label="渠道">{{ PAY_CHANNEL_LABEL[currentOrder.pay_channel] || currentOrder.pay_channel || '-' }}</el-descriptions-item><el-descriptions-item label="状态"><el-tag :type="ORDER_STATUS_TAG[currentOrder.status] || 'info'" effect="light">{{ ORDER_STATUS_LABEL[currentOrder.status] || currentOrder.status }}</el-tag></el-descriptions-item></el-descriptions><div v-if="orderPayInfo" class="wallet-pay-box"><img v-if="orderPayQr" :src="orderPayQr" class="wallet-pay-qr" alt="支付二维码" /><div class="wallet-pay-title">{{ orderPayInfo.provider === 'alipay' ? '请使用支付宝扫码支付' : orderPayInfo.provider === 'wechat' ? '请使用微信扫码支付' : '请按提示完成支付' }}</div><div class="muted">订单 10 分钟内有效，支付成功后钱包余额会自动刷新。</div><div v-if="orderPayRemainSeconds > 0" class="wallet-pay-countdown">剩余 {{ formatPayRemain(orderPayRemainSeconds) }}</div><div v-else class="wallet-pay-expired">订单已超时，请重新创建订单</div></div></div>
+      <template #footer><el-button @click="orderDialogVisible = false">关闭</el-button><el-button :loading="submitting" @click="refreshOrder(true)">刷新状态</el-button><el-button v-if="currentOrder?.status === 'pending' && !orderPayInfo" type="primary" :loading="submitting" @click="initiateOrderPayment">继续支付</el-button></template>
     </el-dialog>
   </div>
 </template>
@@ -158,30 +191,74 @@
 <script setup>
 import { computed, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElButton, ElCard, ElEmpty, ElSkeleton, ElTable, ElTableColumn, ElMessage, ElMessageBox } from 'element-plus'
+import { ElButton, ElCard, ElEmpty, ElSkeleton, ElTable, ElTableColumn, ElTag, ElMessage, ElMessageBox } from 'element-plus'
 import { AiEditor } from 'aieditor'
 import 'aieditor/dist/style.css'
+import QRCode from 'qrcode'
+import { User, Medal, Wallet, ChatLineSquare, Edit, Present, Compass, Document, Star, EditPen, ShoppingBag, Message, Trophy, Bell, Search } from '@element-plus/icons-vue'
 import { communityDelete, communityGet, communityPost, getVipIdentity, getVipStatus, verifyVipStatus } from '@/api/vip'
 
-const MetricCard = defineComponent({ props: ['title','value','desc'], setup: p => () => h(ElCard, { shadow:'never' }, { header: () => p.title, default: () => [h('div',{class:'identity-id'}, p.value), h('div',{class:'muted'}, p.desc)] }) })
-const ListCard = defineComponent({ props: ['title','loading','empty'], setup: (p,{slots}) => () => h(ElCard,{shadow:'never'},{header:()=>h('div',{class:'card-header'},[h('span',p.title), h('div', slots.actions?.())]), default:()=>h(ElSkeleton,{loading:p.loading,animated:true,rows:5},{default:()=>p.empty?h('div',{class:'empty-box'},'暂无数据'):slots.default?.()})}) })
-const DataTable = defineComponent({ props: ['title','data','columns'], setup: (p,{slots}) => () => h(ElCard,{shadow:'never',class:'mt16'},{header:()=>p.title, default:()=>h(ElTable,{data:p.data||[],stripe:true},()=> [...(p.columns||[]).map(c=>h(ElTableColumn,c)), slots['row-actions'] ? h(ElTableColumn,{label:'操作',width:140},{default:({row})=>slots['row-actions']({row})}) : null])}) })
-const SimpleList = defineComponent({ props: ['title','items','nameKey','descKey'], emits:['reload'], setup: (p,{emit,slots}) => () => h(ElCard,{shadow:'never'},{header:()=>h('div',{class:'card-header'},[h('span',p.title),h('div',[slots['header-actions']?.(), h(ElButton,{onClick:()=>emit('reload')},()=> '刷新')])]), default:()=> (p.items||[]).length===0?h(ElEmpty,{description:'暂无数据'}):h('div', (p.items||[]).map(item=>h('div',{class:'topic-item'},[h('div',{class:'topic-title'}, item[p.nameKey] || item.title || item.name || `#${item.id}`), h('div',{class:'topic-summary'}, String(item[p.descKey] || item.content || item.description || item.score || '')), h('div',{class:'topic-actions'}, slots['item-actions']?.({item}))])))}) })
+const MetricCard = defineComponent({ props: ['title','value','desc','icon','accent'], setup: (p) => () => h(ElCard, { shadow:'never', class:'metric-card' }, { default: () => [
+  h('div', { class:'metric-top' }, [
+    p.icon ? h('div', { class:'metric-icon', style: p.accent ? { color: p.accent, background: (p.accent || '#4f46e5') + '14' } : {} }, () => [h(p.icon, { class: 'metric-svg', style: { width: '14px', height: '14px', display: 'block', flexShrink: 0 } })]) : null,
+    h('div', { class:'metric-title' }, p.title)
+  ]),
+  h('div', { class:'metric-value' }, String(p.value ?? '')),
+  h('div', { class:'metric-desc' }, p.desc)
+] }) })
+const ListCard = defineComponent({ props: ['title','loading','empty'], setup: (p,{slots}) => () => h(ElCard,{shadow:'never',class:'list-card'},{header:()=>h('div',{class:'card-header'},[h('span',p.title), h('div', slots.actions?.())]), default:()=>h(ElSkeleton,{loading:p.loading,animated:true,rows:5},{default:()=>p.empty?h('div',{class:'empty-box'},'暂无数据'):slots.default?.()})}) })
+const DataTable = defineComponent({
+  props: ['title', 'data', 'columns'],
+  setup: (p, { slots }) => () => h(ElCard, { shadow: 'never', class: 'mt16 data-table-card' }, {
+    header: () => h('div', { class: 'card-header' }, [
+      h('span', p.title),
+      slots.actions ? h('div', { class: 'dt-actions' }, slots.actions()) : null
+    ]),
+    default: () => h(ElTable, { data: p.data || [], stripe: true }, () => [
+      ...(p.columns || []).map(c => c.render
+        ? h(ElTableColumn, { prop: c.prop, label: c.label, width: c.width, minWidth: c.minWidth }, { default: ({ row }) => c.render(row) })
+        : h(ElTableColumn, c)),
+      slots['row-actions']
+        ? h(ElTableColumn, { label: '操作', width: 140 }, { default: ({ row }) => slots['row-actions']({ row }) })
+        : null
+    ])
+  })
+})
+const SimpleList = defineComponent({
+  props: ['title','items','nameKey','descKey','icon'],
+  emits: ['reload'],
+  setup: (p, { emit, slots }) => () => h(ElCard, { shadow: 'never', class: 'simple-list-card' }, {
+    header: () => h('div', { class: 'card-header' }, [
+      h('span', p.title),
+      h('div', [slots['header-actions']?.(), h(ElButton, { size: 'small', text: true, onClick: () => emit('reload') }, () => '刷新')])
+    ]),
+    default: () => (p.items || []).length === 0
+      ? h(ElEmpty, { description: '暂无数据' })
+      : h('div', { class: 'sl-list' }, (p.items || []).map(item => h('div', { class: 'sl-item' }, [
+        p.icon ? h('div', { class: 'sl-icon' }, () => [h(p.icon, { style: { width: '14px', height: '14px', display: 'block', flexShrink: 0 } })]) : null,
+        h('div', { class: 'sl-body' }, [
+          h('div', { class: 'sl-title' }, item[p.nameKey] || item.title || item.name || `#${item.id}`),
+          h('div', { class: 'sl-desc' }, String(item[p.descKey] || item.content || item.description || item.score || ''))
+        ]),
+        h('div', { class: 'sl-actions' }, slots['item-actions']?.({ item }))
+      ])))
+  })
+})
 
 const route = useRoute(); const router = useRouter(); const loading = ref(false); const submitting = ref(false); const verifying = ref(false)
 const vipStatus = ref({ active:false, communityUid:'', vipLevel:'free' }); const profile = ref({}); const wallet = ref({})
 const topics = ref([]); const replies = ref([]); const orders = ref([]); const transactions = ref([]); const rechargePlans = ref([]); const categories = ref([])
 const circles = ref([]); const myTopics = ref([]); const favorites = ref([]); const drafts = ref([]); const purchases = ref([]); const exchangeItems = ref([]); const notifications = ref([]); const leaderboard = ref([]); const announcements = ref([]); const resources = ref([])
-const topicDialogVisible = ref(false); const currentTopic = ref(null); const replyText = ref(''); const topicQuery = ref({ keyword:'', category_id:'' })
+const topicDialogVisible = ref(false); const currentTopic = ref(null); const replyText = ref(''); const topicQuery = ref({ keyword:'', category_id:'' }); const orderQuery = ref({ status:'', keyword:'' })
 const topicEditorEl = ref(null); const replyEditorEl = ref(null); const topicEditor = ref(null); const replyEditor = ref(null)
-const orderDialogVisible = ref(false); const currentOrder = ref(null); const paymentInfo = ref(''); const rechargeChannel = ref('wechat')
-const composer = ref({ title:'', content:'', circle_id:0, category_id:null, price:0, tagsText:'' }); const circleForm = ref({ name:'', description:'', category_id:null, join_policy:'free', join_price:0 })
+const orderDialogVisible = ref(false); const currentOrder = ref(null); const paymentInfo = ref(''); const orderPayInfo = ref(null); const orderPayQr = ref(''); const orderPayRemainSeconds = ref(0); let orderPayTimer = null; let orderPayPollTimer = null; const rechargeChannel = ref('wechat')
+const composer = ref({ title:'', content:'', circle_id:0, category_id:null, price:0, tagsText:'' }); const circleForm = ref({ name:'', description:'', join_policy:'free', join_price:0 })
 const titleMap = { home:'社区首页', profile:'我的身份', benefits:'我的权益', bindings:'账户绑定', topics:'帖子广场', composer:'发布帖子', wallet:'社区钱包', orders:'支付订单', circles:'社区圈子', 'my-topics':'我的帖子', favorites:'我的收藏', drafts:'草稿箱', purchases:'我的购买', exchange:'兑换商城', notifications:'社区通知', leaderboard:'排行榜', announcements:'社区公告', resources:'资源中心', support:'工单支持' }
 const section = computed(() => route.params.section || 'home'); const pageTitle = computed(() => titleMap[section.value] || '社区首页')
-const filteredCircles = computed(() => {
-  const categoryId = Number(composer.value.category_id || 0)
-  if (!categoryId) return circles.value
-  return circles.value.filter(c => Number(c.category_id || 0) === categoryId)
+const globalCategories = computed(() => categories.value.filter(c => Number(c.circle_id || 0) === 0))
+const filteredCategories = computed(() => {
+  const circleId = Number(composer.value.circle_id || 0)
+  return categories.value.filter(c => Number(c.circle_id || 0) === circleId)
 })
 const VIP_LEVEL_LABEL = { free: '免费版', pro: '专业版 PRO', premium: '旗舰版', team: '团队版', enterprise: '企业版' }
 const VIP_LEVEL_TAG = { free: 'info', pro: 'warning', premium: 'danger', team: 'success', enterprise: 'success' }
@@ -196,28 +273,52 @@ const vipVerifiedStale = computed(() => { const t = toTimestamp(vipStatus.value.
 const VIP_CHANNEL_LABEL = { ALIX: '支付宝', WXX: '微信', UX: '闲鱼', MANX: '人工' }
 const vipChannelLabel = computed(() => { const uid = vipStatus.value.communityUid || profile.value.community_uid || ''; const m = String(uid).match(/^([A-Za-z]+)/); const prefix = m ? m[1] : ''; return VIP_CHANNEL_LABEL[prefix] || '未知渠道' })
 const homeVipDesc = computed(() => { const exp = formatDateTime(vipStatus.value.expiredAt); if (!exp) return '暂无到期时间'; if (vipDaysLeft.value === null) return `到期：${exp}`; if (vipDaysLeft.value <= 0) return `已过期（${exp}）`; return `到期：${exp} · 剩余 ${vipDaysLeft.value} 天` })
-const features = [ { title:'帖子广场', desc:'浏览、搜索、查看、回复、收藏、点赞社区帖子', path:'/app/community/topics' }, { title:'发布帖子', desc:'发布教程、问题、资源，可设置售价和草稿', path:'/app/community/composer' }, { title:'社区钱包', desc:'查看余额、流水、充值套餐和订单', path:'/app/community/wallet' }, { title:'兑换/通知', desc:'兑换商城、排行榜、通知中心、我的内容', path:'/app/community/exchange' } ]
-const txColumns = [{prop:'created_at',label:'时间',width:180},{prop:'currency_type',label:'币种',width:100},{prop:'direction',label:'方向',width:100},{prop:'amount',label:'数量',width:120},{prop:'description',label:'备注'}]
-const orderColumns = [{prop:'order_no',label:'订单号',minWidth:180},{prop:'plan_name',label:'套餐',minWidth:120},{prop:'pay_channel',label:'渠道',width:120},{prop:'pay_amount',label:'金额(分)',width:120},{prop:'status',label:'状态',width:120},{prop:'created_at',label:'创建时间',minWidth:160}]
+const features = [ { title:'帖子广场', desc:'浏览、搜索、查看、回复、收藏、点赞社区帖子', path:'/app/community/topics', icon: ChatLineSquare }, { title:'发布帖子', desc:'发布教程、问题、资源，可设置售价和草稿', path:'/app/community/composer', icon: Edit }, { title:'社区钱包', desc:'查看余额、流水、充值套餐和订单', path:'/app/community/wallet', icon: Wallet }, { title:'兑换/通知', desc:'兑换商城、排行榜、通知中心、我的内容', path:'/app/community/exchange', icon: Present } ]
+const ORDER_STATUS_LABEL = { pending:'待支付', paid:'已支付', success:'已支付', expired:'已过期', cancelled:'已取消', closed:'已关闭', refund:'已退款' }
+const ORDER_STATUS_TAG = { pending:'warning', paid:'success', success:'success', expired:'info', cancelled:'info', closed:'info', refund:'danger' }
+const PAY_CHANNEL_LABEL = { alipay:'支付宝', wxpay:'微信支付', wechat:'微信支付', unionpay:'银联', paypal:'PayPal', stripe:'Stripe' }
+const txColumns = [
+  { prop:'created_at', label:'时间', width:180 },
+  { prop:'currency_type', label:'币种', width:100, render: r => h('span',{class:'mono'}, String(r.currency_type||'').toUpperCase()) },
+  { prop:'direction', label:'方向', width:100, render: r => h(ElTag,{type: r.direction==='income'?'success':'warning', size:'small', effect:'light'},()=> r.direction==='income'?'收入':'支出') },
+  { prop:'amount', label:'数量', width:120, render: r => { const v = Number(r.amount||0); return h('span',{class: v>=0?'amount-pos':'amount-neg'}, (v>=0?'+':'') + Number(v).toLocaleString()) } },
+  { prop:'description', label:'备注' }
+]
+const orderColumns = [
+  { prop:'order_no', label:'订单号', minWidth:180, render: r => h('span',{class:'mono'}, r.order_no) },
+  { prop:'plan_name', label:'套餐', minWidth:120 },
+  { prop:'pay_channel', label:'渠道', width:120, render: r => h('span', PAY_CHANNEL_LABEL[r.pay_channel] || r.pay_channel || '-') },
+  { prop:'pay_amount', label:'金额', width:120, render: r => h('span',{class:'amount'}, '¥' + (Number(r.pay_amount||0)/100).toFixed(2)) },
+  { prop:'status', label:'状态', width:120, render: r => h(ElTag,{type: ORDER_STATUS_TAG[r.status] || 'info', size:'small', effect:'light'},()=> ORDER_STATUS_LABEL[r.status] || r.status || '未知') },
+  { prop:'created_at', label:'创建时间', minWidth:160 }
+]
+const displayOrders = computed(() => {
+  const list = orders.value || []
+  const kw = String(orderQuery.value.keyword || '').trim().toLowerCase()
+  const st = orderQuery.value.status
+  return list.filter(o => (!st || o.status === st) && (!kw || String(o.order_no||'').toLowerCase().includes(kw)))
+})
 
-onMounted(reloadCurrent); onBeforeUnmount(destroyEditors)
+onMounted(reloadCurrent); onBeforeUnmount(() => { destroyEditors(); stopOrderPayTimers() })
 watch(() => route.params.section, reloadCurrent)
 watch(topicDialogVisible, async (visible) => { if (visible) await nextTick(initReplyEditor); else destroyReplyEditor() })
 watch(() => composer.value.circle_id, (circleId) => {
-  if (!circleId) return
-  const circle = circles.value.find(c => Number(c.id) === Number(circleId))
-  if (circle?.category_id) composer.value.category_id = circle.category_id
+  const available = categories.value.filter(c => Number(c.circle_id || 0) === Number(circleId || 0))
+  if (!available.some(c => Number(c.id) === Number(composer.value.category_id))) {
+    composer.value.category_id = available[0]?.id || null
+  }
 })
-watch(() => composer.value.category_id, (categoryId) => {
-  if (!composer.value.circle_id) return
-  const circle = circles.value.find(c => Number(c.id) === Number(composer.value.circle_id))
-  if (circle && Number(circle.category_id || 0) !== Number(categoryId || 0)) composer.value.circle_id = 0
+watch(categories, () => {
+  const available = filteredCategories.value
+  if (!available.some(c => Number(c.id) === Number(composer.value.category_id))) {
+    composer.value.category_id = available[0]?.id || null
+  }
 })
 async function reloadCurrent(){ await Promise.allSettled([loadVipStatus(), loadCategories()]); const s=section.value; if(s==='home') await Promise.allSettled([loadProfile(),loadWallet()]); else if(s==='topics') await loadTopics(); else if(s==='composer') { await Promise.allSettled([loadCategories(),loadCircles()]); await nextTick(initTopicEditor) } else { destroyTopicEditor(); if(s==='wallet') await Promise.allSettled([loadWallet(),loadTransactions(),loadRechargePlans()]); else if(s==='orders') await loadOrders(); else if(['profile','benefits'].includes(s)) await loadProfile(); else if(s==='bindings') await Promise.allSettled([loadProfile(), loadVipIdentity()]); else if(s==='circles') await loadCircles(); else if(s==='my-topics') await loadMyTopics(); else if(s==='favorites') await loadFavorites(); else if(s==='drafts') await loadDrafts(); else if(s==='purchases') await loadPurchases(); else if(s==='exchange') await loadExchangeItems(); else if(s==='notifications') await loadNotifications(); else if(s==='leaderboard') await loadLeaderboard(); else if(s==='announcements') await loadAnnouncements(); else if(s==='resources') await loadResources() } }
 async function loadVipStatus(){ try{const r=await getVipStatus(); if(r.success) vipStatus.value=r.data||{}}catch(e){} }
 async function loadVipIdentity(){ try{const r=await getVipIdentity(); if(r.success&&r.data){ vipStatus.value={...vipStatus.value,email:r.data.email||vipStatus.value.email,emailVerified:r.data.emailVerified??vipStatus.value.emailVerified,communityUid:r.data.communityUid||vipStatus.value.communityUid} }}catch(e){} }
 async function verifyVip(){ verifying.value=true; try{const r=await verifyVipStatus(); if(r.success) { vipStatus.value=r.data||{}; ElMessage.success('权益校验完成') }}catch(e){ElMessage.error(e.message||'校验失败')}finally{verifying.value=false} }
-async function loadCategories(){ try{categories.value=pickList(normalize(await communityGet('/categories'))); if(!composer.value.category_id && categories.value[0]) composer.value.category_id=categories.value[0].id; if(!circleForm.value.category_id && categories.value[0]) circleForm.value.category_id=categories.value[0].id}catch(e){} }
+async function loadCategories(){ try{categories.value=pickList(normalize(await communityGet('/categories'))); const available=filteredCategories.value; if(!available.some(c=>Number(c.id)===Number(composer.value.category_id))) composer.value.category_id=available[0]?.id||null}catch(e){} }
 async function loadProfile(){ try{profile.value=normalize(await communityGet('/profile'))}catch(e){} }
 async function loadWallet(){ try{wallet.value=normalize(await communityGet('/wallet'))}catch(e){} }
 async function loadTopics(){ loading.value=true; try{topics.value=pickList(normalize(await communityGet('/topics', compact(topicQuery.value))))}catch(e){ElMessage.error(e.message||'加载帖子失败')}finally{loading.value=false} }
@@ -241,12 +342,16 @@ async function submitReply(){ syncReplyEditorContent(); if(!stripHtml(replyText.
 async function toggleFavorite(t){ try{await communityPost(`/topics/${t.id}/favorite`,{}); t.favored=!t.favored; ElMessage.success('收藏状态已更新')}catch(e){ElMessage.error(e.message||'操作失败')} }
 async function react(t,type){ try{await communityPost(`/reactions/topic/${t.id}`,{reaction_type:type}); t.liked=true; t.like_count=(t.like_count||0)+1; ElMessage.success('已互动')}catch(e){ElMessage.error(e.message||'操作失败')} }
 async function purchaseTopic(t){ try{await ElMessageBox.confirm(`确认花费 ${t.price || 0} 社区币购买？`,'购买确认'); await communityPost(`/topics/${t.id}/purchase`,{}); t.purchased=true; ElMessage.success('购买成功'); await openTopic(t)}catch(e){ if(e !== 'cancel') ElMessage.error(e.message||'购买失败') } }
-async function createCreditOrder(plan){ try{const r=normalize(await communityPost('/credit-orders',{plan_id:plan.id,pay_channel:rechargeChannel.value})); currentOrder.value=r.order || r; orders.value.unshift(currentOrder.value); ElMessage.success('充值订单已创建'); await initiateOrderPayment()}catch(e){ElMessage.error(e.message||'创建充值订单失败')} }
-async function openOrder(row){ currentOrder.value=row; paymentInfo.value=''; orderDialogVisible.value=true; await refreshOrder() }
-async function refreshOrder(){ if(!currentOrder.value?.id)return; submitting.value=true; try{currentOrder.value=normalize(await communityGet(`/credit-orders/${currentOrder.value.id}`)); const idx=orders.value.findIndex(o=>o.id===currentOrder.value.id); if(idx>=0) orders.value[idx]=currentOrder.value }catch(e){ElMessage.error(e.message||'刷新失败')}finally{submitting.value=false} }
-async function initiateOrderPayment(){ if(!currentOrder.value?.id)return; submitting.value=true; try{const channel=currentOrder.value.pay_channel || rechargeChannel.value; const r=normalize(await communityPost(`/payment/${channel}/${currentOrder.value.id}`,{})); paymentInfo.value=JSON.stringify(r,null,2); orderDialogVisible.value=true; ElMessage.success('支付信息已生成')}catch(e){ElMessage.error(e.message||'发起支付失败')}finally{submitting.value=false} }
+async function createCreditOrder(plan){ try{stopOrderPayTimers(); const r=normalize(await communityPost('/credit-orders',{plan_id:plan.id,pay_channel:rechargeChannel.value})); currentOrder.value=r.order || r; orders.value.unshift(currentOrder.value); ElMessage.success('充值订单已创建'); await initiateOrderPayment()}catch(e){ElMessage.error(e.message||'创建充值订单失败')} }
+async function openOrder(row){ stopOrderPayTimers(); currentOrder.value=row; paymentInfo.value=''; orderPayInfo.value=null; orderPayQr.value=''; orderPayRemainSeconds.value=0; orderDialogVisible.value=true; await refreshOrder(false) }
+async function refreshOrder(manual=false){ if(!currentOrder.value?.id)return; submitting.value=true; try{currentOrder.value=normalize(await communityGet(`/credit-orders/${currentOrder.value.id}`)); const idx=orders.value.findIndex(o=>o.id===currentOrder.value.id); if(idx>=0) orders.value[idx]=currentOrder.value; if(currentOrder.value.status==='paid'){ stopOrderPayTimers(); await Promise.allSettled([loadWallet(),loadTransactions(),loadOrders()]); if(manual) ElMessage.success('支付成功，钱包已刷新') } else if(['timeout','cancelled','failed'].includes(currentOrder.value.status)){ stopOrderPayTimers(); orderPayRemainSeconds.value=0; if(manual) ElMessage.warning('订单已结束，请重新创建订单') } else if(manual){ ElMessage.info('订单尚未支付，系统会自动轮询') } }catch(e){ if(manual) ElMessage.error(e.message||'刷新失败') }finally{submitting.value=false} }
+async function initiateOrderPayment(){ if(!currentOrder.value?.id)return; submitting.value=true; try{const channel=currentOrder.value.pay_channel || rechargeChannel.value; const r=normalize(await communityPost(`/payment/${channel}/${currentOrder.value.id}`,{})); await setOrderPayInfo(r); orderDialogVisible.value=true; ElMessage.success('支付二维码已生成')}catch(e){ElMessage.error(e.message||'发起支付失败')}finally{submitting.value=false} }
+async function setOrderPayInfo(info){ stopOrderPayTimers(); orderPayInfo.value=info||null; paymentInfo.value=''; orderPayQr.value=''; orderPayRemainSeconds.value=Number(info?.expires_in||600); const qrText=info?.code_url||info?.pay_url||info?.h5_url||''; if(qrText){ orderPayQr.value=await QRCode.toDataURL(qrText,{width:260,margin:1}) } if(info?.provider==='alipay'||info?.provider==='wechat'){ startOrderPayTimers() } }
+function stopOrderPayTimers(){ if(orderPayTimer) clearInterval(orderPayTimer); if(orderPayPollTimer) clearInterval(orderPayPollTimer); orderPayTimer=null; orderPayPollTimer=null }
+function startOrderPayTimers(){ stopOrderPayTimers(); orderPayTimer=setInterval(()=>{ orderPayRemainSeconds.value=Math.max(0,orderPayRemainSeconds.value-1); if(orderPayRemainSeconds.value<=0) stopOrderPayTimers() },1000); orderPayPollTimer=setInterval(()=>refreshOrder(false),3000) }
+function formatPayRemain(seconds){ const s=Math.max(0,Number(seconds||0)); const m=Math.floor(s/60); const r=s%60; return `${m}:${String(r).padStart(2,'0')}` }
 async function exchange(item){ try{await communityPost('/exchange',{item_id:item.id}); ElMessage.success('兑换成功'); await Promise.allSettled([loadWallet(),loadExchangeItems()])}catch(e){ElMessage.error(e.message||'兑换失败')} }
-async function createCircle(){ if(!circleForm.value.name){ElMessage.warning('请输入圈子名称');return} if(!circleForm.value.category_id){ElMessage.warning('请选择圈子分类');return} try{await communityPost('/circles', circleForm.value); ElMessage.success('圈子已创建'); circleForm.value={name:'',description:'',category_id:categories.value[0]?.id||null,join_policy:'free',join_price:0}; await loadCircles()}catch(e){ElMessage.error(e.message||'创建失败')} }
+async function createCircle(){ if(!circleForm.value.name){ElMessage.warning('请输入圈子名称');return} try{await communityPost('/circles', circleForm.value); ElMessage.success('圈子已创建，系统已自动初始化圈子分类'); circleForm.value={name:'',description:'',join_policy:'free',join_price:0}; await Promise.allSettled([loadCircles(),loadCategories()])}catch(e){ElMessage.error(e.message||'创建失败')} }
 async function joinCircle(item){ if(item.joined)return; try{ if(item.join_policy==='paid') await ElMessageBox.confirm(`确认花费 ${item.join_price || 0} 社区币加入？`,'付费加入'); await communityPost(`/circles/${item.id}/join`,{}); ElMessage.success('加入申请已提交'); await loadCircles()}catch(e){ if(e !== 'cancel') ElMessage.error(e.message||'加入失败') } }
 async function leaveCircle(item){ try{await communityDelete(`/circles/${item.id}/leave`); ElMessage.success('已退出'); await loadCircles()}catch(e){ElMessage.error(e.message||'退出失败')} }
 async function deleteTopic(item){ try{await ElMessageBox.confirm('确认删除该帖子？','删除确认'); await communityDelete(`/topics/${item.id}`); ElMessage.success('已删除'); await loadMyTopics()}catch(e){ if(e !== 'cancel') ElMessage.error(e.message||'删除失败') } }
@@ -262,8 +367,8 @@ function destroyReplyEditor(){ if(replyEditor.value){ replyEditor.value.destroy(
 function destroyEditors(){ destroyTopicEditor(); destroyReplyEditor() }
 function syncTopicEditorContent(){ if(topicEditor.value) composer.value.content = topicEditor.value.getHtml() }
 function syncReplyEditorContent(){ if(replyEditor.value) replyText.value = replyEditor.value.getHtml() }
-function topicPayload(){ const circle = circles.value.find(c => Number(c.id) === Number(composer.value.circle_id)); return {title:composer.value.title,content:composer.value.content,content_format:'html',circle_id:composer.value.circle_id||0,category_id:circle?.category_id || composer.value.category_id,price:composer.value.price||0,tags:composer.value.tagsText?composer.value.tagsText.split(',').map(s=>s.trim()).filter(Boolean):[]} }
-function resetComposer(){ composer.value={title:'',content:'',circle_id:0,category_id:categories.value[0]?.id||null,price:0,tagsText:''}; topicEditor.value?.clear() }
+function topicPayload(){ return {title:composer.value.title,content:composer.value.content,content_format:'html',circle_id:composer.value.circle_id||0,category_id:composer.value.category_id,price:composer.value.price||0,tags:composer.value.tagsText?composer.value.tagsText.split(',').map(s=>s.trim()).filter(Boolean):[]} }
+function resetComposer(){ composer.value={title:'',content:'',circle_id:0,category_id:globalCategories.value[0]?.id||null,price:0,tagsText:''}; topicEditor.value?.clear() }
 function compact(obj){ return Object.fromEntries(Object.entries(obj).filter(([,v])=>v!==''&&v!==null&&v!==undefined)) }
 function normalize(res){ return res?.data || res || {} } function pickList(data){ return Array.isArray(data)?data:(data.items||data.list||data.records||data.topics||data.orders||data.transactions||data.plans||data.circles||data.notifications||[]) } function stripHtml(text){ return String(text||'').replace(/<[^>]+>/g,'').slice(0,500) } function safeHtml(html){ return String(html || '').replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '') } function formatCents(cents){ return (Number(cents||0)/100).toFixed(2) }
 function parseLocalDateTime(str){ if(str === null || str === undefined) return null; let s = String(str).trim(); if(!s) return null; s = s.replace(/Z$/,'').replace(/([+-]\d{2}:?\d{2})$/,''); s = s.replace(/\.(\d{3})\d*/, '.$1'); const d = new Date(s); return isNaN(d.getTime()) ? null : d }
@@ -273,5 +378,117 @@ function normalizeFeatureArray(raw){ if(!raw) return []; let v = raw; if(typeof 
 </script>
 
 <style scoped>
-.community-page{padding:2px}.hero-card{border-radius:18px;padding:24px;background:linear-gradient(135deg,#eef2ff,#fff7ed);display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:16px}.eyebrow{color:#7c3aed;font-weight:700;font-size:13px;margin-bottom:6px}h2{margin:0 0 8px;font-size:26px;color:#111827}p{margin:0;color:#6b7280}.section-row,.mt16{margin-top:16px;margin-bottom:16px}.mb12{margin-bottom:12px}.identity-id{font-size:24px;font-weight:800;color:#111827;margin-bottom:8px}.muted{color:#6b7280;font-size:13px;line-height:1.6}.feature-card{border-radius:16px}.feature-item{border:1px solid #eef2ff;background:#fafafa;border-radius:12px;padding:14px;min-height:84px;display:flex;flex-direction:column;gap:8px;cursor:pointer;transition:all .2s}.feature-item:hover{border-color:#6366f1;transform:translateY(-1px)}.feature-item span{color:#6b7280;font-size:13px;line-height:1.5}.card-header{display:flex;align-items:center;justify-content:space-between;gap:12px}.empty-box{text-align:center;color:#9ca3af;padding:36px}.topic-item{padding:16px 0;border-bottom:1px solid #eef2f7;cursor:pointer}.topic-title{font-size:17px;font-weight:700;color:#111827;margin-bottom:8px}.topic-meta{display:flex;gap:12px;color:#9ca3af;font-size:12px;margin-bottom:8px;flex-wrap:wrap}.topic-summary,.topic-content{color:#4b5563;line-height:1.7;white-space:pre-wrap}.topic-actions{margin-top:10px}.reply-item{padding:10px 0;border-bottom:1px dashed #e5e7eb;color:#374151}.recharge-plan{width:170px}.vip-plan-title{font-weight:700;color:#111827}.vip-plan-price{font-size:22px;font-weight:800;color:#ef4444;margin:8px 0 4px}.pay-json{background:#0f172a;color:#e5e7eb;padding:12px;border-radius:10px;white-space:pre-wrap;max-height:260px;overflow:auto;margin-top:12px}
+.community-page { padding: 0; }
+.community-page > * { margin-bottom: 16px; }
+.community-page > *:last-child { margin-bottom: 0; }
+
+/* 统一卡片圆角与边框（含嵌套卡片） */
+.community-page .el-card { border-radius: 16px !important; border-color: var(--border) !important; }
+
+/* Hero 头部 */
+.hero-card { border-radius: 18px; padding: 22px 26px; background: linear-gradient(135deg, var(--el-color-primary-light-9), #fff7ed); border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; box-shadow: 0 6px 20px rgba(79,70,229,.06); }
+.hero-card .eyebrow { color: var(--brand); font-weight: 700; font-size: 13px; letter-spacing: .5px; margin-bottom: 6px; }
+.hero-card h2 { margin: 0 0 8px; font-size: 24px; color: var(--text-1); }
+.hero-card p { margin: 0; color: var(--text-2); line-height: 1.6; max-width: 640px; }
+.hero-card .el-space { flex-wrap: wrap; }
+
+/* 卡片标题区 */
+.card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dt-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* MetricCard 指标卡 */
+.metric-card { transition: transform .2s ease, box-shadow .2s ease; }
+.metric-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(79,70,229,.10); }
+.metric-card :deep(.el-card__body) { padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
+.metric-top { display: flex; align-items: center; gap: 10px; }
+.metric-icon { width: 24px; height: 24px; min-width: 24px; min-height: 24px; max-width: 24px; max-height: 24px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; background: var(--el-color-primary-light-9); color: var(--brand); font-size: 14px; flex: 0 0 24px; line-height: 1; overflow: hidden; box-sizing: border-box; }
+.metric-icon :deep(svg), .metric-icon :deep(.metric-svg) { width: 14px !important; height: 14px !important; min-width: 14px !important; min-height: 14px !important; max-width: 14px !important; max-height: 14px !important; display: block !important; flex: 0 0 14px !important; }
+.metric-title { font-size: 13px; color: var(--text-2); font-weight: 500; }
+.metric-value { font-size: 22px; font-weight: 800; color: var(--text-1); word-break: break-word; line-height: 1.25; }
+.metric-desc { font-size: 12.5px; color: var(--text-3); line-height: 1.5; }
+
+/* 功能闭环卡片 */
+.feature-card :deep(.el-card__body) { padding: 18px 20px; }
+.feature-card .el-row { row-gap: 12px; }
+.feature-item { border: 1px solid var(--border); background: var(--bg-soft); border-radius: 14px; padding: 16px; min-height: 96px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; transition: all .2s ease; }
+.feature-item:hover { border-color: var(--brand); background: #fff; transform: translateY(-2px); box-shadow: 0 10px 22px rgba(79,70,229,.10); }
+.feature-icon { width: 22px !important; height: 22px !important; min-width: 22px !important; min-height: 22px !important; max-width: 22px !important; max-height: 22px !important; font-size: 18px; color: var(--brand); line-height: 1; flex: 0 0 22px; overflow: hidden; }
+.feature-icon :deep(svg), .feature-icon :deep(.feature-svg) { width: 18px !important; height: 18px !important; min-width: 18px !important; min-height: 18px !important; max-width: 18px !important; max-height: 18px !important; display: block !important; flex: 0 0 18px !important; }
+.feature-item strong { font-size: 15px; color: var(--text-1); }
+.feature-item span { color: var(--text-2); font-size: 13px; line-height: 1.5; }
+
+/* 列表类卡片（帖子/表格） */
+.list-card :deep(.el-card__body), .data-table-card :deep(.el-card__body) { padding: 12px 16px; }
+.data-table-card :deep(.el-table) { font-size: 13px; }
+.data-table-card :deep(.el-table) th.el-table__cell { background: var(--bg-soft); color: var(--text-2); font-weight: 600; }
+.simple-list-card :deep(.el-card__body) { padding: 8px 12px; }
+
+/* 帖子广场列表 */
+.empty-box { text-align: center; color: var(--text-3); padding: 36px; }
+.topic-item { padding: 16px 4px; border-bottom: 1px solid var(--border); cursor: pointer; border-radius: 8px; transition: background .15s ease; }
+.topic-item:last-child { border-bottom: none; }
+.topic-item:hover { background: var(--bg-soft); }
+.topic-title { font-size: 16px; font-weight: 700; color: var(--text-1); margin-bottom: 8px; }
+.topic-meta { display: flex; gap: 12px; color: var(--text-3); font-size: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.topic-summary, .topic-content { color: var(--text-2); line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+.topic-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+.reply-item { padding: 10px 0; border-bottom: 1px dashed var(--border); color: var(--text-1); }
+
+/* 通用简单列表（我的帖子/收藏/草稿/兑换/排行榜等） */
+.sl-list { display: flex; flex-direction: column; gap: 2px; }
+.sl-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 10px; transition: background .15s ease; }
+.sl-item:hover { background: var(--bg-soft); }
+.sl-icon { width: 22px; height: 22px; min-width: 22px; min-height: 22px; max-width: 22px; max-height: 22px; border-radius: 6px; background: var(--el-color-primary-light-9); color: var(--brand); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; box-sizing: border-box; overflow: hidden; }
+.sl-icon :deep(svg), .sl-icon :deep(.el-icon) { width: 14px !important; height: 14px !important; min-width: 14px !important; min-height: 14px !important; max-width: 14px !important; max-height: 14px !important; display: block !important; flex: 0 0 14px !important; }
+.sl-body { flex: 1; min-width: 0; }
+.sl-title { font-size: 14.5px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sl-desc { font-size: 12.5px; color: var(--text-3); margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sl-actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+.circle-create-form .el-form-item { margin-bottom: 0; margin-right: 14px; }
+.circle-create-form .el-button { margin-left: 2px; }
+
+/* 充值套餐网格 */
+.recharge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 14px; margin-top: 4px; }
+.recharge-plan { border-radius: 14px; text-align: center; transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.recharge-plan:hover { transform: translateY(-2px); border-color: var(--brand); box-shadow: 0 10px 22px rgba(79,70,229,.10); }
+.vip-plan-title { font-weight: 700; color: var(--text-1); }
+.vip-plan-price { font-size: 22px; font-weight: 800; color: #ef4444; margin: 8px 0 4px; }
+.recharge-plan .muted { color: var(--text-3); font-size: 12.5px; }
+.recharge-plan .el-button { margin-top: 8px; }
+
+/* 表格单元格：等宽字体 / 金额 / 收支 */
+.mono { font-family: var(--el-font-family-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace); font-size: 12.5px; color: var(--text-2); }
+.amount { font-weight: 700; color: var(--text-1); }
+.amount-pos { color: var(--el-color-success); font-weight: 600; }
+.amount-neg { color: var(--el-color-warning); font-weight: 600; }
+
+/* 间距工具类 */
+.mt16 { margin-top: 16px; }
+.mb12 { margin-bottom: 12px; }
+.muted { color: var(--text-3); font-size: 13px; line-height: 1.6; }
+
+/* 编辑器 */
+.community-editor { height: 360px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.community-editor :deep(.aieditor) { height: 100%; }
+.community-reply-editor { min-height: 120px; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+
+/* 弹窗 */
+.community-page .el-dialog { border-radius: 14px; }
+.pay-json { background: #0f172a; color: #e5e7eb; padding: 12px; border-radius: 10px; white-space: pre-wrap; max-height: 260px; overflow: auto; margin-top: 12px; }
+.topic-content { max-height: 420px; overflow: auto; }
+
+/* 排行榜 */
+.leaderboard-card :deep(.el-card__body) { padding: 8px 12px; }
+.lb-list { display: flex; flex-direction: column; gap: 2px; }
+.lb-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 10px; transition: background .15s ease; }
+.lb-item:hover { background: var(--bg-soft); }
+.lb-rank { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 13px; background: var(--el-fill-color-light); color: var(--text-2); flex-shrink: 0; }
+.lb-rank-top { color: #fff; }
+.rank-1 .lb-rank { background: linear-gradient(135deg,#f59e0b,#fde68a); box-shadow: 0 2px 6px rgba(245,158,11,.40); }
+.rank-2 .lb-rank { background: linear-gradient(135deg,#94a3b8,#e2e8f0); box-shadow: 0 2px 6px rgba(148,163,184,.40); }
+.rank-3 .lb-rank { background: linear-gradient(135deg,#d97706,#fbbf24); box-shadow: 0 2px 6px rgba(217,119,6,.40); }
+.lb-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--el-color-primary-light-9); color: var(--brand); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; flex-shrink: 0; }
+.lb-main { flex: 1; min-width: 0; }
+.lb-name { font-size: 14px; font-weight: 600; color: var(--text-1); }
+.lb-score { font-size: 12.5px; color: var(--text-3); margin-top: 2px; }
 </style>
