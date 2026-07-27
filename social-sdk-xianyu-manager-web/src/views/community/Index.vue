@@ -486,13 +486,20 @@ function normalizeFeatureArray(raw){ if(!raw) return []; let v = raw; if(typeof 
 
 /* 帖子广场列表 */
 .empty-box { text-align: center; color: var(--text-3); padding: 36px; }
-.topic-item { padding: 16px 4px; border-bottom: 1px solid var(--border); cursor: pointer; border-radius: 8px; transition: background .15s ease; }
-.topic-item:last-child { border-bottom: none; }
-.topic-item:hover { background: var(--bg-soft); }
-.topic-title { font-size: 16px; font-weight: 700; color: var(--text-1); margin-bottom: 8px; }
-.topic-meta { display: flex; gap: 12px; color: var(--text-3); font-size: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.topics-card :deep(.el-card__body) { padding: 6px 4px; }
+.topic-card { display: flex; align-items: flex-start; gap: 14px; padding: 16px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .15s ease; }
+.topic-card:last-child { border-bottom: none; }
+.topic-card:hover { background: var(--bg-soft); }
+.topic-avatar { width: 44px; height: 44px; min-width: 44px; border-radius: 12px; background: linear-gradient(135deg, var(--brand), #8b5cf6); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; flex-shrink: 0; }
+.topic-main { flex: 1; min-width: 0; }
+.topic-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.topic-title { font-size: 16px; font-weight: 700; color: var(--text-1); line-height: 1.4; }
+.topic-meta { display: flex; gap: 14px; color: var(--text-3); font-size: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+.topic-meta .t-author { color: var(--brand); font-weight: 600; }
 .topic-summary, .topic-content { color: var(--text-2); line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
-.topic-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+.topic-card .topic-summary { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; }
+.topic-tags { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+.topic-side { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
 .reply-item { padding: 10px 0; border-bottom: 1px dashed var(--border); color: var(--text-1); }
 
 /* 通用简单列表（我的帖子/收藏/草稿/兑换/排行榜等） */
