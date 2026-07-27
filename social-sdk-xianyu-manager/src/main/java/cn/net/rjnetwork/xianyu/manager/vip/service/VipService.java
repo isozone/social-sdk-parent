@@ -119,9 +119,18 @@ public class VipService {
     public Map<String, Object> config(AdminUser user) {
         ensureBinding(user);
         try {
-            return externalGet("/api/community/external/social-sdk/vip/config");
+            Map<String, Object> config = externalGet("/api/community/external/social-sdk/vip/config");
+            Object plans = config.get("plans");
+            if (plans instanceof List<?> planList) {
+                config.put("plans", planList.stream()
+                        .filter(item -> item instanceof Map<?, ?>)
+                        .map(item -> (Map<?, ?>) item)
+                        .filter(plan -> "social_sdk_vip".equals(stringValue(plan.get("product_type"))) && "social-sdk".equals(stringValue(plan.get("app_code"))))
+                        .toList());
+            }
+            return config;
         } catch (Exception e) {
-            return fallbackConfig(e.getMessage());
+            throw new IllegalStateException("无法从 I 社区拉取真实 VIP 套餐配置：" + e.getMessage(), e);
         }
     }
 
@@ -152,7 +161,7 @@ public class VipService {
         try {
             result = externalPost("/api/community/external/social-sdk/vip/orders", body);
         } catch (Exception e) {
-            result = offlineOrder(localOrderNo, request);
+            throw new IllegalStateException("无法通过 I 社区创建真实 VIP 支付订单：" + e.getMessage(), e);
         }
         VipOrder order = new VipOrder();
         order.setLocalUserId(localUserId);
@@ -310,7 +319,9 @@ public class VipService {
     private Map<String, Object> ensureBinding(AdminUser user) {
         Long localUserId = localUserId(user);
         CommunityUserBinding existing = getBinding(localUserId);
-        if (existing != null && existing.getCommunityUserId() != null) {
+        if (existing != null && existing.getCommunityUserId() != null && existing.getCommunityUserId() > 0
+                && existing.getDeploymentId() != null && !existing.getDeploymentId().isBlank()
+                && existing.getBindToken() != null && !existing.getBindToken().isBlank()) {
             return bindingMap(existing, false);
         }
         SdkDeployment deployment = ensureDeployment();
@@ -325,9 +336,9 @@ public class VipService {
         try {
             response = externalPost("/api/community/external/social-sdk/users/bind", body);
         } catch (Exception e) {
-            response = offlineBind(deployment, localUserId);
+            throw new IllegalStateException("无法连接 I 社区完成账户绑定：" + e.getMessage(), e);
         }
-        CommunityUserBinding binding = new CommunityUserBinding();
+        CommunityUserBinding binding = existing != null ? existing : new CommunityUserBinding();
         binding.setLocalUserId(localUserId);
         binding.setDeploymentId(deployment.getDeploymentId());
         binding.setCommunityUserId(asLong(response.getOrDefault("community_user_id", 0L)));
@@ -339,8 +350,12 @@ public class VipService {
         binding.setWechatBound(false);
         binding.setEmailBound(false);
         binding.setLastSyncAt(LocalDateTime.now());
-        bindingMapper.insert(binding);
-        return bindingMap(binding, true);
+        if (binding.getId() == null) {
+            bindingMapper.insert(binding);
+        } else {
+            bindingMapper.updateById(binding);
+        }
+        return bindingMap(binding, existing == null);
     }
 
     private SdkDeployment ensureDeployment() {
@@ -370,7 +385,7 @@ public class VipService {
     private Map<String, Object> send(HttpRequest request) throws Exception {
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IllegalStateException("new-api 返回异常: " + response.statusCode());
+            throw new IllegalStateException("I 社区返回异常: " + response.statusCode() + "，" + extractErrorMessage(response.body()));
         }
         Map<String, Object> payload = objectMapper.readValue(response.body(), new TypeReference<>() {});
         Object success = payload.get("success");
@@ -430,7 +445,7 @@ public class VipService {
     private Map<String, Object> sendRaw(HttpRequest request) throws Exception {
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IllegalStateException("new-api 返回异常: " + response.statusCode());
+            throw new IllegalStateException("I 社区返回异常: " + response.statusCode());
         }
         return objectMapper.readValue(response.body(), new TypeReference<>() {});
     }
@@ -484,38 +499,6 @@ public class VipService {
         map.put("bind_token", binding.getBindToken());
         map.put("is_new_user", isNew);
         return map;
-    }
-
-    private Map<String, Object> fallbackConfig(String error) {
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("enabled", true);
-        data.put("offline", true);
-        data.put("message", "new-api 暂不可用，展示本地默认套餐：" + error);
-        data.put("community_site_name", "I 社区");
-        data.put("channels", List.of(
-                Map.of("code", "alipay", "name", "支付宝", "enabled", true, "uid_prefix", "ALIX"),
-                Map.of("code", "wechat", "name", "微信支付", "enabled", true, "uid_prefix", "WXX"),
-                Map.of("code", "upay", "name", "U 支付", "enabled", true, "uid_prefix", "UX")
-        ));
-        data.put("plans", List.of(
-                Map.of("id", 101, "code", "vip_monthly", "name", "VIP 月卡", "price_cents", 2900, "currency", "CNY", "duration_days", 31, "discount_tag", "体验"),
-                Map.of("id", 103, "code", "vip_yearly", "name", "VIP 年卡", "price_cents", 19900, "currency", "CNY", "duration_days", 366, "discount_tag", "推荐")
-        ));
-        return data;
-    }
-
-    private Map<String, Object> offlineBind(SdkDeployment deployment, Long localUserId) {
-        return Map.of("community_user_id", -localUserId, "community_uid", "", "bind_id", "offline", "bind_status", "pending", "bind_token", "offline_" + deployment.getDeploymentId(), "is_new_user", true);
-    }
-
-    private Map<String, Object> offlineOrder(String localOrderNo, VipCreateOrderRequest request) {
-        return Map.of(
-                "order_no", localOrderNo,
-                "status", "pending",
-                "channel", normalizeChannel(request.getChannel()),
-                "pay_amount", 0,
-                "pay_info", Map.of("mode", "offline", "message", "new-api 暂不可用，无法完成真实支付解锁")
-        );
     }
 
     private Map<String, Object> menu(String key, String label, String path) {
@@ -602,6 +585,19 @@ public class VipService {
 
     private String stringValue(Object value) {
         return value == null ? "" : String.valueOf(value);
+    }
+
+    private String extractErrorMessage(String body) {
+        if (body == null || body.isBlank()) {
+            return "";
+        }
+        try {
+            Map<String, Object> payload = objectMapper.readValue(body, new TypeReference<>() {});
+            String message = stringValue(payload.get("message"));
+            return message.isBlank() ? body : message;
+        } catch (Exception ignored) {
+            return body;
+        }
     }
 
     private String defaultString(String value, String fallback) {

@@ -59,6 +59,38 @@
             <span class="menu-icon-box"><el-icon><Document /></el-icon></span>
             <span>资源中心</span>
           </el-menu-item>
+          <el-menu-item index="/app/community/circles">
+            <span class="menu-icon-box"><el-icon><Compass /></el-icon></span>
+            <span>社区圈子</span>
+          </el-menu-item>
+          <el-menu-item index="/app/community/my-topics">
+            <span class="menu-icon-box"><el-icon><Document /></el-icon></span>
+            <span>我的帖子</span>
+          </el-menu-item>
+          <el-menu-item index="/app/community/favorites">
+            <span class="menu-icon-box"><el-icon><Star /></el-icon></span>
+            <span>我的收藏</span>
+          </el-menu-item>
+          <el-menu-item index="/app/community/drafts">
+            <span class="menu-icon-box"><el-icon><EditPen /></el-icon></span>
+            <span>草稿箱</span>
+          </el-menu-item>
+          <el-menu-item index="/app/community/purchases">
+            <span class="menu-icon-box"><el-icon><ShoppingBag /></el-icon></span>
+            <span>我的购买</span>
+          </el-menu-item>
+          <el-menu-item index="/app/community/exchange">
+            <span class="menu-icon-box"><el-icon><Present /></el-icon></span>
+            <span>兑换商城</span>
+          </el-menu-item>
+          <el-menu-item index="/app/community/notifications">
+            <span class="menu-icon-box"><el-icon><Message /></el-icon></span>
+            <span>社区通知</span>
+          </el-menu-item>
+          <el-menu-item index="/app/community/leaderboard">
+            <span class="menu-icon-box"><el-icon><Trophy /></el-icon></span>
+            <span>排行榜</span>
+          </el-menu-item>
           <el-menu-item index="/app/community/support">
             <span class="menu-icon-box"><el-icon><Service /></el-icon></span>
             <span>工单支持</span>
@@ -328,7 +360,7 @@
         <div class="vip-hero">
           <div>
             <h3>开通后获得唯一 I 社区身份</h3>
-            <p>支付成功后由 new-api 按真实支付渠道分配 ALIX / WXX / UX 前缀账户，并解锁专业版能力。</p>
+            <p>支付成功后由 I 社区按真实支付渠道分配 ALIX / WXX 前缀账户，并解锁专业版能力。</p>
           </div>
           <el-tag type="warning" size="large">{{ vipHeader.state === 'pending_payment' ? '待支付' : '未解锁' }}</el-tag>
         </div>
@@ -351,12 +383,33 @@
         </div>
         <el-divider content-position="left">支付方式</el-divider>
         <el-radio-group v-model="selectedChannel" class="vip-channels">
-          <el-radio-button v-for="ch in vipChannels" :key="ch.code" :label="ch.code">
+          <el-radio-button v-for="ch in availableVipChannels" :key="ch.code" :label="ch.code">
             {{ ch.name }} · {{ ch.uid_prefix }}
           </el-radio-button>
         </el-radio-group>
-        <div v-if="currentPayInfo" class="pay-info-box">
+        <el-alert
+          v-if="selectedPlan && availableVipChannels.length === 0"
+          type="warning"
+          :closable="false"
+          title="当前套餐没有配置可用支付方式，请到 I 社区套餐配置中启用支付渠道"
+        />
+        <div v-if="currentPayInfoObj" class="pay-info-box">
           <div class="pay-info-title">支付信息</div>
+          <div v-if="currentPayInfoObj.mode === 'redirect'" class="pay-action-row">
+            <div>支付宝订单已创建，请跳转到支付宝完成支付。</div>
+            <el-button type="success" @click="openPayUrl(currentPayInfoObj.pay_url || currentPayInfoObj.form)">打开支付宝支付</el-button>
+          </div>
+          <div v-else-if="currentPayInfoObj.mode === 'native_qr'" class="pay-qr-wrap">
+            <img v-if="currentPayQr" :src="currentPayQr" class="pay-qr" alt="微信支付二维码" />
+            <div>请使用微信扫码支付，完成后点击刷新状态。</div>
+          </div>
+          <div v-else-if="currentPayInfoObj.mode === 'h5'" class="pay-action-row">
+            <div>微信 H5 支付订单已创建，请打开支付链接。</div>
+            <el-button type="success" @click="openPayUrl(currentPayInfoObj.pay_url || currentPayInfoObj.h5_url)">打开微信支付</el-button>
+          </div>
+          <div v-else-if="currentPayInfoObj.mode === 'crypto_transfer'" class="pay-action-row">
+            <div>{{ currentPayInfoObj.message || '请按 U 支付信息完成转账。' }}</div>
+          </div>
           <pre>{{ currentPayInfo }}</pre>
           <el-button v-if="currentLocalOrderNo" :loading="vipPolling" type="primary" @click="pollVipOrder">我已支付，刷新状态</el-button>
         </div>
@@ -535,7 +588,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/store/auth'
 import { ElMessageBox, ElMessage } from 'element-plus'
@@ -544,11 +597,13 @@ import {
   Promotion, UploadFilled, Monitor, Document, Bell, UserFilled, ArrowDown, FullScreen,
   Medal, Connection, Service, Sunrise, Switch, Timer, Setting, Compass,
   Search, Download, Check, InfoFilled, Warning, Lock, SwitchButton,
-  Refresh, Avatar, ChatLineSquare, Link, Back, Edit, Wallet
+  Refresh, Avatar, ChatLineSquare, Link, Back, Edit, Wallet,
+  EditPen, ShoppingBag, Present, Message, Trophy
 } from '@element-plus/icons-vue'
 import * as notify from '@/api/notification'
 import { getChromeConfig, detectChrome, saveChromeConfig, downloadChrome, validateChromePath } from '@/api/chrome'
 import { getVipHeaderStatus, getVipConfig, createVipOrder, getVipOrder } from '@/api/vip'
+import QRCode from 'qrcode'
 
 const route = useRoute()
 const router = useRouter()
@@ -653,6 +708,8 @@ const selectedPlan = ref(null)
 const selectedChannel = ref('wechat')
 const currentLocalOrderNo = ref('')
 const currentPayInfo = ref('')
+const currentPayInfoObj = ref(null)
+const currentPayQr = ref('')
 const vipBenefits = [
   '管理更多闲鱼账号，解锁多账号托管',
   '使用 AI 自动回复、AI 客服和高级规则',
@@ -674,10 +731,10 @@ async function openVipDialog() {
   try {
     const res = await getVipConfig()
     if (res.success && res.data) {
-      vipPlans.value = res.data.plans || []
-      vipChannels.value = (res.data.channels || []).filter(ch => ch.enabled !== false)
+      vipPlans.value = (res.data.plans || []).filter(plan => plan.product_type === 'social_sdk_vip' && plan.app_code === 'social-sdk')
+      vipChannels.value = (res.data.channels || []).filter(ch => ch.enabled !== false && ch.code !== 'upay')
       selectedPlan.value = vipPlans.value[0] || null
-      selectedChannel.value = vipChannels.value[0]?.code || 'wechat'
+      selectedChannel.value = availableVipChannels.value[0]?.code || ''
     }
   } catch (e) {
     ElMessage.error('加载 VIP 配置失败：' + (e.message || e))
@@ -690,19 +747,53 @@ function handleCommunityCommand(cmd) {
   else router.push(`/app/community/${cmd}`)
 }
 
+const availableVipChannels = computed(() => {
+  if (!selectedPlan.value) return vipChannels.value
+  const raw = selectedPlan.value.channels || selectedPlan.value.Channels || ''
+  if (!raw) return vipChannels.value
+  const allowed = String(raw).split(',').map(v => v.trim()).filter(Boolean)
+  return vipChannels.value.filter(ch => allowed.includes(ch.code))
+})
+
+watch(selectedPlan, () => {
+  currentPayInfo.value = ''
+  currentPayInfoObj.value = null
+  currentPayQr.value = ''
+  const available = availableVipChannels.value
+  if (!available.some(ch => ch.code === selectedChannel.value)) {
+    selectedChannel.value = available[0]?.code || ''
+  }
+})
+
 function formatCents(cents) {
   const n = Number(cents || 0)
   return (n / 100).toFixed(2)
+}
+
+async function setPayInfo(payInfo) {
+  currentPayInfoObj.value = payInfo || null
+  currentPayInfo.value = payInfo ? JSON.stringify(payInfo, null, 2) : ''
+  currentPayQr.value = ''
+  const qrText = payInfo?.code_url || (payInfo?.qr_code ? payInfo?.pay_url : '')
+  if (qrText) {
+    currentPayQr.value = await QRCode.toDataURL(qrText, { width: 220, margin: 1 })
+  }
+}
+
+function openPayUrl(url) {
+  if (!url) { ElMessage.warning('支付链接为空'); return }
+  window.open(url, '_blank')
 }
 
 async function submitVipOrder() {
   if (!selectedPlan.value) { ElMessage.warning('请选择套餐'); return }
   vipLoading.value = true
   try {
+    if (!selectedChannel.value) { ElMessage.warning('当前套餐没有可用支付方式'); return }
     const res = await createVipOrder({ planId: selectedPlan.value.id, channel: selectedChannel.value })
     if (res.success && res.data) {
       currentLocalOrderNo.value = res.data.local_order_no
-      currentPayInfo.value = JSON.stringify(res.data.pay_info || res.data, null, 2)
+      await setPayInfo(res.data.pay_info || res.data)
       ElMessage.success('订单已创建，请按支付信息完成付款')
     } else {
       ElMessage.error(res.message || '创建订单失败')
