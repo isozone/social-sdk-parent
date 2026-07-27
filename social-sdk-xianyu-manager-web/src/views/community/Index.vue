@@ -34,24 +34,46 @@
     </template>
 
     <template v-else-if="section === 'topics'">
-      <list-card title="帖子广场" :loading="loading" :empty="topics.length === 0">
-        <template #actions>
-          <el-input v-model="topicQuery.keyword" placeholder="搜索帖子" clearable style="width:220px" @keyup.enter="loadTopics" />
-          <el-select v-model="topicQuery.category_id" clearable placeholder="分类" style="width:160px" @change="loadTopics"><el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" /></el-select>
-          <el-button @click="loadTopics">搜索</el-button>
-          <el-button type="primary" @click="$router.push('/app/community/composer')">发布帖子</el-button>
+      <el-card shadow="never" class="topics-card">
+        <template #header>
+          <div class="card-header">
+            <span>帖子广场</span>
+            <div class="dt-actions">
+              <el-input v-model="topicQuery.keyword" placeholder="搜索帖子" clearable style="width:200px" @keyup.enter="loadTopics" @clear="loadTopics" />
+              <el-select v-model="topicQuery.category_id" clearable placeholder="全部分类" style="width:150px" @change="loadTopics"><el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" /></el-select>
+              <el-button @click="loadTopics">搜索</el-button>
+              <el-button type="primary" @click="$router.push('/app/community/composer')">发布帖子</el-button>
+            </div>
+          </div>
         </template>
-        <div v-for="topic in topics" :key="topic.id" class="topic-item" @click="openTopic(topic)">
-          <div class="topic-title">{{ topic.title }}</div>
-          <div class="topic-meta"><span>{{ topic.user?.nickname || topic.author_name || topic.username || '社区用户' }}</span><span>浏览 {{ topic.view_count || 0 }}</span><span>回复 {{ topic.reply_count || 0 }}</span><span>点赞 {{ topic.like_count || 0 }}</span><span v-if="topic.price > 0">售价 {{ topic.price }} 币</span></div>
-          <div class="topic-summary">{{ topic.summary || stripHtml(topic.content || '') }}</div>
-          <el-space class="topic-actions" @click.stop>
-            <el-button size="small" @click="toggleFavorite(topic)">{{ topic.favored ? '取消收藏' : '收藏' }}</el-button>
-            <el-button size="small" @click="react(topic, 'like')">{{ topic.liked ? '已赞' : '点赞' }}</el-button>
-            <el-button v-if="topic.price > 0 && !topic.purchased" size="small" type="warning" @click="purchaseTopic(topic)">购买</el-button>
-          </el-space>
+        <div v-loading="loading">
+          <el-empty v-if="topics.length === 0 && !loading" description="暂无帖子，去发布第一篇吧" />
+          <div v-for="topic in topics" :key="topic.id" class="topic-card" @click="openTopic(topic)">
+            <div class="topic-avatar">{{ (topic.user?.nickname || topic.author_name || topic.username || '匿')[0]?.toUpperCase() }}</div>
+            <div class="topic-main">
+              <div class="topic-head">
+                <span class="topic-title">{{ topic.title }}</span>
+                <el-tag v-if="topic.price > 0" type="warning" size="small" effect="light">付费 {{ topic.price }} 币</el-tag>
+              </div>
+              <div class="topic-meta">
+                <span class="t-author">{{ topic.user?.nickname || topic.author_name || topic.username || '社区用户' }}</span>
+                <span>浏览 {{ topic.view_count || 0 }}</span>
+                <span>回复 {{ topic.reply_count || 0 }}</span>
+                <span>点赞 {{ topic.like_count || 0 }}</span>
+              </div>
+              <div class="topic-summary">{{ topic.summary || stripHtml(topic.content || '') }}</div>
+              <div v-if="topicTags(topic).length" class="topic-tags">
+                <el-tag v-for="tag in topicTags(topic)" :key="tag" size="small" effect="plain" type="info">{{ tag }}</el-tag>
+              </div>
+            </div>
+            <div class="topic-side" @click.stop>
+              <el-button :type="topic.favored ? 'warning' : 'default'" size="small" :plain="!topic.favored" @click="toggleFavorite(topic)">{{ topic.favored ? '已收藏' : '收藏' }}</el-button>
+              <el-button :type="topic.liked ? 'danger' : 'default'" size="small" :plain="!topic.liked" @click="react(topic, 'like')">{{ topic.liked ? '已赞' : '点赞' }}</el-button>
+              <el-button v-if="topic.price > 0 && !topic.purchased" size="small" type="warning" @click="purchaseTopic(topic)">购买</el-button>
+            </div>
+          </div>
         </div>
-      </list-card>
+      </el-card>
     </template>
 
     <template v-else-if="section === 'composer'">
@@ -101,11 +123,49 @@
     </template>
 
     <template v-else-if="section === 'circles'">
-      <el-card shadow="never" class="mb12">
+      <el-card shadow="never" class="circle-create-card">
         <template #header>创建圈子</template>
-        <el-form inline class="circle-create-form"><el-form-item label="名称"><el-input v-model="circleForm.name" placeholder="圈子名称" /></el-form-item><el-form-item label="加入方式"><el-select v-model="circleForm.join_policy" style="width:120px"><el-option label="免费" value="free" /><el-option label="审批" value="approve" /><el-option label="付费" value="paid" /></el-select></el-form-item><el-form-item label="价格"><el-input-number v-model="circleForm.join_price" :min="0" /></el-form-item><el-button type="primary" @click="createCircle">创建</el-button></el-form>
+        <el-form class="circle-create-form" label-width="72px">
+          <el-row :gutter="12">
+            <el-col :xs="24" :sm="12" :md="8"><el-form-item label="名称"><el-input v-model="circleForm.name" placeholder="圈子名称" /></el-form-item></el-col>
+            <el-col :xs="24" :sm="12" :md="8"><el-form-item label="加入方式"><el-select v-model="circleForm.join_policy" style="width:100%"><el-option label="免费" value="free" /><el-option label="审批" value="approve" /><el-option label="付费" value="paid" /></el-select></el-form-item></el-col>
+            <el-col v-if="circleForm.join_policy === 'paid'" :xs="24" :sm="12" :md="8"><el-form-item label="价格"><el-input-number v-model="circleForm.join_price" :min="0" style="width:100%" /></el-form-item></el-col>
+          </el-row>
+          <el-form-item label="简介"><el-input v-model="circleForm.description" type="textarea" :rows="2" placeholder="一句话介绍这个圈子，方便他人了解" /></el-form-item>
+          <el-form-item label=" " style="margin-bottom:0"><el-button type="primary" @click="createCircle">创建圈子</el-button></el-form-item>
+        </el-form>
       </el-card>
-      <simple-list title="社区圈子" :icon="Compass" :items="circles" name-key="name" desc-key="description" @reload="loadCircles"><template #item-actions="{ item }"><el-button size="small" type="primary" @click="joinCircle(item)">{{ item.joined ? '已加入' : item.join_policy === 'paid' ? `付费加入 ${item.join_price || 0}` : '加入' }}</el-button><el-button v-if="item.joined" size="small" @click="leaveCircle(item)">退出</el-button></template></simple-list>
+
+      <el-card shadow="never" class="circles-card mt16">
+        <template #header>
+          <div class="card-header">
+            <span>社区圈子</span>
+            <el-button size="small" text @click="loadCircles">刷新</el-button>
+          </div>
+        </template>
+        <div v-if="circles.length === 0" class="empty-box">暂无圈子，创建第一个吧</div>
+        <div v-else class="circle-list">
+          <div v-for="c in circles" :key="c.id" class="circle-item">
+            <div class="circle-avatar"><el-icon class="circle-avatar-icon"><Compass /></el-icon></div>
+            <div class="circle-main">
+              <div class="circle-name-row">
+                <span class="circle-name">{{ c.name || '-' }}</span>
+                <el-tag size="small" :type="c.joined ? 'success' : 'info'" effect="light">{{ c.joined ? '已加入' : '未加入' }}</el-tag>
+              </div>
+              <div class="circle-meta">
+                <el-tag size="small" :type="c.join_policy === 'paid' ? 'warning' : c.join_policy === 'approve' ? 'primary' : 'success'" effect="plain">{{ c.join_policy === 'paid' ? '付费 ¥' + (c.join_price || 0) : c.join_policy === 'approve' ? '审批加入' : '免费加入' }}</el-tag>
+                <span v-if="c.member_count != null" class="circle-members">{{ c.member_count }} 人</span>
+                <span v-if="c.category_name" class="circle-cat">{{ c.category_name }}</span>
+              </div>
+              <div v-if="c.description" class="circle-desc">{{ c.description }}</div>
+            </div>
+            <div class="circle-actions">
+              <el-button v-if="!c.joined" size="small" type="primary" @click="joinCircle(c)">{{ c.join_policy === 'paid' ? '付费加入' : '加入' }}</el-button>
+              <el-button v-if="c.joined" size="small" @click="leaveCircle(c)">退出</el-button>
+            </div>
+          </div>
+        </div>
+      </el-card>
     </template>
 
     <template v-else-if="section === 'my-topics'"><simple-list title="我的帖子" :icon="Document" :items="myTopics" name-key="title" desc-key="summary" @reload="loadMyTopics"><template #item-actions="{ item }"><el-button size="small" @click="openTopic(item)">查看</el-button><el-button size="small" type="danger" @click="deleteTopic(item)">删除</el-button></template></simple-list></template>
@@ -341,6 +401,7 @@ async function openTopic(topic){ currentTopic.value=topic; topicDialogVisible.va
 async function submitReply(){ syncReplyEditorContent(); if(!stripHtml(replyText.value)||!currentTopic.value)return; submitting.value=true; try{await communityPost(`/topics/${currentTopic.value.id}/replies`,{content:replyText.value,content_format:'html'}); replyText.value=''; replyEditor.value?.clear(); await openTopic(currentTopic.value); ElMessage.success('回复成功')}catch(e){ElMessage.error(e.message||'回复失败')}finally{submitting.value=false} }
 async function toggleFavorite(t){ try{await communityPost(`/topics/${t.id}/favorite`,{}); t.favored=!t.favored; ElMessage.success('收藏状态已更新')}catch(e){ElMessage.error(e.message||'操作失败')} }
 async function react(t,type){ try{await communityPost(`/reactions/topic/${t.id}`,{reaction_type:type}); t.liked=true; t.like_count=(t.like_count||0)+1; ElMessage.success('已互动')}catch(e){ElMessage.error(e.message||'操作失败')} }
+function topicTags(t){ const val=t.tags; if(!val) return []; return Array.isArray(val)?val:String(val).split(',').map(s=>s.trim()).filter(Boolean) }
 async function purchaseTopic(t){ try{await ElMessageBox.confirm(`确认花费 ${t.price || 0} 社区币购买？`,'购买确认'); await communityPost(`/topics/${t.id}/purchase`,{}); t.purchased=true; ElMessage.success('购买成功'); await openTopic(t)}catch(e){ if(e !== 'cancel') ElMessage.error(e.message||'购买失败') } }
 async function createCreditOrder(plan){ try{stopOrderPayTimers(); const r=normalize(await communityPost('/credit-orders',{plan_id:plan.id,pay_channel:rechargeChannel.value})); currentOrder.value=r.order || r; orders.value.unshift(currentOrder.value); ElMessage.success('充值订单已创建'); await initiateOrderPayment()}catch(e){ElMessage.error(e.message||'创建充值订单失败')} }
 async function openOrder(row){ stopOrderPayTimers(); currentOrder.value=row; paymentInfo.value=''; orderPayInfo.value=null; orderPayQr.value=''; orderPayRemainSeconds.value=0; orderDialogVisible.value=true; await refreshOrder(false) }
@@ -491,4 +552,23 @@ function normalizeFeatureArray(raw){ if(!raw) return []; let v = raw; if(typeof 
 .lb-main { flex: 1; min-width: 0; }
 .lb-name { font-size: 14px; font-weight: 600; color: var(--text-1); }
 .lb-score { font-size: 12.5px; color: var(--text-3); margin-top: 2px; }
+
+/* 圈子 */
+.circle-create-card :deep(.el-card__body) { padding: 16px 18px; }
+.circle-create-form .el-row { margin-bottom: 0; }
+.circle-create-form .el-form-item { margin-bottom: 14px; }
+.circles-card :deep(.el-card__body) { padding: 8px 12px; }
+.circle-list { display: flex; flex-direction: column; gap: 2px; }
+.circle-item { display: flex; align-items: flex-start; gap: 12px; padding: 14px 12px; border-radius: 10px; transition: background .15s ease; }
+.circle-item:hover { background: var(--bg-soft); }
+.circle-avatar { width: 40px; height: 40px; border-radius: 12px; background: var(--el-color-primary-light-9); color: var(--brand); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.circle-avatar-icon { font-size: 20px; }
+.circle-avatar-icon :deep(svg) { width: 20px !important; height: 20px !important; }
+.circle-main { flex: 1; min-width: 0; }
+.circle-name-row { display: flex; align-items: center; gap: 8px; }
+.circle-name { font-size: 15px; font-weight: 700; color: var(--text-1); }
+.circle-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.circle-members, .circle-cat { font-size: 12.5px; color: var(--text-3); }
+.circle-desc { font-size: 13px; color: var(--text-2); line-height: 1.6; margin-top: 6px; white-space: pre-wrap; }
+.circle-actions { flex-shrink: 0; display: flex; gap: 8px; }
 </style>
