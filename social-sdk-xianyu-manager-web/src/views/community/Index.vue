@@ -15,8 +15,8 @@
 
     <template v-if="section === 'home'">
       <el-row :gutter="16" class="section-row">
-        <el-col :xs="24" :md="8"><metric-card title="我的身份" :value="vipStatus.communityUid || profile.community_uid || '未分配'" desc="按真实支付渠道分配：ALIX / WXX / UX / MANX" /></el-col>
-        <el-col :xs="24" :md="8"><metric-card title="我的权益" :value="vipLevelLabel" :desc="`到期时间：${formatDateTime(vipStatus.expiredAt) || '暂无'}`" /></el-col>
+        <el-col :xs="24" :md="8"><metric-card title="我的身份" :value="vipStatus.communityUid || profile.community_uid || '未分配'" :desc="`支付渠道：${vipChannelLabel}`" /></el-col>
+        <el-col :xs="24" :md="8"><metric-card title="我的权益" :value="vipLevelLabel" :desc="homeVipDesc" /></el-col>
         <el-col :xs="24" :md="8"><metric-card title="社区钱包" :value="wallet.balance ?? wallet.coins ?? 0" desc="可用于购买、打赏、兑换与资源消费" /></el-col>
       </el-row>
       <el-card shadow="never" class="feature-card">
@@ -57,8 +57,8 @@
           <el-form-item label="标题"><el-input v-model="composer.title" maxlength="120" show-word-limit placeholder="请输入帖子标题" /></el-form-item>
           <el-form-item label="内容"><div ref="topicEditorEl" class="community-editor"></div></el-form-item>
           <el-row :gutter="12">
-            <el-col :xs="24" :md="8"><el-form-item label="圈子"><el-select v-model="composer.circle_id" clearable style="width:100%"><el-option :value="0" label="不选择圈子" /><el-option v-for="c in circles" :key="c.id" :label="c.name" :value="c.id" /></el-select></el-form-item></el-col>
-            <el-col :xs="24" :md="8"><el-form-item label="分类"><el-select v-model="composer.category_id" style="width:100%"><el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" /></el-select></el-form-item></el-col>
+            <el-col :xs="24" :md="8"><el-form-item label="分类"><el-select v-model="composer.category_id" :disabled="composer.circle_id > 0" style="width:100%"><el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" /></el-select><div v-if="composer.circle_id > 0" class="form-tip">选择圈子后，分类自动跟随圈子所属分类。</div></el-form-item></el-col>
+            <el-col :xs="24" :md="8"><el-form-item label="圈子"><el-select v-model="composer.circle_id" clearable style="width:100%"><el-option :value="0" label="不选择圈子" /><el-option v-for="c in filteredCircles" :key="c.id" :label="c.name" :value="c.id" /></el-select></el-form-item></el-col>
             <el-col :xs="24" :md="8"><el-form-item label="售价社区币"><el-input-number v-model="composer.price" :min="0" style="width:100%" /></el-form-item></el-col>
           </el-row>
           <el-form-item label="标签"><el-input v-model="composer.tagsText" placeholder="多个标签用逗号分隔" /></el-form-item>
@@ -90,7 +90,7 @@
     <template v-else-if="section === 'circles'">
       <el-card shadow="never" class="mb12">
         <template #header>创建圈子</template>
-        <el-form inline><el-form-item label="名称"><el-input v-model="circleForm.name" placeholder="圈子名称" /></el-form-item><el-form-item label="加入方式"><el-select v-model="circleForm.join_policy" style="width:120px"><el-option label="免费" value="free" /><el-option label="审批" value="approve" /><el-option label="付费" value="paid" /></el-select></el-form-item><el-form-item label="价格"><el-input-number v-model="circleForm.join_price" :min="0" /></el-form-item><el-button type="primary" @click="createCircle">创建</el-button></el-form>
+        <el-form inline><el-form-item label="名称"><el-input v-model="circleForm.name" placeholder="圈子名称" /></el-form-item><el-form-item label="分类"><el-select v-model="circleForm.category_id" style="width:140px"><el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" /></el-select></el-form-item><el-form-item label="加入方式"><el-select v-model="circleForm.join_policy" style="width:120px"><el-option label="免费" value="free" /><el-option label="审批" value="approve" /><el-option label="付费" value="paid" /></el-select></el-form-item><el-form-item label="价格"><el-input-number v-model="circleForm.join_price" :min="0" /></el-form-item><el-button type="primary" @click="createCircle">创建</el-button></el-form>
       </el-card>
       <simple-list title="社区圈子" :items="circles" name-key="name" desc-key="description" @reload="loadCircles"><template #item-actions="{ item }"><el-button size="small" type="primary" @click="joinCircle(item)">{{ item.joined ? '已加入' : item.join_policy === 'paid' ? `付费加入 ${item.join_price || 0}` : '加入' }}</el-button><el-button v-if="item.joined" size="small" @click="leaveCircle(item)">退出</el-button></template></simple-list>
     </template>
@@ -107,7 +107,7 @@
 
     <template v-else-if="section === 'profile'">
       <el-row :gutter="16">
-        <el-col :xs="24" :md="12"><el-card shadow="never"><template #header>社区资料</template><el-descriptions :column="1" border><el-descriptions-item label="社区 ID">{{ vipStatus.communityUid || profile.user?.username || '-' }}</el-descriptions-item><el-descriptions-item label="昵称">{{ profile.user?.nickname || profile.display_name || profile.nickname || '-' }}</el-descriptions-item><el-descriptions-item label="等级">{{ profile.profile?.level || '-' }}</el-descriptions-item><el-descriptions-item label="经验">{{ profile.profile?.exp || 0 }}</el-descriptions-item></el-descriptions></el-card></el-col>
+        <el-col :xs="24" :md="12"><el-card shadow="never"><template #header>社区资料</template><el-descriptions :column="1" border><el-descriptions-item label="社区 ID">{{ vipStatus.communityUid || profile.user?.username || '-' }}</el-descriptions-item><el-descriptions-item label="昵称">{{ profile.user?.nickname || profile.display_name || profile.nickname || '-' }}</el-descriptions-item><el-descriptions-item label="VIP 等级"><el-tag :type="vipLevelType" effect="dark">{{ vipLevelLabel }}</el-tag></el-descriptions-item><el-descriptions-item label="VIP 状态">{{ vipStatus.active ? '生效中' : '未生效/已过期' }}</el-descriptions-item><el-descriptions-item label="到期时间">{{ formatDateTime(vipStatus.expiredAt) || '-' }}<el-tag v-if="vipDaysLeft !== null" :type="vipDaysLeft <= 7 ? 'danger' : 'info'" size="small" style="margin-left:8px">剩余 {{ vipDaysLeft }} 天</el-tag></el-descriptions-item><el-descriptions-item label="最后校验">{{ formatDateTime(vipStatus.lastVerifiedAt) || '-' }}<el-tag v-if="vipVerifiedStale" type="warning" size="small" style="margin-left:8px">校验较旧，建议重新校验</el-tag></el-descriptions-item><el-descriptions-item label="社区等级">{{ profile.profile?.level ? 'Lv.' + profile.profile.level : '-' }}</el-descriptions-item><el-descriptions-item label="经验">{{ profile.profile?.exp || 0 }}</el-descriptions-item></el-descriptions></el-card></el-col>
         <el-col :xs="24" :md="12"><el-card shadow="never"><template #header>社区成长</template><el-descriptions :column="1" border><el-descriptions-item label="帖子数">{{ profile.profile?.topic_count || 0 }}</el-descriptions-item><el-descriptions-item label="回复数">{{ profile.profile?.reply_count || 0 }}</el-descriptions-item><el-descriptions-item label="获赞数">{{ profile.profile?.like_count || 0 }}</el-descriptions-item><el-descriptions-item label="徽章数">{{ profile.profile?.badge_count || 0 }}</el-descriptions-item></el-descriptions></el-card></el-col>
       </el-row>
     </template>
@@ -138,7 +138,7 @@
     </template>
 
     <template v-else-if="section === 'bindings'">
-      <el-card shadow="never"><template #header>账户绑定</template><el-alert type="info" :closable="false" title="VIP 身份以邮箱验证码为准；社区数据实时从 I 社区同步，当前客户端只保存绑定状态和授权快照。" class="mb12" /><el-descriptions :column="1" border><el-descriptions-item label="社区 ID">{{ vipStatus.communityUid || profile.user?.username || '-' }}</el-descriptions-item><el-descriptions-item label="绑定邮箱">{{ profile.email || vipStatus.email || '请在解锁 VIP 弹窗中绑定邮箱' }}</el-descriptions-item><el-descriptions-item label="邮箱状态">{{ (profile.email_verified || vipStatus.emailVerified) ? '已验证' : '未验证' }}</el-descriptions-item><el-descriptions-item label="客户端授权">{{ vipStatus.active ? '已授权' : '未授权/已过期' }}</el-descriptions-item><el-descriptions-item label="社区昵称">{{ profile.user?.nickname || profile.display_name || profile.nickname || '-' }}</el-descriptions-item></el-descriptions><el-space class="mt16"><el-button type="primary" @click="verifyVip">重新校验授权</el-button><el-button @click="$router.push('/app/community/profile')">查看社区资料</el-button></el-space></el-card>
+      <el-card shadow="never"><template #header>账户绑定</template><el-alert type="info" :closable="false" title="VIP 身份以邮箱验证码为准；社区数据实时从 I 社区同步，当前客户端只保存绑定状态和授权快照。" class="mb12" /><el-descriptions :column="1" border><el-descriptions-item label="社区 ID">{{ vipStatus.communityUid || profile.user?.username || '-' }}</el-descriptions-item><el-descriptions-item label="绑定邮箱">{{ profile.email || vipStatus.email || '请在解锁 VIP 弹窗中绑定邮箱' }}</el-descriptions-item><el-descriptions-item label="邮箱状态">{{ (profile.email_verified || vipStatus.emailVerified) ? '已验证' : '未验证' }}</el-descriptions-item><el-descriptions-item label="VIP 等级"><el-tag :type="vipLevelType" effect="dark">{{ vipLevelLabel }}</el-tag></el-descriptions-item><el-descriptions-item label="客户端授权">{{ vipStatus.active ? '已授权' : '未授权/已过期' }}</el-descriptions-item><el-descriptions-item label="到期时间">{{ formatDateTime(vipStatus.expiredAt) || '-' }}<el-tag v-if="vipDaysLeft !== null" :type="vipDaysLeft <= 7 ? 'danger' : 'info'" size="small" style="margin-left:8px">剩余 {{ vipDaysLeft }} 天</el-tag></el-descriptions-item><el-descriptions-item label="最后校验">{{ formatDateTime(vipStatus.lastVerifiedAt) || '-' }}<el-tag v-if="vipVerifiedStale" type="warning" size="small" style="margin-left:8px">校验较旧，建议重新校验</el-tag></el-descriptions-item><el-descriptions-item label="社区昵称">{{ profile.user?.nickname || profile.display_name || profile.nickname || '-' }}</el-descriptions-item></el-descriptions><el-space class="mt16"><el-button type="primary" @click="verifyVip">重新校验授权</el-button><el-button @click="$router.push('/app/community/profile')">查看社区资料</el-button></el-space></el-card>
     </template>
 
     <template v-else-if="section === 'support'"><el-card shadow="never"><template #header>工单支持</template><el-alert type="info" :closable="false" title="工单支持通过 I 社区通知、公告与资源帖子闭环承载。请在帖子广场发布问题或查看官方公告。" /><el-button class="mt16" type="primary" @click="$router.push('/app/community/composer')">发布求助帖</el-button></el-card></template>
@@ -161,7 +161,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElButton, ElCard, ElEmpty, ElSkeleton, ElTable, ElTableColumn, ElMessage, ElMessageBox } from 'element-plus'
 import { AiEditor } from 'aieditor'
 import 'aieditor/dist/style.css'
-import { communityDelete, communityGet, communityPost, getVipStatus, verifyVipStatus } from '@/api/vip'
+import { communityDelete, communityGet, communityPost, getVipIdentity, getVipStatus, verifyVipStatus } from '@/api/vip'
 
 const MetricCard = defineComponent({ props: ['title','value','desc'], setup: p => () => h(ElCard, { shadow:'never' }, { header: () => p.title, default: () => [h('div',{class:'identity-id'}, p.value), h('div',{class:'muted'}, p.desc)] }) })
 const ListCard = defineComponent({ props: ['title','loading','empty'], setup: (p,{slots}) => () => h(ElCard,{shadow:'never'},{header:()=>h('div',{class:'card-header'},[h('span',p.title), h('div', slots.actions?.())]), default:()=>h(ElSkeleton,{loading:p.loading,animated:true,rows:5},{default:()=>p.empty?h('div',{class:'empty-box'},'暂无数据'):slots.default?.()})}) })
@@ -175,9 +175,14 @@ const circles = ref([]); const myTopics = ref([]); const favorites = ref([]); co
 const topicDialogVisible = ref(false); const currentTopic = ref(null); const replyText = ref(''); const topicQuery = ref({ keyword:'', category_id:'' })
 const topicEditorEl = ref(null); const replyEditorEl = ref(null); const topicEditor = ref(null); const replyEditor = ref(null)
 const orderDialogVisible = ref(false); const currentOrder = ref(null); const paymentInfo = ref(''); const rechargeChannel = ref('wechat')
-const composer = ref({ title:'', content:'', circle_id:0, category_id:null, price:0, tagsText:'' }); const circleForm = ref({ name:'', description:'', join_policy:'free', join_price:0 })
+const composer = ref({ title:'', content:'', circle_id:0, category_id:null, price:0, tagsText:'' }); const circleForm = ref({ name:'', description:'', category_id:null, join_policy:'free', join_price:0 })
 const titleMap = { home:'社区首页', profile:'我的身份', benefits:'我的权益', bindings:'账户绑定', topics:'帖子广场', composer:'发布帖子', wallet:'社区钱包', orders:'支付订单', circles:'社区圈子', 'my-topics':'我的帖子', favorites:'我的收藏', drafts:'草稿箱', purchases:'我的购买', exchange:'兑换商城', notifications:'社区通知', leaderboard:'排行榜', announcements:'社区公告', resources:'资源中心', support:'工单支持' }
 const section = computed(() => route.params.section || 'home'); const pageTitle = computed(() => titleMap[section.value] || '社区首页')
+const filteredCircles = computed(() => {
+  const categoryId = Number(composer.value.category_id || 0)
+  if (!categoryId) return circles.value
+  return circles.value.filter(c => Number(c.category_id || 0) === categoryId)
+})
 const VIP_LEVEL_LABEL = { free: '免费版', pro: '专业版 PRO', premium: '旗舰版', team: '团队版', enterprise: '企业版' }
 const VIP_LEVEL_TAG = { free: 'info', pro: 'warning', premium: 'danger', team: 'success', enterprise: 'success' }
 const FEATURE_LABELS = { multi_account_pro: '多账号专业版', ai_auto_reply: 'AI 自动回复', batch_task: '批量任务', advanced_dashboard: '高级数据看板', rule_engine_pro: '规则引擎专业版', cloud_sync: '云同步' }
@@ -188,6 +193,9 @@ const vipFeatureList = computed(() => normalizeFeatureArray(vipStatus.value.feat
 const vipLimitItems = computed(() => { const raw = vipStatus.value.limits; if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return []; return Object.entries(raw).map(([key, value]) => { const m = LIMIT_LABELS[key] || { label: key, unit: '' }; return { key, label: m.label, value, unit: m.unit } }) })
 const vipDaysLeft = computed(() => { const t = toTimestamp(vipStatus.value.expiredAt); if (!t) return null; const diff = t - Date.now(); return diff <= 0 ? 0 : Math.ceil(diff / 86400000) })
 const vipVerifiedStale = computed(() => { const t = toTimestamp(vipStatus.value.lastVerifiedAt); if (!t) return false; return (Date.now() - t) > 6 * 3600 * 1000 })
+const VIP_CHANNEL_LABEL = { ALIX: '支付宝', WXX: '微信', UX: '闲鱼', MANX: '人工' }
+const vipChannelLabel = computed(() => { const uid = vipStatus.value.communityUid || profile.value.community_uid || ''; const m = String(uid).match(/^([A-Za-z]+)/); const prefix = m ? m[1] : ''; return VIP_CHANNEL_LABEL[prefix] || '未知渠道' })
+const homeVipDesc = computed(() => { const exp = formatDateTime(vipStatus.value.expiredAt); if (!exp) return '暂无到期时间'; if (vipDaysLeft.value === null) return `到期：${exp}`; if (vipDaysLeft.value <= 0) return `已过期（${exp}）`; return `到期：${exp} · 剩余 ${vipDaysLeft.value} 天` })
 const features = [ { title:'帖子广场', desc:'浏览、搜索、查看、回复、收藏、点赞社区帖子', path:'/app/community/topics' }, { title:'发布帖子', desc:'发布教程、问题、资源，可设置售价和草稿', path:'/app/community/composer' }, { title:'社区钱包', desc:'查看余额、流水、充值套餐和订单', path:'/app/community/wallet' }, { title:'兑换/通知', desc:'兑换商城、排行榜、通知中心、我的内容', path:'/app/community/exchange' } ]
 const txColumns = [{prop:'created_at',label:'时间',width:180},{prop:'currency_type',label:'币种',width:100},{prop:'direction',label:'方向',width:100},{prop:'amount',label:'数量',width:120},{prop:'description',label:'备注'}]
 const orderColumns = [{prop:'order_no',label:'订单号',minWidth:180},{prop:'plan_name',label:'套餐',minWidth:120},{prop:'pay_channel',label:'渠道',width:120},{prop:'pay_amount',label:'金额(分)',width:120},{prop:'status',label:'状态',width:120},{prop:'created_at',label:'创建时间',minWidth:160}]
@@ -195,10 +203,21 @@ const orderColumns = [{prop:'order_no',label:'订单号',minWidth:180},{prop:'pl
 onMounted(reloadCurrent); onBeforeUnmount(destroyEditors)
 watch(() => route.params.section, reloadCurrent)
 watch(topicDialogVisible, async (visible) => { if (visible) await nextTick(initReplyEditor); else destroyReplyEditor() })
-async function reloadCurrent(){ await Promise.allSettled([loadVipStatus(), loadCategories()]); const s=section.value; if(s==='home') await Promise.allSettled([loadProfile(),loadWallet()]); else if(s==='topics') await loadTopics(); else if(s==='composer') { await Promise.allSettled([loadCategories(),loadCircles()]); await nextTick(initTopicEditor) } else { destroyTopicEditor(); if(s==='wallet') await Promise.allSettled([loadWallet(),loadTransactions(),loadRechargePlans()]); else if(s==='orders') await loadOrders(); else if(['profile','bindings','benefits'].includes(s)) await loadProfile(); else if(s==='circles') await loadCircles(); else if(s==='my-topics') await loadMyTopics(); else if(s==='favorites') await loadFavorites(); else if(s==='drafts') await loadDrafts(); else if(s==='purchases') await loadPurchases(); else if(s==='exchange') await loadExchangeItems(); else if(s==='notifications') await loadNotifications(); else if(s==='leaderboard') await loadLeaderboard(); else if(s==='announcements') await loadAnnouncements(); else if(s==='resources') await loadResources() } }
+watch(() => composer.value.circle_id, (circleId) => {
+  if (!circleId) return
+  const circle = circles.value.find(c => Number(c.id) === Number(circleId))
+  if (circle?.category_id) composer.value.category_id = circle.category_id
+})
+watch(() => composer.value.category_id, (categoryId) => {
+  if (!composer.value.circle_id) return
+  const circle = circles.value.find(c => Number(c.id) === Number(composer.value.circle_id))
+  if (circle && Number(circle.category_id || 0) !== Number(categoryId || 0)) composer.value.circle_id = 0
+})
+async function reloadCurrent(){ await Promise.allSettled([loadVipStatus(), loadCategories()]); const s=section.value; if(s==='home') await Promise.allSettled([loadProfile(),loadWallet()]); else if(s==='topics') await loadTopics(); else if(s==='composer') { await Promise.allSettled([loadCategories(),loadCircles()]); await nextTick(initTopicEditor) } else { destroyTopicEditor(); if(s==='wallet') await Promise.allSettled([loadWallet(),loadTransactions(),loadRechargePlans()]); else if(s==='orders') await loadOrders(); else if(['profile','benefits'].includes(s)) await loadProfile(); else if(s==='bindings') await Promise.allSettled([loadProfile(), loadVipIdentity()]); else if(s==='circles') await loadCircles(); else if(s==='my-topics') await loadMyTopics(); else if(s==='favorites') await loadFavorites(); else if(s==='drafts') await loadDrafts(); else if(s==='purchases') await loadPurchases(); else if(s==='exchange') await loadExchangeItems(); else if(s==='notifications') await loadNotifications(); else if(s==='leaderboard') await loadLeaderboard(); else if(s==='announcements') await loadAnnouncements(); else if(s==='resources') await loadResources() } }
 async function loadVipStatus(){ try{const r=await getVipStatus(); if(r.success) vipStatus.value=r.data||{}}catch(e){} }
+async function loadVipIdentity(){ try{const r=await getVipIdentity(); if(r.success&&r.data){ vipStatus.value={...vipStatus.value,email:r.data.email||vipStatus.value.email,emailVerified:r.data.emailVerified??vipStatus.value.emailVerified,communityUid:r.data.communityUid||vipStatus.value.communityUid} }}catch(e){} }
 async function verifyVip(){ verifying.value=true; try{const r=await verifyVipStatus(); if(r.success) { vipStatus.value=r.data||{}; ElMessage.success('权益校验完成') }}catch(e){ElMessage.error(e.message||'校验失败')}finally{verifying.value=false} }
-async function loadCategories(){ try{categories.value=pickList(normalize(await communityGet('/categories'))); if(!composer.value.category_id && categories.value[0]) composer.value.category_id=categories.value[0].id}catch(e){} }
+async function loadCategories(){ try{categories.value=pickList(normalize(await communityGet('/categories'))); if(!composer.value.category_id && categories.value[0]) composer.value.category_id=categories.value[0].id; if(!circleForm.value.category_id && categories.value[0]) circleForm.value.category_id=categories.value[0].id}catch(e){} }
 async function loadProfile(){ try{profile.value=normalize(await communityGet('/profile'))}catch(e){} }
 async function loadWallet(){ try{wallet.value=normalize(await communityGet('/wallet'))}catch(e){} }
 async function loadTopics(){ loading.value=true; try{topics.value=pickList(normalize(await communityGet('/topics', compact(topicQuery.value))))}catch(e){ElMessage.error(e.message||'加载帖子失败')}finally{loading.value=false} }
@@ -227,7 +246,7 @@ async function openOrder(row){ currentOrder.value=row; paymentInfo.value=''; ord
 async function refreshOrder(){ if(!currentOrder.value?.id)return; submitting.value=true; try{currentOrder.value=normalize(await communityGet(`/credit-orders/${currentOrder.value.id}`)); const idx=orders.value.findIndex(o=>o.id===currentOrder.value.id); if(idx>=0) orders.value[idx]=currentOrder.value }catch(e){ElMessage.error(e.message||'刷新失败')}finally{submitting.value=false} }
 async function initiateOrderPayment(){ if(!currentOrder.value?.id)return; submitting.value=true; try{const channel=currentOrder.value.pay_channel || rechargeChannel.value; const r=normalize(await communityPost(`/payment/${channel}/${currentOrder.value.id}`,{})); paymentInfo.value=JSON.stringify(r,null,2); orderDialogVisible.value=true; ElMessage.success('支付信息已生成')}catch(e){ElMessage.error(e.message||'发起支付失败')}finally{submitting.value=false} }
 async function exchange(item){ try{await communityPost('/exchange',{item_id:item.id}); ElMessage.success('兑换成功'); await Promise.allSettled([loadWallet(),loadExchangeItems()])}catch(e){ElMessage.error(e.message||'兑换失败')} }
-async function createCircle(){ if(!circleForm.value.name){ElMessage.warning('请输入圈子名称');return} try{await communityPost('/circles', circleForm.value); ElMessage.success('圈子已创建'); circleForm.value={name:'',description:'',join_policy:'free',join_price:0}; await loadCircles()}catch(e){ElMessage.error(e.message||'创建失败')} }
+async function createCircle(){ if(!circleForm.value.name){ElMessage.warning('请输入圈子名称');return} if(!circleForm.value.category_id){ElMessage.warning('请选择圈子分类');return} try{await communityPost('/circles', circleForm.value); ElMessage.success('圈子已创建'); circleForm.value={name:'',description:'',category_id:categories.value[0]?.id||null,join_policy:'free',join_price:0}; await loadCircles()}catch(e){ElMessage.error(e.message||'创建失败')} }
 async function joinCircle(item){ if(item.joined)return; try{ if(item.join_policy==='paid') await ElMessageBox.confirm(`确认花费 ${item.join_price || 0} 社区币加入？`,'付费加入'); await communityPost(`/circles/${item.id}/join`,{}); ElMessage.success('加入申请已提交'); await loadCircles()}catch(e){ if(e !== 'cancel') ElMessage.error(e.message||'加入失败') } }
 async function leaveCircle(item){ try{await communityDelete(`/circles/${item.id}/leave`); ElMessage.success('已退出'); await loadCircles()}catch(e){ElMessage.error(e.message||'退出失败')} }
 async function deleteTopic(item){ try{await ElMessageBox.confirm('确认删除该帖子？','删除确认'); await communityDelete(`/topics/${item.id}`); ElMessage.success('已删除'); await loadMyTopics()}catch(e){ if(e !== 'cancel') ElMessage.error(e.message||'删除失败') } }
@@ -243,7 +262,7 @@ function destroyReplyEditor(){ if(replyEditor.value){ replyEditor.value.destroy(
 function destroyEditors(){ destroyTopicEditor(); destroyReplyEditor() }
 function syncTopicEditorContent(){ if(topicEditor.value) composer.value.content = topicEditor.value.getHtml() }
 function syncReplyEditorContent(){ if(replyEditor.value) replyText.value = replyEditor.value.getHtml() }
-function topicPayload(){ return {title:composer.value.title,content:composer.value.content,content_format:'html',circle_id:composer.value.circle_id||0,category_id:composer.value.category_id,price:composer.value.price||0,tags:composer.value.tagsText?composer.value.tagsText.split(',').map(s=>s.trim()).filter(Boolean):[]} }
+function topicPayload(){ const circle = circles.value.find(c => Number(c.id) === Number(composer.value.circle_id)); return {title:composer.value.title,content:composer.value.content,content_format:'html',circle_id:composer.value.circle_id||0,category_id:circle?.category_id || composer.value.category_id,price:composer.value.price||0,tags:composer.value.tagsText?composer.value.tagsText.split(',').map(s=>s.trim()).filter(Boolean):[]} }
 function resetComposer(){ composer.value={title:'',content:'',circle_id:0,category_id:categories.value[0]?.id||null,price:0,tagsText:''}; topicEditor.value?.clear() }
 function compact(obj){ return Object.fromEntries(Object.entries(obj).filter(([,v])=>v!==''&&v!==null&&v!==undefined)) }
 function normalize(res){ return res?.data || res || {} } function pickList(data){ return Array.isArray(data)?data:(data.items||data.list||data.records||data.topics||data.orders||data.transactions||data.plans||data.circles||data.notifications||[]) } function stripHtml(text){ return String(text||'').replace(/<[^>]+>/g,'').slice(0,500) } function safeHtml(html){ return String(html || '').replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '') } function formatCents(cents){ return (Number(cents||0)/100).toFixed(2) }

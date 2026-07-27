@@ -105,6 +105,7 @@ public class VipService {
         Long localUserId = localUserId(user);
         VipSubscription sub = getSubscription(localUserId);
         CommunityUserBinding binding = getBinding(localUserId);
+        SdkDeployment deployment = ensureDeployment();
         if (sub != null && shouldVerify(sub)) {
             try {
                 syncEntitlement(user, binding);
@@ -116,7 +117,9 @@ public class VipService {
         Map<String, Object> data = new LinkedHashMap<>();
         boolean active = sub != null && "ACTIVE".equals(sub.getStatus()) && sub.getExpiredAt() != null && sub.getExpiredAt().isAfter(LocalDateTime.now());
         data.put("active", active);
-        data.put("communityUid", sub != null ? sub.getCommunityUid() : binding != null ? binding.getCommunityUid() : "");
+        data.put("communityUid", sub != null ? sub.getCommunityUid() : binding != null ? binding.getCommunityUid() : deployment.getCommunityUid());
+        data.put("email", firstNonBlank(sub != null ? sub.getEmail() : "", binding != null ? binding.getEmail() : "", deployment.getBoundEmail()));
+        data.put("emailVerified", binding != null ? Boolean.TRUE.equals(binding.getEmailVerified()) : Boolean.TRUE.equals(deployment.getEmailVerified()));
         data.put("vipLevel", active ? sub.getVipLevel() : "free");
         data.put("expiredAt", sub != null ? sub.getExpiredAt() : null);
         data.put("features", parseJson(active && sub != null ? sub.getFeaturesJson() : null, List.of()));
@@ -829,6 +832,18 @@ public class VipService {
 
     private String defaultString(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "";
     }
 
     private String normalizeEmail(String email) {
