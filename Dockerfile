@@ -12,6 +12,8 @@
 FROM maven:3.9-eclipse-temurin-17 AS builder
 WORKDIR /app
 COPY pom.xml .
+# 使用阿里云 Maven 镜像，避免容器内直连 Maven Central 超时
+COPY scripts/docker/settings.xml /root/.m2/settings.xml
 COPY social-sdk-core ./social-sdk-core
 COPY social-sdk-xianyu ./social-sdk-xianyu
 COPY social-sdk-chrome ./social-sdk-chrome

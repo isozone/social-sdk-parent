@@ -18,6 +18,9 @@ WORKDIR /app
 
 # 复制项目文件
 COPY pom.xml .
+# 使用阿里云 Maven 镜像，避免容器内直连 Maven Central 超时
+# 构建上下文是项目根目录，settings.xml 位于 scripts/docker/ 下
+COPY scripts/docker/settings.xml /root/.m2/settings.xml
 COPY social-sdk-core ./social-sdk-core
 COPY social-sdk-xianyu ./social-sdk-xianyu
 COPY social-sdk-chrome ./social-sdk-chrome

@@ -9,6 +9,8 @@
 #   TAG=latest
 #   ACR_USERNAME=xxx
 #   ACR_PASSWORD=xxx
+#   BUILD_PROXY=http://host.docker.internal:7890
+#     (容器内构建走宿主机代理,绕过 Clash/Surge fake-ip DNS 导致的 Maven 下载超时)
 #
 # Usage:
 #   ./publish-acr.sh --help
@@ -63,6 +65,8 @@ Environment variables:
   ACR_USERNAME      If set with ACR_PASSWORD, script runs docker login first
   ACR_PASSWORD      ACR password/token
   PLATFORM          Optional docker build platform
+  BUILD_PROXY       HTTP(S) proxy for docker build, e.g. http://host.docker.internal:7890
+                    (use when host proxy fake-ip DNS makes Maven downloads time out)
 
 Tags produced for TAG=v1.0.0:
   <registry>/<namespace>/<image>:sqlite-v1.0.0
@@ -121,6 +125,12 @@ build_one() {
   local args=(build --build-arg "DB_MODE=${db_mode}" -f "$DOCKERFILE" -t "$local_tag")
   [[ -n "$ACR_REGISTRY" && -n "$ACR_NAMESPACE" ]] && args+=(-t "$remote_tag")
   [[ -n "$PLATFORM" ]] && args+=(--platform "$PLATFORM")
+  # 宿主机代理(fake-ip DNS)会导致容器内解析 Maven 镜像域名超时。
+  # buildx 不支持 --dns,改为通过 BUILD_PROXY 让构建走宿主机代理(如 Clash):
+  #   BUILD_PROXY=http://host.docker.internal:7890 ./publish-acr.sh
+  if [[ -n "${BUILD_PROXY:-}" ]]; then
+    args+=(--build-arg "HTTP_PROXY=$BUILD_PROXY" --build-arg "HTTPS_PROXY=$BUILD_PROXY")
+  fi
   args+=("$PROJECT_ROOT")
 
   log_step "Building ${db_mode} image: $local_tag"
@@ -142,7 +152,7 @@ main() {
   echo " social-sdk-parent Docker ACR publisher"
   echo " Modes : ${MODES[*]}"
   echo " Tag   : $TAG"
-  echo " Image : ${ACR_REGISTRY:+$REMOTE_PREFIX}${ACR_REGISTRY:-$LOCAL_PREFIX}"
+  echo " Image : ${REMOTE_PREFIX:-$LOCAL_PREFIX}"
   echo "=================================================="
 
   login_if_needed
