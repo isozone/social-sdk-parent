@@ -78,6 +78,12 @@
   /* ===== Design Tokens：动效 ===== */
   --transition-fast: 0.15s ease;
   --transition-base: 0.25s ease;
+
+  /* ===== 兼容旧版自定义变量(messages/proxy 等遗留引用,统一指向现有 token) ===== */
+  --line-2: var(--border);
+  --hover-1: var(--border);
+  --surface-0: var(--bg-soft);
+  --surface-1: #ffffff;
 }
 
 /* ===== 卡片：统一圆角 + 细边框 + 悬浮轻微上浮 ===== */
@@ -193,3 +199,52 @@
 
 /* ===== 标签统一 ===================== */
 .el-tag { font-weight: 500; }
+
+/* ===== 组件圆角统一(4px 默认 → 8px,与卡片 12px 形成层级) ===== */
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner,
+.el-button:not(.is-round):not(.is-circle),
+.el-input-number,
+.el-cascader .el-input__wrapper {
+  border-radius: var(--radius-md);
+}
+.el-dialog,
+.el-message-box {
+  border-radius: var(--radius-lg);
+}
+.el-tag { border-radius: var(--radius-sm); }
+.el-picker-panel { border-radius: var(--radius-md); }
+
+/* ===== 页面标题 / 区块头统一 ===================== */
+.page-title { font-size: var(--font-xl); font-weight: 600; color: var(--text-1); }
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+.page-head__title { font-size: var(--font-xl); font-weight: 600; color: var(--text-1); }
+.page-head__actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* ===== 文本层级统一(替换硬编码 #888/#999/#78909C 等) ===== */
+.text-secondary { color: var(--text-2); }
+.text-muted { color: var(--text-3); }
+.text-strong { color: var(--text-1); }
+
+/* ===== 分页器:居中模式 ===== */
+.pagination-center {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-4);
+}
+
+/* ===== 面板标题(panel-title)统一 ===== */
+.panel-title {
+  font-size: var(--font-md);
+  font-weight: 600;
+  color: var(--text-1);
+  margin: 0 0 var(--space-3);
+}

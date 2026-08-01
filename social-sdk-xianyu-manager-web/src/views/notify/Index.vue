@@ -291,7 +291,7 @@
           <el-form-item label="模板参数">
             <el-input v-model="channelForm.config.templateParam" type="textarea" :rows="2"
               placeholder='阿里云：{"name":"{accountName}"} 或整段 {"content":"{body}"}' />
-            <div style="color:#909399;font-size:12px;margin-top:4px;line-height:1.6">
+            <div style="color: var(--text-3);font-size:12px;margin-top:4px;line-height:1.6">
               支持任意模板变量：{accountName} {orderId} {itemTitle} {amount} {status} {counterparty} {content} {balance} {threshold} {bizType}；{body} 兜底为完整正文。
             </div>
           </el-form-item>
@@ -317,7 +317,7 @@
           </template>
           <el-form-item label="每分钟限频">
             <el-input-number v-model="channelForm.config.rateLimitPerMinute" :min="0" :max="1000" />
-            <span style="margin-left:8px;color:#909399;font-size:12px">0=不限制</span>
+            <span style="margin-left:8px;color: var(--text-3);font-size:12px">0=不限制</span>
           </el-form-item>
         </template>
       </el-form>

@@ -183,6 +183,6 @@ onMounted(async () => { await loadAccounts(); await loadList() })
 .card-head-left { display: flex; align-items: center; gap: 12px; }
 .card-chip { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 20px; }
 .chip-purple { background: #8b5cf6; }
-.card-title { font-size: 18px; font-weight: 600; }
-.card-sub { font-size: 12px; color: #6b7280; margin-top: 2px; }
+.card-title { font-size: var(--font-lg); font-weight: 600; }
+.card-sub { font-size: var(--font-sm); color: var(--text-3); margin-top: 2px; }
 </style>

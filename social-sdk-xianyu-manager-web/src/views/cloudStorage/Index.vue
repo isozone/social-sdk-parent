@@ -58,7 +58,7 @@
           striped
           striped-flow
         />
-        <p style="margin-top: 8px; color: #909399; font-size: 13px;">
+        <p style="margin-top: 8px; color: var(--text-3); font-size: 13px;">
           {{ status.message || '处理中...' }}
         </p>
       </div>

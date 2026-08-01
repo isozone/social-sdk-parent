@@ -515,11 +515,11 @@ onMounted(() => {
 .card-title {
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--text-1);
 }
 .card-sub {
   font-size: 12px;
-  color: #909399;
+  color: var(--text-3);
 }
 
 .profile-form {
@@ -527,11 +527,11 @@ onMounted(() => {
 }
 .profile-form :deep(.el-form-item__label) {
   font-weight: 500;
-  color: #606266;
+  color: var(--text-2);
   padding-bottom: 4px;
 }
 .profile-form :deep(.el-input__prefix) {
-  color: #909399;
+  color: var(--text-3);
 }
 .form-actions {
   margin-top: 8px;
@@ -542,7 +542,7 @@ onMounted(() => {
   gap: 5px;
   margin-top: 6px;
   font-size: 12px;
-  color: #909399;
+  color: var(--text-3);
 }
 .pwd-tip .el-icon {
   color: #22d3ee;

@@ -796,7 +796,7 @@ onUnmounted(() => {
 }
 .card-title {
   font-weight: 600;
-  font-size: 15px;
+  font-size: var(--font-lg);
   color: var(--text-1);
   margin-bottom: 4px;
 }

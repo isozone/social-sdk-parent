@@ -115,7 +115,7 @@
                   </el-tag>
                 </el-tooltip>
               </template>
-              <span v-else style="color: #909399;">-</span>
+              <span v-else style="color: var(--text-3);">-</span>
             </template>
           </el-table-column>
           <el-table-column label="发布账号" width="140">
@@ -162,7 +162,7 @@
           <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
           <div class="el-upload__text">拖拽 CSV 文件到此处，或 <em>点击上传</em></div>
           <template #tip>
-            <div style="font-size: 12px; color: #909399; margin-top: 8px;">
+            <div style="font-size: 12px; color: var(--text-3); margin-top: 8px;">
               列：account_name, title, price, stock, images, goods_type, deliver_type, deliver_content_template
             </div>
           </template>
@@ -180,7 +180,7 @@
           </el-form-item>
           <el-form-item label="发货内容分隔符">
             <el-input v-model="importForm.deliverContentSeparator" style="width: 200px;" />
-            <span style="font-size: 12px; color: #909399; margin-left: 8px;">虚拟商品卡密分隔符（默认 |||）</span>
+            <span style="font-size: 12px; color: var(--text-3); margin-left: 8px;">虚拟商品卡密分隔符（默认 |||）</span>
           </el-form-item>
           <el-form-item label="去重"><el-switch v-model="importForm.deduplicate" /></el-form-item>
           <el-form-item label="重复时覆盖" v-if="importForm.deduplicate">
@@ -210,7 +210,7 @@
           <el-table-column label="图片" width="60">
             <template #default="{ row }">
               <el-tag v-if="row.images && row.images.length" size="small" type="success">{{ row.images.length }} 张</el-tag>
-              <span v-else style="color: #909399;">-</span>
+              <span v-else style="color: var(--text-3);">-</span>
             </template>
           </el-table-column>
         </el-table>
@@ -282,7 +282,7 @@
         <el-tab-pane label="🏷️ 关键词提取" name="kw">
           <div style="min-height: 50px;">
             <el-tag v-for="kw in aiResult.keywords" :key="kw" style="margin: 4px;">{{ kw }}</el-tag>
-            <span v-if="!aiResult.keywords.length" style="color: #909399;">暂无关键词</span>
+            <span v-if="!aiResult.keywords.length" style="color: var(--text-3);">暂无关键词</span>
           </div>
           <el-button type="primary" size="small" style="margin-top: 8px;" @click="extractKeywords" :loading="aiLoading">提取关键词</el-button>
         </el-tab-pane>
@@ -328,7 +328,7 @@
             style="width: 100%;"
             :loading="categoryTreeLoading"
           />
-          <div style="font-size: 12px; color: #909399; margin-top: 4px;">从闲鱼拉分类树选择，留空走 AI 推荐</div>
+          <div style="font-size: 12px; color: var(--text-3); margin-top: 4px;">从闲鱼拉分类树选择，留空走 AI 推荐</div>
         </el-form-item>
         <el-form-item label="运费">
           <el-select v-model="createForm.deliveryChoice" style="width: 100%;">
@@ -343,7 +343,7 @@
         </el-form-item>
         <el-form-item label="所在地">
           <el-input v-model="createForm.location" placeholder="留空走闲鱼账号默认所在地" />
-          <div style="font-size: 12px; color: #909399; margin-top: 4px;">填省市（如「杭州市」），留空走账号默认</div>
+          <div style="font-size: 12px; color: var(--text-3); margin-top: 4px;">填省市（如「杭州市」），留空走账号默认</div>
         </el-form-item>
         <el-form-item label="图片">
           <el-upload
@@ -357,7 +357,7 @@
           >
             <el-icon><Plus /></el-icon>
             <template #tip>
-              <div style="font-size: 12px; color: #909399;">最多 9 张图片，单张不超过 10MB</div>
+              <div style="font-size: 12px; color: var(--text-3);">最多 9 张图片，单张不超过 10MB</div>
             </template>
           </el-upload>
         </el-form-item>
@@ -374,7 +374,7 @@
               <el-icon><UploadFilled /></el-icon> 上传视频
             </el-button>
             <template #tip>
-              <div style="font-size: 12px; color: #909399;">最多 3 个视频，单个不超过 10MB</div>
+              <div style="font-size: 12px; color: var(--text-3);">最多 3 个视频，单个不超过 10MB</div>
             </template>
           </el-upload>
         </el-form-item>
@@ -433,7 +433,7 @@
         </el-form-item>
         <el-form-item label="发货内容模板" v-if="localForm.goodsType === 'VIRTUAL'">
           <el-input v-model="localForm.deliverContentTemplate" type="textarea" :rows="3" placeholder="每行一条：卡密 / 账号 / 链接，发布后按顺序交付" />
-          <div style="font-size: 12px; color: #909399; margin-top: 4px;">支持变量 {orderNo} / {buyer}，运行时自动替换</div>
+          <div style="font-size: 12px; color: var(--text-3); margin-top: 4px;">支持变量 {orderNo} / {buyer}，运行时自动替换</div>
         </el-form-item>
         <el-form-item label="商品描述">
           <el-input v-model="localForm.description" type="textarea" :rows="4" placeholder="商品详细描述（可选）" />
@@ -450,7 +450,7 @@
           >
             <el-icon><Plus /></el-icon>
             <template #tip>
-              <div style="font-size: 12px; color: #909399;">最多 9 张图片，单张不超过 10MB，首张为主图</div>
+              <div style="font-size: 12px; color: var(--text-3);">最多 9 张图片，单张不超过 10MB，首张为主图</div>
             </template>
           </el-upload>
         </el-form-item>
@@ -506,7 +506,7 @@
         </el-descriptions-item>
         <el-descriptions-item label="发货类型">
           <el-tag size="small" v-if="detail.deliverType">{{ deliverTypeLabel(detail.deliverType) }}</el-tag>
-          <span v-else style="color:#909399;">-</span>
+          <span v-else style="color: var(--text-3);">-</span>
         </el-descriptions-item>
       </el-descriptions>
 
@@ -538,7 +538,7 @@
         <template #header><span>🎥 视频列表</span></template>
         <div style="display: flex; flex-direction: column; gap: 8px;">
           <div v-for="(v, idx) in detail.videos" :key="idx" style="display: flex; align-items: center; gap: 12px;">
-            <span style="color: #909399; min-width: 50px;">视频 {{ idx + 1 }}</span>
+            <span style="color: var(--text-3); min-width: 50px;">视频 {{ idx + 1 }}</span>
             <el-link :href="v" target="_blank" type="primary" :underline="false">
               <el-icon><VideoPlay /></el-icon> {{ v }}
             </el-link>

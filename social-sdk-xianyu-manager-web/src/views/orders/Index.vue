@@ -90,10 +90,10 @@
               <div v-if="row.virtualShipTaskError" style="font-size: 11px; color: #F56C6C; margin-top: 2px;" :title="row.virtualShipTaskError">
                 {{ row.virtualShipTaskError }}
               </div>
-              <div v-else-if="row.virtualShipExecuteAt && !row.virtualShippedAt" style="font-size: 11px; color: #909399; margin-top: 2px;">
+              <div v-else-if="row.virtualShipExecuteAt && !row.virtualShippedAt" style="font-size: 11px; color: var(--text-3); margin-top: 2px;">
                 计划：{{ formatTime(row.virtualShipExecuteAt) }}
               </div>
-              <div v-if="row.virtualShippedAt" style="font-size: 11px; color: #909399; margin-top: 2px;">
+              <div v-if="row.virtualShippedAt" style="font-size: 11px; color: var(--text-3); margin-top: 2px;">
                 {{ formatTime(row.virtualShippedAt) }}
               </div>
             </span>

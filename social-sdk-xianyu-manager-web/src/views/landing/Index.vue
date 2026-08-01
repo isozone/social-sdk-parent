@@ -154,6 +154,10 @@ const stats = [
   backdrop-filter: blur(12px);
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
+/* 锚点跳转时避开 sticky 导航(64px 高 + 留白),避免标题被遮挡 */
+.features, .scenes, .stats, .bottom-cta {
+  scroll-margin-top: 80px;
+}
 .nav-inner {
   width: 100%; box-sizing: border-box;
   padding: 0 32px; height: 64px;
@@ -279,10 +283,10 @@ const stats = [
 .footer { background: #111; padding: 24px 32px; border-top: 1px solid #222; }
 .footer-inner {
   display: flex; justify-content: space-between; align-items: center;
-  font-size: 13px; color: #888;
+  font-size: 13px; color: var(--text-3);
 }
 .footer-links { display: flex; gap: 20px; }
-.footer-links a { color: #888; text-decoration: none; }
+.footer-links a { color: var(--text-3); text-decoration: none; }
 .footer-links a:hover { color: #fff; }
 
 /* ===== Responsive ===== */

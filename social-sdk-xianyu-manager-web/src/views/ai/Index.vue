@@ -561,12 +561,12 @@ onMounted(() => { loadProviders() })
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  color: #303133;
+  color: var(--text-1);
 }
 .page-head__title p {
   margin: 4px 0 0;
   font-size: 13px;
-  color: #909399;
+  color: var(--text-3);
 }
 
 .ai-body {
@@ -586,7 +586,7 @@ onMounted(() => { loadProviders() })
 .vendor-card__title {
   font-size: 15px;
   font-weight: 600;
-  color: #303133;
+  color: var(--text-1);
 }
 .vendor-card__title em {
   font-style: normal;
@@ -648,7 +648,7 @@ onMounted(() => { loadProviders() })
 .vendor-item__name {
   font-size: 14px;
   font-weight: 600;
-  color: #303133;
+  color: var(--text-1);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -705,7 +705,7 @@ onMounted(() => { loadProviders() })
 .model-card__name {
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--text-1);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -728,7 +728,7 @@ onMounted(() => { loadProviders() })
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #606266;
+  color: var(--text-2);
   font-size: 13px;
 }
 .model-card__switch-label {
@@ -748,7 +748,7 @@ onMounted(() => { loadProviders() })
 }
 .model-count {
   font-size: 13px;
-  color: #909399;
+  color: var(--text-3);
 }
 .model-table {
   margin-top: 4px;
@@ -768,7 +768,7 @@ onMounted(() => { loadProviders() })
 /* 获取模型对话框 */
 .fetch-tip {
   font-size: 13px;
-  color: #606266;
+  color: var(--text-2);
   line-height: 1.6;
 }
 .fetch-tip code {
@@ -802,7 +802,7 @@ onMounted(() => { loadProviders() })
   flex: 1 1 auto;
   min-width: 0;
   font-size: 14px;
-  color: #303133;
+  color: var(--text-1);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   white-space: nowrap;
   overflow: hidden;
@@ -811,7 +811,7 @@ onMounted(() => { loadProviders() })
 .remote-model-item__owner {
   flex: 0 0 auto;
   font-size: 12px;
-  color: #909399;
+  color: var(--text-3);
   background: #f4f4f5;
   padding: 1px 8px;
   border-radius: 10px;
@@ -824,7 +824,7 @@ onMounted(() => { loadProviders() })
 /* 测试对话框：对话气泡 */
 .test-ctx {
   font-size: 13px;
-  color: #606266;
+  color: var(--text-2);
   margin-bottom: 12px;
 }
 .test-form {
@@ -851,7 +851,7 @@ onMounted(() => { loadProviders() })
 }
 .bubble__who {
   font-size: 12px;
-  color: #909399;
+  color: var(--text-3);
   margin-bottom: 4px;
 }
 .bubble--user {
@@ -867,7 +867,7 @@ onMounted(() => { loadProviders() })
 .bubble--ai {
   align-self: flex-start;
   background: #fff;
-  color: #303133;
+  color: var(--text-1);
   border: 1px solid #ebeef5;
   border-bottom-left-radius: 2px;
 }

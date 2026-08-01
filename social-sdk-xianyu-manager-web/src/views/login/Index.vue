@@ -742,11 +742,11 @@ function copyWechat() {
   cursor: zoom-in;
 }
 .qr-tip {
-  color: #606266;
+  color: var(--text-2);
   font-size: 14px;
   margin: 0;
 }
-.qr-tip strong { color: #303133; }
+.qr-tip strong { color: var(--text-1); }
 
 /* ===== 响应式：小屏改为上下堆叠，输入框占满整行 ===== */
 @media (max-width: 1024px) {

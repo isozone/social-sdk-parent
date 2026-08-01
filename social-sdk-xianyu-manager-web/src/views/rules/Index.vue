@@ -80,7 +80,7 @@
                 :value="m.id"
               />
             </el-select>
-            <div style="color: #999; font-size: 12px; margin-top: 4px;">
+            <div style="color: var(--text-3); font-size: 12px; margin-top: 4px;">
               <router-link to="/ai" style="text-decoration: none;">前往 AI 管理添加模型</router-link>
             </div>
           </el-form-item>
@@ -92,7 +92,7 @@
           </el-form-item>
           <el-form-item label="包含上下文">
             <el-switch v-model="aiConfig.includeChatHistory" />
-            <span style="margin-left: 8px; color: #999; font-size: 12px;">带上历史对话，回复更精准</span>
+            <span style="margin-left: 8px; color: var(--text-3); font-size: 12px;">带上历史对话，回复更精准</span>
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="saveAiConfig" :loading="saving">保存配置</el-button>
@@ -112,7 +112,7 @@
           <el-divider />
           <el-form-item label="欢迎语">
             <el-input v-model="autoConfig.welcomeMessage" type="textarea" :rows="2" placeholder="您好，欢迎光临~" />
-            <div style="color: #999; font-size: 12px;">首次对话时自动发送</div>
+            <div style="color: var(--text-3); font-size: 12px;">首次对话时自动发送</div>
           </el-form-item>
           <el-divider />
           <el-form-item label="超时回复">

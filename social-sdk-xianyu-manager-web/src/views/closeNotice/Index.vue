@@ -25,7 +25,7 @@
           <template #default="{ row }"><span style="color: #ef4444">{{ row.failedCount }}</span></template>
         </el-table-column>
         <el-table-column prop="skippedCount" label="跳过" width="80">
-          <template #default="{ row }"><span style="color: #6b7280">{{ row.skippedCount }}</span></template>
+          <template #default="{ row }"><span style="color: var(--text-3)">{{ row.skippedCount }}</span></template>
         </el-table-column>
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
@@ -91,6 +91,6 @@ onMounted(() => loadList())
 .card-head-left { display: flex; align-items: center; gap: 12px; }
 .card-chip { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 20px; }
 .chip-amber { background: #f59e0b; }
-.card-title { font-size: 18px; font-weight: 600; }
-.card-sub { font-size: 12px; color: #6b7280; margin-top: 2px; }
+.card-title { font-size: var(--font-lg); font-weight: 600; }
+.card-sub { font-size: var(--font-sm); color: var(--text-3); margin-top: 2px; }
 </style>

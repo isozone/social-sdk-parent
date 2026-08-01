@@ -406,7 +406,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   font-size: 13px;
-  color: #78909C;
+  color: var(--text-3);
 }
 .status-dot {
   width: 8px;
@@ -491,7 +491,7 @@ onBeforeUnmount(() => {
 }
 .kpi-title {
   font-size: 12px;
-  color: #78909C;
+  color: var(--text-3);
   margin-top: 4px;
 }
 .kpi-trend {
@@ -609,7 +609,7 @@ onBeforeUnmount(() => {
 }
 .acc-status {
   font-size: 11px;
-  color: #78909C;
+  color: var(--text-3);
   margin-top: 2px;
 }
 .acc-dot {
