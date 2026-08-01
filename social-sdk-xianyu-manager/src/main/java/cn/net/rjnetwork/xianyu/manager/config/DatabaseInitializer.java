@@ -623,28 +623,53 @@ public class DatabaseInitializer {
             String boolDdl = "mysql".equals(d) ? "TINYINT(1)" : "BOOLEAN";
             st.execute("CREATE TABLE IF NOT EXISTS sdk_deployment ("
                     + "id " + idPk + ", deployment_id VARCHAR(128) NOT NULL UNIQUE, install_time " + timeDdl + ", server_url VARCHAR(512), "
+                    + "bound_email VARCHAR(191), email_verified " + boolDdl + " DEFAULT FALSE, email_verified_at " + timeDdl + ", community_uid VARCHAR(64), last_identity_sync_at " + timeDdl + ", "
                     + "created_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, updated_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, deleted INTEGER DEFAULT 0)");
             st.execute("CREATE TABLE IF NOT EXISTS community_user_binding ("
                     + "id " + idPk + ", local_user_id BIGINT NOT NULL, deployment_id VARCHAR(128) NOT NULL, community_user_id BIGINT, community_uid VARCHAR(64), "
                     + "bind_id VARCHAR(128), bind_token VARCHAR(512), new_api_base_url VARCHAR(512), status VARCHAR(32), initial_pay_channel VARCHAR(32), initial_channel_prefix VARCHAR(16), "
-                    + "wechat_bound " + boolDdl + " DEFAULT FALSE, email_bound " + boolDdl + " DEFAULT FALSE, last_sync_at " + timeDdl + ", "
+                    + "wechat_bound " + boolDdl + " DEFAULT FALSE, email_bound " + boolDdl + " DEFAULT FALSE, email VARCHAR(191), email_verified " + boolDdl + " DEFAULT FALSE, email_verified_at " + timeDdl + ", identity_status VARCHAR(32), last_restore_at " + timeDdl + ", last_sync_at " + timeDdl + ", "
                     + "created_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, updated_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, deleted INTEGER DEFAULT 0)");
             st.execute("CREATE TABLE IF NOT EXISTS vip_subscription ("
                     + "id " + idPk + ", local_user_id BIGINT NOT NULL, deployment_id VARCHAR(128) NOT NULL, community_user_id BIGINT, community_uid VARCHAR(64), "
-                    + "license_id VARCHAR(128), plan_code VARCHAR(64), vip_level VARCHAR(32), features_json TEXT, limits_json TEXT, started_at " + timeDdl + ", expired_at " + timeDdl + ", "
+                    + "license_id VARCHAR(128), email VARCHAR(191), plan_code VARCHAR(64), vip_level VARCHAR(32), features_json TEXT, limits_json TEXT, started_at " + timeDdl + ", expired_at " + timeDdl + ", "
                     + "status VARCHAR(32), source_order_no VARCHAR(128), signature TEXT, last_verified_at " + timeDdl + ", "
                     + "created_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, updated_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, deleted INTEGER DEFAULT 0)");
             st.execute("CREATE TABLE IF NOT EXISTS vip_order ("
                     + "id " + idPk + ", local_user_id BIGINT NOT NULL, deployment_id VARCHAR(128) NOT NULL, community_user_id BIGINT, community_uid VARCHAR(64), "
                     + "local_order_no VARCHAR(128) NOT NULL UNIQUE, new_api_order_no VARCHAR(128), plan_id VARCHAR(64), plan_code VARCHAR(64), plan_name VARCHAR(128), pay_channel VARCHAR(32), "
-                    + "pay_amount DECIMAL(12,2), currency VARCHAR(16), status VARCHAR(32), pay_info_json TEXT, entitlement_json TEXT, paid_at " + timeDdl + ", "
+                    + "pay_amount DECIMAL(12,2), currency VARCHAR(16), email VARCHAR(191), identity_verified " + boolDdl + " DEFAULT FALSE, status VARCHAR(32), pay_info_json TEXT, entitlement_json TEXT, paid_at " + timeDdl + ", "
                     + "created_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, updated_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, deleted INTEGER DEFAULT 0)");
-            st.execute("CREATE INDEX IF NOT EXISTS idx_community_user_binding_local ON community_user_binding(local_user_id, deployment_id)");
-            st.execute("CREATE INDEX IF NOT EXISTS idx_vip_subscription_local ON vip_subscription(local_user_id, deployment_id)");
-            st.execute("CREATE INDEX IF NOT EXISTS idx_vip_order_local ON vip_order(local_user_id, local_order_no)");
+            logger.info("VIP tables base ensured");
+        } catch (Exception e) {
+            logger.warn("ensureVipTables base skipped: {}", e.getMessage());
+            return;
+        }
+
+        String d = dialect();
+        String timeDdl = "mysql".equals(d) || "postgres".equals(d) ? "TIMESTAMP" : "DATETIME";
+        String boolDdl = "mysql".equals(d) ? "TINYINT(1)" : "BOOLEAN";
+        ensureColumn("sdk_deployment", "bound_email", "VARCHAR(191)");
+        ensureColumn("sdk_deployment", "email_verified", boolDdl + " DEFAULT FALSE");
+        ensureColumn("sdk_deployment", "email_verified_at", timeDdl);
+        ensureColumn("sdk_deployment", "community_uid", "VARCHAR(64)");
+        ensureColumn("sdk_deployment", "last_identity_sync_at", timeDdl);
+        ensureColumn("community_user_binding", "email", "VARCHAR(191)");
+        ensureColumn("community_user_binding", "email_verified", boolDdl + " DEFAULT FALSE");
+        ensureColumn("community_user_binding", "email_verified_at", timeDdl);
+        ensureColumn("community_user_binding", "identity_status", "VARCHAR(32)");
+        ensureColumn("community_user_binding", "last_restore_at", timeDdl);
+        ensureColumn("vip_subscription", "email", "VARCHAR(191)");
+        ensureColumn("vip_order", "email", "VARCHAR(191)");
+        ensureColumn("vip_order", "identity_verified", boolDdl + " DEFAULT FALSE");
+
+        try (java.sql.Connection conn = dataSource.getConnection(); java.sql.Statement st = conn.createStatement()) {
+            ensureIndex(conn, st, "community_user_binding", "idx_community_user_binding_local", "CREATE INDEX idx_community_user_binding_local ON community_user_binding(local_user_id, deployment_id)");
+            ensureIndex(conn, st, "vip_subscription", "idx_vip_subscription_local", "CREATE INDEX idx_vip_subscription_local ON vip_subscription(local_user_id, deployment_id)");
+            ensureIndex(conn, st, "vip_order", "idx_vip_order_local", "CREATE INDEX idx_vip_order_local ON vip_order(local_user_id, local_order_no)");
             logger.info("VIP tables ensured");
         } catch (Exception e) {
-            logger.warn("ensureVipTables skipped: {}", e.getMessage());
+            logger.warn("ensureVipTables indexes skipped: {}", e.getMessage());
         }
     }
 
@@ -860,6 +885,12 @@ public class DatabaseInitializer {
                 + "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
                 + "deleted INTEGER DEFAULT 0"
                 + ")";
+    }
+
+    private void ensureIndex(java.sql.Connection conn, java.sql.Statement st, String table, String indexName, String ddl) throws Exception {
+        if (!indexExists(conn, table, indexName)) {
+            st.execute(ddl);
+        }
     }
 
     private void ensureColumn(String table, String column, String ddl) {

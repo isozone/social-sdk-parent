@@ -21,6 +21,8 @@ public class VipOrder extends BaseEntity {
     private String payChannel;
     private BigDecimal payAmount;
     private String currency;
+    private String email;
+    private Boolean identityVerified;
     private String status;
     private String payInfoJson;
     private String entitlementJson;
@@ -120,6 +122,22 @@ public class VipOrder extends BaseEntity {
 
     public void setCurrency(String currency) {
         this.currency = currency;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public Boolean getIdentityVerified() {
+        return identityVerified;
+    }
+
+    public void setIdentityVerified(Boolean identityVerified) {
+        this.identityVerified = identityVerified;
     }
 
     public String getStatus() {

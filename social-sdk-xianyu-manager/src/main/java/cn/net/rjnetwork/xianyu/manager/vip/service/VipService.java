@@ -4,6 +4,7 @@ import cn.net.rjnetwork.xianyu.manager.auth.model.AdminUser;
 import cn.net.rjnetwork.xianyu.manager.common.ApiResponse;
 import cn.net.rjnetwork.xianyu.manager.vip.config.NewApiCommunityProperties;
 import cn.net.rjnetwork.xianyu.manager.vip.dto.VipCreateOrderRequest;
+import cn.net.rjnetwork.xianyu.manager.vip.dto.VipEmailCodeRequest;
 import cn.net.rjnetwork.xianyu.manager.vip.mapper.CommunityUserBindingMapper;
 import cn.net.rjnetwork.xianyu.manager.vip.mapper.SdkDeploymentMapper;
 import cn.net.rjnetwork.xianyu.manager.vip.mapper.VipOrderMapper;
@@ -104,16 +105,36 @@ public class VipService {
         Long localUserId = localUserId(user);
         VipSubscription sub = getSubscription(localUserId);
         CommunityUserBinding binding = getBinding(localUserId);
+        SdkDeployment deployment = ensureDeployment();
+        if (sub != null && shouldVerify(sub)) {
+            try {
+                syncEntitlement(user, binding);
+                sub = getSubscription(localUserId);
+                binding = getBinding(localUserId);
+            } catch (Exception ignored) {
+            }
+        }
         Map<String, Object> data = new LinkedHashMap<>();
         boolean active = sub != null && "ACTIVE".equals(sub.getStatus()) && sub.getExpiredAt() != null && sub.getExpiredAt().isAfter(LocalDateTime.now());
         data.put("active", active);
-        data.put("communityUid", sub != null ? sub.getCommunityUid() : binding != null ? binding.getCommunityUid() : "");
+        data.put("communityUid", sub != null ? sub.getCommunityUid() : binding != null ? binding.getCommunityUid() : deployment.getCommunityUid());
+        data.put("email", firstNonBlank(sub != null ? sub.getEmail() : "", binding != null ? binding.getEmail() : "", deployment.getBoundEmail()));
+        data.put("emailVerified", binding != null ? Boolean.TRUE.equals(binding.getEmailVerified()) : Boolean.TRUE.equals(deployment.getEmailVerified()));
         data.put("vipLevel", active ? sub.getVipLevel() : "free");
         data.put("expiredAt", sub != null ? sub.getExpiredAt() : null);
-        data.put("features", parseJson(sub != null ? sub.getFeaturesJson() : null, List.of()));
-        data.put("limits", parseJson(sub != null ? sub.getLimitsJson() : null, Map.of("max_accounts", 1, "max_rules", 3)));
+        data.put("features", parseJson(active && sub != null ? sub.getFeaturesJson() : null, List.of()));
+        data.put("limits", parseJson(active && sub != null ? sub.getLimitsJson() : null, Map.of("max_accounts", 1, "max_rules", 3, "max_ai_rules", 0, "max_batch_tasks_per_day", 0)));
         data.put("lastVerifiedAt", sub != null ? sub.getLastVerifiedAt() : null);
+        data.put("signature", sub != null ? sub.getSignature() : "");
         return data;
+    }
+
+    @Transactional
+    public Map<String, Object> verify(AdminUser user) {
+        Long localUserId = localUserId(user);
+        CommunityUserBinding binding = getBinding(localUserId);
+        syncEntitlement(user, binding);
+        return status(user);
     }
 
     public Map<String, Object> config(AdminUser user) {
@@ -139,6 +160,74 @@ public class VipService {
         return ensureBinding(user);
     }
 
+    public Map<String, Object> identity(AdminUser user) {
+        Long localUserId = localUserId(user);
+        SdkDeployment deployment = ensureDeployment();
+        CommunityUserBinding binding = getBinding(localUserId);
+        VipSubscription sub = getSubscription(localUserId);
+        boolean active = sub != null && "ACTIVE".equals(sub.getStatus()) && sub.getExpiredAt() != null && sub.getExpiredAt().isAfter(LocalDateTime.now());
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("deploymentId", deployment.getDeploymentId());
+        data.put("email", binding != null ? stringValue(binding.getEmail()) : stringValue(deployment.getBoundEmail()));
+        data.put("emailVerified", binding != null ? Boolean.TRUE.equals(binding.getEmailVerified()) : Boolean.TRUE.equals(deployment.getEmailVerified()));
+        data.put("communityUid", sub != null ? sub.getCommunityUid() : binding != null ? binding.getCommunityUid() : deployment.getCommunityUid());
+        data.put("identityStatus", binding != null ? defaultString(binding.getIdentityStatus(), "unbound") : "unbound");
+        data.put("hasActiveVip", active);
+        data.put("vipLevel", active ? sub.getVipLevel() : "free");
+        data.put("expiredAt", sub != null ? sub.getExpiredAt() : null);
+        return data;
+    }
+
+    @Transactional
+    public Map<String, Object> sendEmailCode(AdminUser user, VipEmailCodeRequest request) {
+        if (request == null || normalizeEmail(request.getEmail()).isBlank()) {
+            throw new IllegalArgumentException("邮箱不能为空");
+        }
+        SdkDeployment deployment = ensureDeployment();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("deployment_id", deployment.getDeploymentId());
+        body.put("email", normalizeEmail(request.getEmail()));
+        body.put("scene", defaultString(request.getScene(), "vip_bind"));
+        try {
+            return externalPost("/api/community/external/social-sdk/email/send-code", body);
+        } catch (Exception e) {
+            throw new IllegalStateException("发送 I 社区邮箱验证码失败：" + e.getMessage(), e);
+        }
+    }
+
+    @Transactional
+    public Map<String, Object> verifyEmail(AdminUser user, VipEmailCodeRequest request) {
+        if (request == null || normalizeEmail(request.getEmail()).isBlank() || stringValue(request.getCode()).isBlank()) {
+            throw new IllegalArgumentException("邮箱和验证码不能为空");
+        }
+        Long localUserId = localUserId(user);
+        SdkDeployment deployment = ensureDeployment();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("deployment_id", deployment.getDeploymentId());
+        body.put("local_user_id", String.valueOf(localUserId));
+        body.put("email", normalizeEmail(request.getEmail()));
+        body.put("code", request.getCode());
+        body.put("domain", deployment.getServerUrl() == null ? "" : deployment.getServerUrl());
+        Map<String, Object> result;
+        try {
+            result = externalPost("/api/community/external/social-sdk/email/verify", body);
+        } catch (Exception e) {
+            throw new IllegalStateException("验证 I 社区邮箱失败：" + e.getMessage(), e);
+        }
+        upsertIdentityBinding(localUserId, deployment, result);
+        if (result.get("entitlement") instanceof Map<?, ?> entitlement) {
+            CommunityUserBinding binding = getBinding(localUserId);
+            VipOrder restoreOrder = new VipOrder();
+            restoreOrder.setLocalUserId(localUserId);
+            restoreOrder.setDeploymentId(deployment.getDeploymentId());
+            restoreOrder.setCommunityUserId(binding != null ? binding.getCommunityUserId() : asLong(result.get("community_user_id")));
+            restoreOrder.setEmail(normalizeEmail(request.getEmail()));
+            restoreOrder.setNewApiOrderNo(stringValue(entitlement.get("source_order_no")));
+            upsertSubscription(user, restoreOrder, entitlement, stringValue(result.get("community_uid")));
+        }
+        return identity(user);
+    }
+
     @Transactional
     public Map<String, Object> createOrder(AdminUser user, VipCreateOrderRequest request) {
         if (request == null || request.getPlanId() == null || request.getPlanId() <= 0 || request.getChannel() == null || request.getChannel().isBlank()) {
@@ -147,11 +236,16 @@ public class VipService {
         Long localUserId = localUserId(user);
         String deploymentId = ensureDeployment().getDeploymentId();
         Map<String, Object> bind = ensureBinding(user);
+        CommunityUserBinding binding = getBinding(localUserId);
+        if (binding == null || !Boolean.TRUE.equals(binding.getEmailVerified()) || normalizeEmail(binding.getEmail()).isBlank()) {
+            throw new IllegalStateException("请先绑定并验证邮箱，再购买 VIP");
+        }
         Long communityUserId = asLong(bind.get("community_user_id"));
         String localOrderNo = "SDKVIP" + System.currentTimeMillis() + randomCode(6);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("community_user_id", communityUserId);
         body.put("deployment_id", deploymentId);
+        body.put("verified_email", normalizeEmail(binding.getEmail()));
         body.put("plan_id", request.getPlanId());
         body.put("channel", normalizeChannel(request.getChannel()));
         body.put("client_order_no", localOrderNo);
@@ -173,6 +267,8 @@ public class VipService {
         order.setPayChannel(normalizeChannel(request.getChannel()));
         order.setPayAmount(BigDecimal.valueOf(asLong(result.getOrDefault("pay_amount", 0L))).movePointLeft(2));
         order.setCurrency("CNY");
+        order.setEmail(normalizeEmail(binding.getEmail()));
+        order.setIdentityVerified(true);
         order.setStatus(stringValue(result.getOrDefault("status", "pending")));
         order.setPayInfoJson(toJson(result.get("pay_info")));
         orderMapper.insert(order);
@@ -205,6 +301,21 @@ public class VipService {
         return result;
     }
 
+    public void assertAccountCreateAllowed(long currentAccountCount) {
+        Map<String, Object> status = status(null);
+        Object limitsObj = status.get("limits");
+        long maxAccounts = 1;
+        if (limitsObj instanceof Map<?, ?> limits) {
+            maxAccounts = asLong(limits.get("max_accounts"));
+        }
+        if (maxAccounts <= 0) {
+            maxAccounts = 1;
+        }
+        if (currentAccountCount >= maxAccounts) {
+            throw new IllegalStateException("当前版本最多可管理 " + maxAccounts + " 个闲鱼账号，请开通或升级 I 社区 VIP");
+        }
+    }
+
     public Map<String, Object> communityMenu(AdminUser user) {
         Map<String, Object> status = headerStatus(user);
         boolean enabled = "active".equals(status.get("state")) || "expired".equals(status.get("state"));
@@ -224,6 +335,65 @@ public class VipService {
                         menu("support", "工单支持", "/community/support")
                 )
         );
+    }
+
+    private void syncEntitlement(AdminUser user, CommunityUserBinding binding) {
+        Long localUserId = localUserId(user);
+        if (binding == null || binding.getDeploymentId() == null || binding.getDeploymentId().isBlank()) {
+            ensureBinding(user);
+            binding = getBinding(localUserId);
+        }
+        if (binding == null || binding.getDeploymentId() == null || binding.getDeploymentId().isBlank()) {
+            throw new IllegalStateException("I 社区账户尚未绑定");
+        }
+        Map<String, Object> entitlement;
+        try {
+            entitlement = externalGet("/api/community/external/social-sdk/vip/entitlement?deployment_id=" + urlEncode(binding.getDeploymentId()));
+        } catch (Exception e) {
+            throw new IllegalStateException("无法校验 I 社区 VIP 授权：" + e.getMessage(), e);
+        }
+        boolean active = Boolean.TRUE.equals(entitlement.get("active"));
+        VipSubscription sub = getSubscription(localUserId);
+        if (!active) {
+            if (sub != null) {
+                sub.setStatus("EXPIRED");
+                sub.setLastVerifiedAt(LocalDateTime.now());
+                subscriptionMapper.updateById(sub);
+            }
+            return;
+        }
+        String communityUid = stringValue(entitlement.get("community_uid"));
+        if (communityUid.isBlank()) {
+            communityUid = binding.getCommunityUid();
+        }
+        if (sub == null) {
+            sub = new VipSubscription();
+            sub.setLocalUserId(localUserId);
+            sub.setDeploymentId(binding.getDeploymentId());
+        }
+        sub.setCommunityUserId(binding.getCommunityUserId());
+        sub.setCommunityUid(communityUid);
+        sub.setLicenseId(stringValue(entitlement.get("license_id")));
+        sub.setVipLevel(defaultString(stringValue(entitlement.get("vip_level")), "pro"));
+        sub.setFeaturesJson(toJson(entitlement.get("features")));
+        sub.setLimitsJson(toJson(entitlement.get("limits")));
+        sub.setStartedAt(fromEpoch(asLong(entitlement.get("started_at"))));
+        sub.setExpiredAt(fromEpoch(asLong(entitlement.get("expired_at"))));
+        sub.setStatus("ACTIVE");
+        sub.setSourceOrderNo(stringValue(entitlement.get("source_order_no")));
+        sub.setSignature(stringValue(entitlement.get("signature")));
+        sub.setLastVerifiedAt(LocalDateTime.now());
+        if (sub.getId() == null) {
+            subscriptionMapper.insert(sub);
+        } else {
+            subscriptionMapper.updateById(sub);
+        }
+        if (communityUid != null && !communityUid.isBlank()) {
+            binding.setCommunityUid(communityUid);
+            binding.setStatus("ACTIVE");
+            binding.setLastSyncAt(LocalDateTime.now());
+            bindingMapper.updateById(binding);
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -281,6 +451,12 @@ public class VipService {
         binding.setInitialPayChannel(stringValue(userMap.get("initial_pay_channel")));
         binding.setInitialChannelPrefix(expectedPrefix(order.getPayChannel()));
         binding.setStatus("ACTIVE");
+        if (order.getEmail() != null && !order.getEmail().isBlank()) {
+            binding.setEmail(order.getEmail());
+            binding.setEmailBound(true);
+            binding.setEmailVerified(true);
+            binding.setIdentityStatus("active");
+        }
         binding.setLastSyncAt(LocalDateTime.now());
         if (binding.getId() == null) {
             bindingMapper.insert(binding);
@@ -299,6 +475,7 @@ public class VipService {
         }
         sub.setCommunityUserId(order.getCommunityUserId());
         sub.setCommunityUid(communityUid);
+        sub.setEmail(order.getEmail());
         sub.setLicenseId(stringValue(entitlement.get("license_id")));
         sub.setVipLevel(defaultString(stringValue(entitlement.get("vip_level")), "pro"));
         sub.setFeaturesJson(toJson(entitlement.get("features")));
@@ -314,6 +491,41 @@ public class VipService {
         } else {
             subscriptionMapper.updateById(sub);
         }
+    }
+
+    private void upsertIdentityBinding(Long localUserId, SdkDeployment deployment, Map<String, Object> result) {
+        CommunityUserBinding binding = getBinding(localUserId);
+        if (binding == null) {
+            binding = new CommunityUserBinding();
+            binding.setLocalUserId(localUserId);
+            binding.setDeploymentId(deployment.getDeploymentId());
+            binding.setNewApiBaseUrl(properties.getBaseUrl());
+        }
+        String email = normalizeEmail(stringValue(result.get("email")));
+        String communityUid = stringValue(result.get("community_uid"));
+        binding.setCommunityUserId(asLong(result.get("community_user_id")));
+        binding.setCommunityUid(communityUid);
+        binding.setBindId(stringValue(result.get("bind_id")));
+        binding.setBindToken(stringValue(result.get("bind_token")));
+        binding.setEmail(email);
+        binding.setEmailBound(true);
+        binding.setEmailVerified(true);
+        binding.setEmailVerifiedAt(LocalDateTime.now());
+        binding.setIdentityStatus("verified");
+        binding.setStatus(defaultString(stringValue(result.get("bind_status")), "PENDING").toUpperCase(Locale.ROOT));
+        binding.setLastRestoreAt(LocalDateTime.now());
+        binding.setLastSyncAt(LocalDateTime.now());
+        if (binding.getId() == null) {
+            bindingMapper.insert(binding);
+        } else {
+            bindingMapper.updateById(binding);
+        }
+        deployment.setBoundEmail(email);
+        deployment.setEmailVerified(true);
+        deployment.setEmailVerifiedAt(LocalDateTime.now());
+        deployment.setCommunityUid(communityUid);
+        deployment.setLastIdentitySyncAt(LocalDateTime.now());
+        deploymentMapper.updateById(deployment);
     }
 
     private Map<String, Object> ensureBinding(AdminUser user) {
@@ -410,7 +622,8 @@ public class VipService {
                 .header("X-Timestamp", timestamp)
                 .header("X-Nonce", nonce);
         if (properties.getSecret() != null && !properties.getSecret().isBlank()) {
-            String canonical = method + "\n" + path + "\n" + timestamp + "\n" + nonce + "\n" + sha256Hex(body == null ? "" : body);
+            String signPath = path == null ? "" : path.split("\\?", 2)[0];
+            String canonical = method + "\n" + signPath + "\n" + timestamp + "\n" + nonce + "\n" + sha256Hex(body == null ? "" : body);
             builder.header("X-Signature", hmacSha256Hex(properties.getSecret(), canonical));
         }
         return builder;
@@ -532,6 +745,23 @@ public class VipService {
         return LocalDateTime.ofInstant(Instant.ofEpochSecond(epoch), ZONE);
     }
 
+    private boolean shouldVerify(VipSubscription sub) {
+        if (sub == null) {
+            return false;
+        }
+        if (sub.getLastVerifiedAt() == null) {
+            return true;
+        }
+        if (sub.getExpiredAt() != null && sub.getExpiredAt().isBefore(LocalDateTime.now())) {
+            return true;
+        }
+        return sub.getLastVerifiedAt().isBefore(LocalDateTime.now().minusHours(6));
+    }
+
+    private String urlEncode(String value) {
+        return java.net.URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
+    }
+
     private Object parseJson(String json, Object fallback) {
         if (json == null || json.isBlank()) {
             return fallback;
@@ -602,6 +832,22 @@ public class VipService {
 
     private String defaultString(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return "";
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }
 
     private String randomCode(int len) {
