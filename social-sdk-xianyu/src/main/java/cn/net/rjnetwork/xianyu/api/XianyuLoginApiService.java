@@ -292,7 +292,9 @@ public class XianyuLoginApiService {
     /**
      * 检测指定 Cookie 的登录状态
      *
-     * <p>通过 MTOP 接口 mtop.alibaba.xianyu.user.userInfo.get 验证登录态。
+     * <p>通过 MTOP 接口 mtop.taobao.idlemessage.pc.loginuser.get 验证登录态
+     * （真实抓包验证，返回 data.userId；旧接口名 mtop.alibaba.xianyu.user.userInfo.get
+     * 已失效，返回 FAIL_SYS_API_NOT_FOUNDED 被误判为未登录）。
      * 新版 XianyuMtopApiClient 会自动预热 _m_h5_tk、计算 sign、设置 Referer/Origin，
      * 不再需要手动拼 URL 和签名。</p>
      */
@@ -308,7 +310,7 @@ public class XianyuLoginApiService {
         try {
             XianyuMtopApiClient client = new XianyuMtopApiClient(cookieHeader);
             JsonNode root = client.callMtop(
-                    "mtop.alibaba.xianyu.user.userInfo.get",
+                    "mtop.taobao.idlemessage.pc.loginuser.get",
                     "{}");
 
             if (root == null) {
@@ -317,15 +319,19 @@ public class XianyuLoginApiService {
                 return result;
             }
 
-            // 失败码：ret[0] 含 FAIL_SYS_ILLEGAL_REQUEST / FAIL_SYS_USER_VALIDATE
+            // 失败码：ret[0] 形如 "FAIL_SYS_xxx::描述"
             JsonNode ret = root.path("ret");
             if (ret.isArray() && ret.size() > 0) {
                 String r0 = ret.get(0).asText("");
-                // 任意 FAIL_SYS_ / FAIL_BIZ_ 前缀都视为未登录，避免白名单遗漏
-                if (r0.startsWith("FAIL_SYS_") || r0.startsWith("FAIL_BIZ_")
-                        || r0.contains("mtop.permission.login-error")) {
+                // 仅登录态相关失败码判为未登录；接口不存在/系统错误等不属于 Cookie 失效
+                if (isLoginFailureCode(r0)) {
                     result.loggedIn = false;
                     result.message = "Not logged in: " + r0;
+                    return result;
+                }
+                if (r0.startsWith("FAIL_")) {
+                    result.loggedIn = false;
+                    result.message = "MTOP call failed: " + r0;
                     return result;
                 }
             }
@@ -361,6 +367,24 @@ public class XianyuLoginApiService {
         }
 
         return result;
+    }
+
+    /**
+     * 判断 MTOP 失败码是否属于登录态失效（而非接口不存在/系统错误）。
+     * <p>FAIL_SYS_API_NOT_FOUNDED（接口名不存在）不属于 Cookie 失效——它是接口命名/版本问题，
+     * 若判为未登录会把“接口错”误报成“请重新登录”，误导用户反复刷新 Cookie。</p>
+     */
+    private boolean isLoginFailureCode(String code) {
+        if (code == null || code.isEmpty()) return false;
+        String upper = code.toUpperCase();
+        // 接口不存在 / API 名错误：不属于登录态失效
+        if (upper.contains("API_NOT_FOUNDED") || upper.contains("API NOT FOUND")) {
+            return false;
+        }
+        // 其余 FAIL_SYS_ / FAIL_BIZ_ 保持原有“视为未登录”的保守判定，
+        // 并兼容 mtop.permission.login-error 这类非 FAIL_ 前缀的登录错误。
+        return upper.startsWith("FAIL_SYS_") || upper.startsWith("FAIL_BIZ_")
+                || code.contains("mtop.permission.login-error");
     }
 
     // ==================== 私有方法 ====================

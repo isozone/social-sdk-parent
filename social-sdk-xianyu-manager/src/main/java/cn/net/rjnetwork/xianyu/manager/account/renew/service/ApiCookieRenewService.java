@@ -35,7 +35,7 @@ import java.util.Optional;
 public class ApiCookieRenewService {
 
     private static final Logger log = LoggerFactory.getLogger(ApiCookieRenewService.class);
-    private static final String USER_INFO_API = "mtop.alibaba.xianyu.user.userInfo.get";
+    private static final String USER_INFO_API = "mtop.taobao.idlemessage.pc.loginuser.get";
     private static final String USER_INFO_VERSION = "1.0";
 
     private final AccountMapper accountMapper;

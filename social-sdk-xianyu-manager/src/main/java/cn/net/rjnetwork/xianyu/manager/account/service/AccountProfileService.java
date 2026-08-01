@@ -60,8 +60,13 @@ public class AccountProfileService {
                 String message = loginResult != null && loginResult.message != null
                         ? loginResult.message
                         : "登录状态校验失败";
-                markCookieExpired(account, message);
-                return ProfileResult.error("Cookie 已失效，请重新登录：" + message);
+                // 仅真正的登录态失效（Not logged in）才把账号标记为 COOKIE_EXPIRED；
+                // 接口不存在/系统错误等（MTOP call failed）不是 Cookie 问题，不能误标。
+                if (message.startsWith("Not logged in")) {
+                    markCookieExpired(account, message);
+                    return ProfileResult.error("Cookie 已失效，请重新登录：" + message);
+                }
+                return ProfileResult.error("获取个人信息失败：" + message);
             }
 
             result.userId = loginResult.userId;
