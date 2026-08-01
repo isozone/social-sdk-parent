@@ -37,8 +37,15 @@ RUN mvn clean package -DskipTests -pl social-sdk-xianyu-manager -am \
 
 # ── Stage 2: 运行时镜像 ────────────────────────────────────────────────────
 FROM eclipse-temurin:17-jre
+# Ubuntu 24.04+ 的 chromium apt 包是 snap 过渡包装，容器内无法运行，
+# 改用 saiarcot895/chromium-beta PPA 安装真实 chromium 二进制。
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    chromium \
+    software-properties-common \
+    curl \
+    ca-certificates \
+    && add-apt-repository -y ppa:saiarcot895/chromium-beta \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    chromium-browser \
     fonts-liberation \
     fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
@@ -46,7 +53,7 @@ WORKDIR /app
 COPY --from=builder /app/app.jar app.jar
 RUN mkdir -p /app/data /app/chrome-profiles /app/logs
 EXPOSE 8080
-ENV CHROME_BIN=/usr/bin/chromium \
+ENV CHROME_BIN=/usr/bin/chromium-browser \
     CHROME_HEADLESS=true \
     CHROME_HEADLESS_MODE=new \
     SPRING_PROFILES_ACTIVE=prod \

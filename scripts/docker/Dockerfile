@@ -53,11 +53,17 @@ RUN mvn clean package -DskipTests -pl social-sdk-xianyu-manager -am \
 FROM eclipse-temurin:17-jre
 
 # 安装生产环境依赖
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    chromium \
-    fonts-liberation \
-    fonts-noto-cjk \
-    curl \
+# 注意：Ubuntu 24.04+ 的 chromium apt 包是 snap 过渡包装，容器内无 snapd 无法运行
+# （报错 "requires the chromium snap to be installed"）。
+# 改用 saiarcot895/chromium-beta PPA 安装真实 chromium 二进制（/usr/bin/chromium-browser）。
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends software-properties-common curl ca-certificates \
+    && add-apt-repository -y ppa:saiarcot895/chromium-beta \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        chromium-browser \
+        fonts-liberation \
+        fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 # 创建非 root 用户
@@ -76,7 +82,7 @@ RUN mkdir -p /app/data /app/data/openlist /app/chrome-profiles /app/logs /app/co
 ARG DB_MODE=sqlite
 
 # 环境变量
-ENV CHROME_BIN=/usr/bin/chromium \
+ENV CHROME_BIN=/usr/bin/chromium-browser \
     CHROME_HEADLESS=true \
     CHROME_HEADLESS_MODE=new \
     SPRING_PROFILES_ACTIVE=${DB_MODE} \
