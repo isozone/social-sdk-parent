@@ -18,10 +18,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +53,27 @@ public class AccountService {
 
     @Autowired
     private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    /**
+     * 与账号强关联、删除账号时必须级联清理的数据表（均含 account_id 列）。
+     * 新功能若新增按 accountId 存储的实体，请同步补充到此处。
+     */
+    private static final List<String> ACCOUNT_RELATED_TABLES = List.of(
+            "xianyu_product", "local_product", "xianyu_order", "xianyu_message",
+            "xianyu_collect", "xianyu_wallet", "xianyu_wallet_transaction",
+            "xianyu_auto_reply_config", "xianyu_auto_reply_log", "xianyu_keyword_rule",
+            "item_reply", "comment_templates", "delivery_rules", "delivery_block_rule",
+            "delivery_log", "virtual_ship_config", "virtual_ship_task",
+            "ai_cs_knowledge", "ai_cs_policy", "ai_cs_session",
+            "ai_ops_task", "ai_ops_suggestion",
+            "monitor_task", "market_snapshot",
+            "notify_message", "cookie_refresh_schedule", "login_renew_schedule",
+            "im_token_cache", "risk_control_log", "cloud_storage_account",
+            "auto_rate_config", "red_flower_config",
+            "scheduled_close_notice_log", "scheduled_polish_log");
 
     public AccountService(AccountMapper accountMapper, VipService vipService) {
         this.accountMapper = accountMapper;
@@ -418,9 +445,54 @@ public class AccountService {
 
     @Transactional
     public void removeById(Long id) {
+        XianyuAccount account = accountMapper.selectById(id);
+        if (account == null) {
+            return;
+        }
         // 关闭 Chrome 容器（如果存在）
         stopChromeContainer(id);
+        // 删除该账号的 Chrome profile 目录（如 ./chrome-profiles/account-{id}）
+        deleteChromeProfileDir(account);
+        // 级联删除所有与账号关联的数据表
+        for (String table : ACCOUNT_RELATED_TABLES) {
+            try {
+                jdbcTemplate.update("DELETE FROM " + table + " WHERE account_id = ?", id);
+            } catch (Exception e) {
+                // 个别表缺 account_id 列时跳过，不影响其他表与账号本身的删除
+                logger.warn("[ACCOUNT-DELETE] 清理表 {} 失败(可能无 account_id 列), accountId={}: {}",
+                        table, id, e.getMessage());
+            }
+        }
+        // 最后删除账号本身
         accountMapper.deleteById(id);
+        logger.info("[ACCOUNT-DELETE] 账号 {} 及其关联数据已删除", id);
+    }
+
+    /**
+     * 删除账号对应的 Chrome profile 目录（幂等：目录不存在时静默跳过）。
+     * 文件系统操作不可回滚，失败仅记录日志，不影响数据库删除。
+     */
+    private void deleteChromeProfileDir(XianyuAccount account) {
+        String profileDir = account.getChromeProfilePath();
+        if (profileDir == null || profileDir.isBlank()) {
+            profileDir = "./chrome-profiles/account-" + account.getId();
+        }
+        Path path = Paths.get(profileDir);
+        if (!Files.exists(path)) {
+            return;
+        }
+        try (var stream = Files.walk(path)) {
+            stream.sorted(Comparator.reverseOrder()).forEach(p -> {
+                try {
+                    Files.deleteIfExists(p);
+                } catch (IOException e) {
+                    logger.warn("[ACCOUNT-DELETE] 删除文件失败: {} ({})", p, e.getMessage());
+                }
+            });
+            logger.info("[ACCOUNT-DELETE] 已删除账号 {} 的 Chrome profile 目录: {}", account.getId(), profileDir);
+        } catch (IOException e) {
+            logger.warn("[ACCOUNT-DELETE] 删除 Chrome profile 目录失败, accountId={}: {}", account.getId(), e.getMessage());
+        }
     }
 
     // ==================== Chrome 容器生命周期集成 ====================
