@@ -51,7 +51,7 @@ public class XianyuLoginApiService {
 
     // ==================== 字段 ====================
     private final HttpClient httpClient;
-    private final String mtCookie;
+    private volatile String mtCookie;
     private final ConcurrentMap<String, InternalQrSession> qrSessions = new ConcurrentHashMap<>();
 
     public XianyuLoginApiService(String cookie) {
@@ -60,6 +60,11 @@ public class XianyuLoginApiService {
                 .followRedirects(HttpClient.Redirect.ALWAYS)
                 .connectTimeout(java.time.Duration.ofSeconds(15))
                 .build();
+    }
+
+    /** 更新登录 Cookie（登录成功后调用，避免无参 checkLoginStatus 使用旧 cookie 误判）。 */
+    public void updateCookie(String cookie) {
+        this.mtCookie = cookie != null ? cookie : "";
     }
 
     // ==================== 二维码登录 ====================
@@ -370,9 +375,9 @@ public class XianyuLoginApiService {
     }
 
     /**
-     * 判断 MTOP 失败码是否属于登录态失效（而非接口不存在/系统错误）。
-     * <p>FAIL_SYS_API_NOT_FOUNDED（接口名不存在）不属于 Cookie 失效——它是接口命名/版本问题，
-     * 若判为未登录会把“接口错”误报成“请重新登录”，误导用户反复刷新 Cookie。</p>
+     * 判断 MTOP 失败码是否属于登录态失效（而非接口不存在/系统错误/限流等临时错误）。
+     * <p>FAIL_SYS_API_NOT_FOUNDED（接口名不存在）不属于 Cookie 失效——它是接口命名/版本问题；
+     * 限流（FAIL_SYS_RATE_LIMIT 等）与系统错误也不是登录问题，误判会让用户反复刷新 Cookie。</p>
      */
     private boolean isLoginFailureCode(String code) {
         if (code == null || code.isEmpty()) return false;
@@ -381,10 +386,13 @@ public class XianyuLoginApiService {
         if (upper.contains("API_NOT_FOUNDED") || upper.contains("API NOT FOUND")) {
             return false;
         }
-        // 其余 FAIL_SYS_ / FAIL_BIZ_ 保持原有“视为未登录”的保守判定，
-        // 并兼容 mtop.permission.login-error 这类非 FAIL_ 前缀的登录错误。
-        return upper.startsWith("FAIL_SYS_") || upper.startsWith("FAIL_BIZ_")
-                || code.contains("mtop.permission.login-error");
+        // 仅明确的登录态失效码才判为未登录：用户校验失败、token 过期、会话过期、登录错误等
+        return code.contains("mtop.permission.login-error")
+                || upper.contains("USER_VALIDATE")
+                || upper.contains("TOKEN_EXOIRED")
+                || upper.contains("SESSION_EXPIRED")
+                || upper.contains("_LOGIN")
+                || upper.equals("FAIL_SYS_LOGIN");
     }
 
     // ==================== 私有方法 ====================

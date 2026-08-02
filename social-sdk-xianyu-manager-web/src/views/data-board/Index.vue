@@ -44,7 +44,7 @@
             </div>
           </div>
           <div class="kpi-sparkline">
-            <div class="spark-bar" v-for="(v, si) in kpi.spark" :key="si" :style="{ height: (v / Math.max(...kpi.spark)) * 100 + '%', background: kpi.color }"></div>
+            <div class="spark-bar" v-for="(v, si) in kpi.spark" :key="si" :style="{ height: (v / (Math.max(...kpi.spark) || 1)) * 100 + '%', background: kpi.color }"></div>
           </div>
         </div>
       </section>

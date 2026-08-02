@@ -28,7 +28,7 @@ import java.util.Map;
 public class XianyuMtopApiClient {
 
     /** IM/滑块验证获取的 cookie（x5sec 等），与登录 cookie 合并使用 */
-    private String imCookieHeader;
+    private volatile String imCookieHeader;
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String APP_KEY = "34839810";
@@ -36,12 +36,12 @@ public class XianyuMtopApiClient {
     private static final String ORIGIN = "https://www.goofish.com";
     private static final String USER_AGENT = XianyuRuntimeFingerprint.USER_AGENT;
 
-    private String cookie;
-    private boolean tokenPrimed = false;
+    private volatile String cookie;
+    private volatile boolean tokenPrimed = false;
     private final Map<String, String> baseHeaders = new HashMap<>();
 
     /** 当前使用的 httpClient（代理感知，每次创建时绑定当前代理） */
-    private HttpClient httpClient;
+    private volatile HttpClient httpClient;
 
     /** 日志（java.util.logging 零依赖） */
     private static final java.util.logging.Logger log = java.util.logging.Logger.getLogger(XianyuMtopApiClient.class.getName());

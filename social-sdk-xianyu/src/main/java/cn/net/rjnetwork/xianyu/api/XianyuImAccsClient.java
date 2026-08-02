@@ -74,9 +74,10 @@ public class XianyuImAccsClient {
      *
      * @throws Exception 连接失败或帧超时
      */
-    public synchronized void connect() throws Exception {
-        if (socket != null && connected) return;
-        closed = false;
+    public void connect() throws Exception {
+        synchronized (this) {
+            if (socket != null && connected) return;
+            closed = false;
 
         // 1. MTOP 拿 IM accessToken
         String userId = extractUserIdFromCookie();
@@ -119,6 +120,9 @@ public class XianyuImAccsClient {
 
         // 6. 注册后必须同步并确认 sync 状态，否则业务 LWP 容易返回 code=400
         initializeSyncState();
+        } // synchronized 块结束，释放锁
+
+        // 锁外等待 sync 稳定，避免 sleep 阻塞其他调用者
         try { Thread.sleep(3000); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
 
         System.err.println("[IM-WSS] wss connected, /reg and sync initialized");
@@ -252,13 +256,15 @@ public class XianyuImAccsClient {
                 byte[] readBuf = new byte[8192];
                 ByteArrayOutputStream fragmentBuffer = new ByteArrayOutputStream();
 
-                while (!closed && !socket.isClosed()) {
+                while (!closed && socket != null && !socket.isClosed()) {
                     int n = in.read(readBuf);
                     if (n == -1) {
                         System.err.println("[IM-WSS] stream ended, reconnecting...");
                         closeQuietly();
                         connected = false;
-                        // 尝试重连（通过外层 ensureConnected）
+                        // closeQuietly 会中断当前读线程，必须先清除中断标志，
+                        // 否则 Thread.sleep 立即抛 InterruptedException，重连永远走不到
+                        Thread.interrupted();
                         try {
                             Thread.sleep(2000);
                             connect();
@@ -277,6 +283,14 @@ public class XianyuImAccsClient {
                     System.err.println("[IM-WSS] read thread error: " + e.getMessage());
                     closeQuietly();
                     connected = false;
+                    // 读线程异常同样尝试重连（先清中断标志再 sleep）
+                    Thread.interrupted();
+                    try {
+                        Thread.sleep(2000);
+                        connect();
+                    } catch (Exception re) {
+                        System.err.println("[IM-WSS] reconnect failed: " + re.getMessage());
+                    }
                 }
             }
         }, "xianyu-im-wss-reader");

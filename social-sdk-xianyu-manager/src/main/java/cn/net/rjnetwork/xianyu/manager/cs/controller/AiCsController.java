@@ -195,6 +195,9 @@ public class AiCsController {
 
     @DeleteMapping("/knowledge/{id}")
     public ApiResponse<Void> deleteKnowledge(@PathVariable Long id) {
+        if (knowledgeMapper.selectById(id) == null) {
+            return ApiResponse.fail("NOT_FOUND", "知识条目不存在");
+        }
         knowledgeMapper.deleteById(id);
         return ApiResponse.ok(null);
     }

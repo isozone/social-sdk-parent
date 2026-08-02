@@ -432,8 +432,17 @@ async function saveProvider() {
 
 async function toggleProvider(row) {
   try {
-    await api.put(`/ai/providers/${row.id}`, { enabled: row.enabled })
-  } catch (e) {}
+    const res = await api.put(`/ai/providers/${row.id}`, { enabled: row.enabled })
+    if (res && res.success) {
+      ElMessage.success('已更新')
+    } else {
+      row.enabled = !row.enabled
+      ElMessage.error((res && res.message) || '更新失败')
+    }
+  } catch (e) {
+    row.enabled = !row.enabled
+    ElMessage.error('更新失败')
+  }
 }
 
 async function deleteProvider(row) {
@@ -508,8 +517,17 @@ async function saveModel() {
 
 async function toggleModel(row) {
   try {
-    await api.put(`/ai/models/${row.id}`, { enabled: row.enabled })
-  } catch (e) {}
+    const res = await api.put(`/ai/models/${row.id}`, { enabled: row.enabled })
+    if (res && res.success) {
+      ElMessage.success('已更新')
+    } else {
+      row.enabled = !row.enabled
+      ElMessage.error((res && res.message) || '更新失败')
+    }
+  } catch (e) {
+    row.enabled = !row.enabled
+    ElMessage.error('更新失败')
+  }
 }
 
 async function deleteModel(row) {

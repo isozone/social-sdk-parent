@@ -515,10 +515,18 @@ async function saveChannel() {
 
 async function toggleChannel(row, v) {
   try {
-    await notify.toggleChannel(row.id, v)
-    row.enabled = v
-    ElMessage.success('已更新')
-  } catch (e) {}
+    const res = await notify.toggleChannel(row.id, v)
+    if (res && res.success) {
+      row.enabled = v
+      ElMessage.success('已更新')
+    } else {
+      row.enabled = !v
+      ElMessage.error((res && res.message) || '更新失败')
+    }
+  } catch (e) {
+    row.enabled = !v
+    ElMessage.error('更新失败')
+  }
 }
 
 function openTestDialog(row) {
@@ -656,10 +664,18 @@ async function saveSub() {
 
 async function toggleSub(row, v) {
   try {
-    await notify.toggleSubscription(row.id, v)
-    row.enabled = v
-    ElMessage.success('已更新')
-  } catch (e) {}
+    const res = await notify.toggleSubscription(row.id, v)
+    if (res && res.success) {
+      row.enabled = v
+      ElMessage.success('已更新')
+    } else {
+      row.enabled = !v
+      ElMessage.error((res && res.message) || '更新失败')
+    }
+  } catch (e) {
+    row.enabled = !v
+    ElMessage.error('更新失败')
+  }
 }
 
 async function removeSub(row) {

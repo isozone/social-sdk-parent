@@ -299,9 +299,17 @@ async function handleCreate() {
 
 async function toggleRule(row) {
   try {
-    await toggleRuleApi(row.id, row.enabled)
-    ElMessage.success('规则状态已更新')
-  } catch (e) {}
+    const res = await toggleRuleApi(row.id, row.enabled)
+    if (res && res.success) {
+      ElMessage.success('规则状态已更新')
+    } else {
+      row.enabled = !row.enabled
+      ElMessage.error((res && res.message) || '更新失败')
+    }
+  } catch (e) {
+    row.enabled = !row.enabled
+    ElMessage.error('更新失败')
+  }
 }
 
 async function testRule(row) {
@@ -320,8 +328,12 @@ async function testRule(row) {
 }
 
 async function deleteRule(id) {
-  await ElMessageBox.confirm('确认删除该规则？', '提示', { type: 'warning' })
-  try { await deleteRule(id); ElMessage.success('已删除'); await loadKeywordRules() } catch (e) {}
+  try {
+    await ElMessageBox.confirm('确认删除该规则？', '提示', { type: 'warning' })
+    await deleteRuleApi(id)
+    ElMessage.success('已删除')
+    await loadKeywordRules()
+  } catch (e) {}
 }
 
 // === AI 配置 ===

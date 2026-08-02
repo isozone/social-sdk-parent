@@ -155,7 +155,10 @@ public class XianyuProductEditApiService {
             images, catDTO, labelExtList, addrDTO, deliverySettings
         );
 
-        // 5. 下架原商品
+        // 5. 发布成功才下架原商品；失败抛异常保留原商品，避免丢失在售
+        if (!isPublishSuccess(publishResult)) {
+            throw new IllegalStateException("改价：发布新商品失败，已保留原商品，resp=" + publishResult);
+        }
         shelfOff(itemId);
 
         return publishResult;
@@ -200,7 +203,10 @@ public class XianyuProductEditApiService {
             images, catDTO, labelExtList, addrDTO, deliverySettings
         );
 
-        // 4. 下架原商品
+        // 4. 发布成功才下架原商品；失败抛异常保留原商品，避免丢失在售
+        if (!isPublishSuccess(publishResult)) {
+            throw new IllegalStateException("改库存：发布新商品失败，已保留原商品，resp=" + publishResult);
+        }
         shelfOff(itemId);
 
         return publishResult;
@@ -236,8 +242,25 @@ public class XianyuProductEditApiService {
             images, catDTO, labelExtList, addrDTO, deliverySettings
         );
 
+        // 发布成功才下架原商品；失败抛异常保留原商品，避免丢失在售
+        if (!isPublishSuccess(publishResult)) {
+            throw new IllegalStateException("改原价：发布新商品失败，已保留原商品，resp=" + publishResult);
+        }
         shelfOff(itemId);
         return publishResult;
+    }
+
+    /**
+     * 判断发布结果是否成功：ret[0] 为空或含 SUCCESS 视为成功；FAIL_ 前缀视为失败。
+     */
+    private boolean isPublishSuccess(JsonNode resp) {
+        if (resp == null) return false;
+        JsonNode ret = resp.path("ret");
+        if (ret.isArray() && ret.size() > 0) {
+            String r0 = ret.get(0).asText("");
+            return r0.isEmpty() || r0.contains("SUCCESS");
+        }
+        return true;
     }
 
     // ==================== 字段提取方法 ====================

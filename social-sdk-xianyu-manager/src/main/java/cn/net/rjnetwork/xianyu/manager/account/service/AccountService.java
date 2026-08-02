@@ -12,9 +12,12 @@ import cn.net.rjnetwork.xianyu.manager.account.dto.QrLoginRequest;
 import cn.net.rjnetwork.xianyu.manager.account.dto.QrLoginResponse;
 import cn.net.rjnetwork.xianyu.manager.account.mapper.AccountMapper;
 import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
+import cn.net.rjnetwork.xianyu.manager.notify.mapper.NotifySubscriptionMapper;
+import cn.net.rjnetwork.xianyu.manager.notify.model.NotifySubscription;
 import cn.net.rjnetwork.xianyu.manager.vip.service.VipService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
@@ -56,6 +60,11 @@ public class AccountService {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private NotifySubscriptionMapper notifySubscriptionMapper;
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     /**
      * 与账号强关联、删除账号时必须级联清理的数据表（均含 account_id 列）。
@@ -463,9 +472,56 @@ public class AccountService {
                         table, id, e.getMessage());
             }
         }
+        // 通知订阅的 accountIds 是 JSON 数组，从订阅中移除该账号；清空后删除订阅
+        cleanupNotifySubscriptions(id);
         // 最后删除账号本身
         accountMapper.deleteById(id);
         logger.info("[ACCOUNT-DELETE] 账号 {} 及其关联数据已删除", id);
+    }
+
+    /**
+     * 清理通知订阅中对被删账号的引用。
+     * <p>notify_subscription.accountIds 为 JSON 数组字符串（CUSTOM 作用域时按账号订阅），
+     * 无法用 SQL 直接删，这里用 Java 解析后移除该账号；若数组清空则删除整条订阅。</p>
+     */
+    private void cleanupNotifySubscriptions(Long accountId) {
+        List<NotifySubscription> subs = notifySubscriptionMapper.selectList(
+                new LambdaQueryWrapper<NotifySubscription>()
+                        .eq(NotifySubscription::getAccountScope, "CUSTOM")
+                        .isNotNull(NotifySubscription::getAccountIds)
+                        .ne(NotifySubscription::getAccountIds, ""));
+        for (NotifySubscription sub : subs) {
+            try {
+                JsonNode arr = MAPPER.readTree(sub.getAccountIds());
+                if (arr == null || !arr.isArray()) {
+                    continue;
+                }
+                List<Long> ids = new ArrayList<>();
+                boolean removed = false;
+                for (JsonNode n : arr) {
+                    long v = n.asLong();
+                    if (v == accountId) {
+                        removed = true;
+                    } else {
+                        ids.add(v);
+                    }
+                }
+                if (!removed) {
+                    continue;
+                }
+                if (ids.isEmpty()) {
+                    notifySubscriptionMapper.deleteById(sub.getId());
+                    logger.info("[ACCOUNT-DELETE] 已删除通知订阅 {}, 因账号 {} 是唯一订阅账号", sub.getId(), accountId);
+                } else {
+                    sub.setAccountIds(MAPPER.writeValueAsString(ids));
+                    notifySubscriptionMapper.updateById(sub);
+                    logger.info("[ACCOUNT-DELETE] 已从通知订阅 {} 移除账号 {}", sub.getId(), accountId);
+                }
+            } catch (Exception e) {
+                logger.warn("[ACCOUNT-DELETE] 清理通知订阅失败, subId={}, accountId={}: {}",
+                        sub.getId(), accountId, e.getMessage());
+            }
+        }
     }
 
     /**

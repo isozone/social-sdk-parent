@@ -113,6 +113,9 @@ public class RuleService {
 
     @Transactional
     public void delete(Long id) {
+        if (ruleMapper.selectById(id) == null) {
+            throw new IllegalArgumentException("规则不存在");
+        }
         ruleMapper.deleteById(id);
     }
 

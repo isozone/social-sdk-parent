@@ -88,6 +88,9 @@ public class CommentTemplateService {
 
     @Transactional
     public void delete(Long id) {
+        if (templateMapper.selectById(id) == null) {
+            throw new IllegalArgumentException("评论模板不存在");
+        }
         templateMapper.deleteById(id);
     }
 

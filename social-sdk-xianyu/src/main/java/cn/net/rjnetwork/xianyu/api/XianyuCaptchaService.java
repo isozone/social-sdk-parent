@@ -27,13 +27,18 @@ public class XianyuCaptchaService {
 
     private static final java.util.logging.Logger log = java.util.logging.Logger.getLogger(XianyuCaptchaService.class.getName());
 
-    private final String cookie;
+    private volatile String cookie;
     private final cn.net.rjnetwork.xianyu.proxy.core.ProxyPoolManager proxyPoolManager;
     private final Long accountId;
     private HttpClient httpClient;
 
     public XianyuCaptchaService(String cookie) {
         this(cookie, null, null);
+    }
+
+    /** 更新 Cookie（登录成功后调用，避免风控处理使用旧 cookie）。 */
+    public void updateCookie(String cookie) {
+        this.cookie = cookie != null ? cookie : "";
     }
 
     /**

@@ -432,7 +432,7 @@ function selectSession(s) {
     n.delete(s.sessionId)
     unreadSet.value = n
   }
-  loadHistory()
+  // loadHistory 由下方 watch(selectedSession) 统一触发，避免重复请求
 }
 
 async function handleSyncNow() {

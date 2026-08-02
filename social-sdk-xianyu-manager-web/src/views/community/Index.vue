@@ -400,7 +400,7 @@ async function saveDraft(){ syncTopicEditorContent(); submitting.value=true; try
 async function openTopic(topic){ currentTopic.value=topic; topicDialogVisible.value=true; try{currentTopic.value=normalize(await communityGet(`/topics/${topic.id}`))||topic}catch(e){} try{replies.value=pickList(normalize(await communityGet(`/topics/${topic.id}/replies`)))}catch(e){replies.value=[]} await nextTick(initReplyEditor) }
 async function submitReply(){ syncReplyEditorContent(); if(!stripHtml(replyText.value)||!currentTopic.value)return; submitting.value=true; try{await communityPost(`/topics/${currentTopic.value.id}/replies`,{content:replyText.value,content_format:'html'}); replyText.value=''; replyEditor.value?.clear(); await openTopic(currentTopic.value); ElMessage.success('回复成功')}catch(e){ElMessage.error(e.message||'回复失败')}finally{submitting.value=false} }
 async function toggleFavorite(t){ try{await communityPost(`/topics/${t.id}/favorite`,{}); t.favored=!t.favored; ElMessage.success('收藏状态已更新')}catch(e){ElMessage.error(e.message||'操作失败')} }
-async function react(t,type){ try{await communityPost(`/reactions/topic/${t.id}`,{reaction_type:type}); t.liked=true; t.like_count=(t.like_count||0)+1; ElMessage.success('已互动')}catch(e){ElMessage.error(e.message||'操作失败')} }
+async function react(t,type){ if(t.liked){ ElMessage.info('已点过赞'); return } try{await communityPost(`/reactions/topic/${t.id}`,{reaction_type:type}); t.liked=true; t.like_count=(t.like_count||0)+1; ElMessage.success('已互动')}catch(e){ElMessage.error(e.message||'操作失败')} }
 function topicTags(t){ const val=t.tags; if(!val) return []; return Array.isArray(val)?val:String(val).split(',').map(s=>s.trim()).filter(Boolean) }
 async function purchaseTopic(t){ try{await ElMessageBox.confirm(`确认花费 ${t.price || 0} 社区币购买？`,'购买确认'); await communityPost(`/topics/${t.id}/purchase`,{}); t.purchased=true; ElMessage.success('购买成功'); await openTopic(t)}catch(e){ if(e !== 'cancel') ElMessage.error(e.message||'购买失败') } }
 async function createCreditOrder(plan){ try{stopOrderPayTimers(); const r=normalize(await communityPost('/credit-orders',{plan_id:plan.id,pay_channel:rechargeChannel.value})); currentOrder.value=r.order || r; orders.value.unshift(currentOrder.value); ElMessage.success('充值订单已创建'); await initiateOrderPayment()}catch(e){ElMessage.error(e.message||'创建充值订单失败')} }
@@ -431,7 +431,19 @@ function syncReplyEditorContent(){ if(replyEditor.value) replyText.value = reply
 function topicPayload(){ return {title:composer.value.title,content:composer.value.content,content_format:'html',circle_id:composer.value.circle_id||0,category_id:composer.value.category_id,price:composer.value.price||0,tags:composer.value.tagsText?composer.value.tagsText.split(',').map(s=>s.trim()).filter(Boolean):[]} }
 function resetComposer(){ composer.value={title:'',content:'',circle_id:0,category_id:globalCategories.value[0]?.id||null,price:0,tagsText:''}; topicEditor.value?.clear() }
 function compact(obj){ return Object.fromEntries(Object.entries(obj).filter(([,v])=>v!==''&&v!==null&&v!==undefined)) }
-function normalize(res){ return res?.data || res || {} } function pickList(data){ return Array.isArray(data)?data:(data.items||data.list||data.records||data.topics||data.orders||data.transactions||data.plans||data.circles||data.notifications||[]) } function stripHtml(text){ return String(text||'').replace(/<[^>]+>/g,'').slice(0,500) } function safeHtml(html){ return String(html || '').replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '') } function formatCents(cents){ return (Number(cents||0)/100).toFixed(2) }
+function normalize(res){ return res?.data || res || {} } function pickList(data){ return Array.isArray(data)?data:(data.items||data.list||data.records||data.topics||data.orders||data.transactions||data.plans||data.circles||data.notifications||[]) } function stripHtml(text){ return String(text||'').replace(/<[^>]+>/g,'').slice(0,500) } function safeHtml(html){ return String(html || '')
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, '')
+    .replace(/<iframe[\s\S]*?>[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<object[\s\S]*?>[\s\S]*?<\/object>/gi, '')
+    .replace(/<embed[\s\S]*?>[\s\S]*?<\/embed>/gi, '')
+    .replace(/<link[\s\S]*?>/gi, '')
+    .replace(/<meta[\s\S]*?>/gi, '')
+    // 移除事件属性 on*（防 <img onerror=...> 等存储型 XSS）
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    // 移除 javascript:/data: 危险协议
+    .replace(/(javascript|vbscript|data):/gi, '$1&#58;')
+ } function formatCents(cents){ return (Number(cents||0)/100).toFixed(2) }
 function parseLocalDateTime(str){ if(str === null || str === undefined) return null; let s = String(str).trim(); if(!s) return null; s = s.replace(/Z$/,'').replace(/([+-]\d{2}:?\d{2})$/,''); s = s.replace(/\.(\d{3})\d*/, '.$1'); const d = new Date(s); return isNaN(d.getTime()) ? null : d }
 function formatDateTime(str){ const d = parseLocalDateTime(str); if(!d) return ''; const p = n => String(n).padStart(2,'0'); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}` }
 function toTimestamp(str){ const d = parseLocalDateTime(str); return d ? d.getTime() : null }

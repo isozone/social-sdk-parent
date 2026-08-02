@@ -21,7 +21,7 @@ import java.util.Optional;
  * 失败降级到 A1。链路：</p>
  * <ol>
  *   <li>用账号当前 cookie 通过代理感知工厂构造 {@link XianyuMtopApiClient}，调一次轻量 MTOP 接口
- *       （mtop.alibaba.xianyu.user.userInfo.get），触发 {@link XianyuMtopApiClient#primeTokenIfNeeded}
+ *       （mtop.taobao.idlemessage.pc.loginuser.get），触发 {@link XianyuMtopApiClient#primeTokenIfNeeded}
  *       自动剔除过期 _m_h5_tk、让服务端重下发新 token；</li>
  *   <li>调 {@link XianyuMtopApiClient#getMergedCookie} 拿到合并 Set-Cookie 后的新 cookie；</li>
  *   <li>调 {@link XianyuLoginApiService#checkLoginStatus} 校验新 cookie 仍登录态；</li>

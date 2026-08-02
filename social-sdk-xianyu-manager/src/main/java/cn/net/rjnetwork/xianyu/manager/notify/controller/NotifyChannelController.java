@@ -63,6 +63,9 @@ public class NotifyChannelController {
 
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
+        if (channelMapper.selectById(id) == null) {
+            return ApiResponse.fail("NOT_FOUND", "通知通道不存在");
+        }
         channelMapper.deleteById(id);
         return ApiResponse.ok(null);
     }

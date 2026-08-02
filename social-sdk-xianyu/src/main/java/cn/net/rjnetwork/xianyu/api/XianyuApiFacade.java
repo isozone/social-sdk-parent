@@ -73,6 +73,10 @@ public class XianyuApiFacade {
     /** 更新 Cookie（登录成功后调用）*/
     public void updateCookie(String newCookie) {
         apiClient.updateCookie(newCookie);
+        // 同步更新持有 cookie 的组件，避免换 cookie 后旧登录态误判 / 旧 IM 长连接继续存活
+        loginApiService.updateCookie(newCookie);
+        captchaService.updateCookie(newCookie);
+        messageApiService.closeAccsClient();
     }
 
     // ======================== 1. 登录 ========================
@@ -365,7 +369,13 @@ public class XianyuApiFacade {
 
     // ======================== 8. 订单管理 ========================
 
-    public JsonNode getOrderList(String tab, String page) { return orderApiService.getOrderList(tab, page); }
+    public JsonNode getOrderList(String tab, String page) {
+        // tab: "sold" / "bought"，与分页参数分开传（此前把 tab 误当 pageNumber 传给 bought.list，sold 列表不可用）
+        if ("sold".equalsIgnoreCase(tab)) {
+            return orderApiService.getSoldOrderList(page, null);
+        }
+        return orderApiService.getOrderList(page, null);
+    }
     public JsonNode getOrderDetail(String orderId) { return orderApiService.getOrderDetail(orderId); }
     public JsonNode delivery(String orderId, String trackingNo) { return orderApiService.delivery(orderId, trackingNo); }
 

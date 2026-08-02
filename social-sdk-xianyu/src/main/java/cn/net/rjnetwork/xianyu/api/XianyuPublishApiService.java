@@ -74,11 +74,11 @@ public class XianyuPublishApiService {
         // 解析 object.url + object.pix
         JsonNode object = resp.path("object");
         if (object.isMissingNode() || object.isNull()) {
-            throw new IllegalStateException("闲鱼图片上传失败：返回缺 object 字段，resp=" + resp.toString().substring(0, 300));
+            throw new IllegalStateException("闲鱼图片上传失败：返回缺 object 字段，resp=" + truncate(resp));
         }
         String imgUrl = object.path("url").asText("");
         if (imgUrl.isEmpty()) {
-            throw new IllegalStateException("闲鱼图片上传失败：返回缺 object.url，resp=" + resp.toString().substring(0, 300));
+            throw new IllegalStateException("闲鱼图片上传失败：返回缺 object.url，resp=" + truncate(resp));
         }
         // pix 形如 "1024x768"，解析出 width/height；无 pix 时传 0，闲鱼会自己拉
         int width = 0, height = 0;
@@ -154,7 +154,7 @@ public class XianyuPublishApiService {
         }
         JsonNode object = resp.path("object");
         if (object.isMissingNode() || object.isNull()) {
-            throw new IllegalStateException("闲鱼视频上传失败：返回缺 object 字段，resp=" + resp.toString().substring(0, 300));
+            throw new IllegalStateException("闲鱼视频上传失败：返回缺 object 字段，resp=" + truncate(resp));
         }
         String videoUrl = object.path("url").asText("");
         if (videoUrl.isEmpty()) {
@@ -407,7 +407,7 @@ public class XianyuPublishApiService {
         if (price != null && !price.isEmpty()) {
             try {
                 double p = Double.parseDouble(price);
-                priceInCent = String.valueOf((long) (p * 100));
+                priceInCent = String.valueOf(Math.round(p * 100));
             } catch (NumberFormatException ignored) {}
         }
 
@@ -423,5 +423,11 @@ public class XianyuPublishApiService {
 
     private static String toJson(Map<String, ?> map) {
         try { return MAPPER.writeValueAsString(map); } catch (Exception e) { return "{}"; }
+    }
+
+    /** 截断响应文本用于异常信息，避免响应过短时 substring 越界。 */
+    private static String truncate(JsonNode resp) {
+        String s = resp == null ? "null" : resp.toString();
+        return s.length() <= 300 ? s : s.substring(0, 300);
     }
 }

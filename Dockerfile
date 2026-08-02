@@ -37,17 +37,24 @@ RUN mvn clean package -DskipTests -pl social-sdk-xianyu-manager -am \
 
 # ── Stage 2: 运行时镜像 ────────────────────────────────────────────────────
 FROM eclipse-temurin:17-jre
-# Ubuntu 24.04+ 的 chromium apt 包是 snap 过渡包装，容器内无法运行，
-# 改用 saiarcot895/chromium-beta PPA 安装真实 chromium 二进制。
+# Ubuntu 24.04+ 的 chromium apt 包是 snap 过渡包装，容器内无法运行；
+# PPA 也不支持 Ubuntu 26.04。改用 Chrome for Testing 官方 zip（国内走 npmmirror 镜像），
+# 解压后软链到 /usr/bin/chromium-browser。版本可用 --build-arg CHROME_VERSION=x.y.z 覆盖。
+ARG CHROME_VERSION=146.0.7658.0
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    software-properties-common \
     curl \
     ca-certificates \
-    && add-apt-repository -y ppa:saiarcot895/chromium-beta \
-    && apt-get update && apt-get install -y --no-install-recommends \
-    chromium-browser \
+    unzip \
     fonts-liberation \
     fonts-noto-cjk \
+    libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
+    libcups2 libdrm2 libgbm1 libasound2 libxkbcommon0 \
+    libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libxshmfence1 \
+    && curl -fsSL -o /tmp/chrome-linux64.zip \
+        https://registry.npmmirror.com/-/binary/chrome-for-testing/${CHROME_VERSION}/linux64/chrome-linux64.zip \
+    && unzip -q /tmp/chrome-linux64.zip -d /opt \
+    && rm -f /tmp/chrome-linux64.zip \
+    && ln -sf /opt/chrome-linux64/chrome /usr/bin/chromium-browser \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=builder /app/app.jar app.jar

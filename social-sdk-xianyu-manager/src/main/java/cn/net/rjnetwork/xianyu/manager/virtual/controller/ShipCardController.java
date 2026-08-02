@@ -62,6 +62,9 @@ public class ShipCardController {
     /** 删除卡券（软删）。 */
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
+        if (shipCardMapper.selectById(id) == null) {
+            return ApiResponse.fail("NOT_FOUND", "卡券不存在");
+        }
         shipCardMapper.deleteById(id);
         return ApiResponse.ok(null);
     }

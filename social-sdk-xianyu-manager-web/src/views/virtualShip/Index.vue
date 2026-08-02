@@ -371,17 +371,33 @@ const loadCards = async () => {
 const addCards = async () => {
   const list = cardText.value.split('\n').map(s => s.trim()).filter(Boolean)
   if (!list.length) return ElMessage.warning('请输入至少一个卡密')
-  await importVirtualCards({ productId: null, cards: list })
-  ElMessage.success(`已添加 ${list.length} 个卡密`)
-  showAddCardDialog.value = false
-  cardText.value = ''
-  loadCards()
+  try {
+    const res = await importVirtualCards({ productId: null, cards: list })
+    if (res && res.success) {
+      ElMessage.success(`已添加 ${list.length} 个卡密`)
+      showAddCardDialog.value = false
+      cardText.value = ''
+      loadCards()
+    } else {
+      ElMessage.error((res && res.message) || '添加失败')
+    }
+  } catch (e) {
+    ElMessage.error('添加失败：' + (e.message || ''))
+  }
 }
 const deleteCard = async (id) => {
-  await ElMessageBox.confirm('确认删除？', '提示', { type: 'warning' })
-  await deleteVirtualCard(id)
-  ElMessage.success('已删除')
-  loadCards()
+  try {
+    await ElMessageBox.confirm('确认删除？', '提示', { type: 'warning' })
+    const res = await deleteVirtualCard(id)
+    if (res && res.success) {
+      ElMessage.success('已删除')
+      loadCards()
+    } else {
+      ElMessage.error((res && res.message) || '删除失败')
+    }
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error('删除失败：' + (e.message || ''))
+  }
 }
 
 const storageAccounts = ref([])
