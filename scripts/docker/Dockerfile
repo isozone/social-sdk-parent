@@ -112,7 +112,10 @@ EXPOSE 8080
 # 数据卷
 VOLUME ["/app/data", "/app/chrome-profiles", "/app/logs", "/app/config"]
 
-# 使用非 root 用户运行
-USER xianyu
+# 方案 B:入口以 root 修正 bind mount 目录属主后降权运行(xianyu)
+# 不再使用 USER xianyu —— 由 docker-entrypoint.sh 在启动时 chown 再 su 降权
+COPY scripts/docker/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dfile.encoding=UTF-8 -jar /app/server.jar"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["server.jar"]

@@ -69,4 +69,8 @@ ENV CHROME_BIN=/usr/bin/chromium-browser \
     CHROME_HEADLESS_MODE=new \
     SPRING_PROFILES_ACTIVE=prod \
     JAVA_OPTS="-Xmx512m -Xms256m"
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -Dfile.encoding=UTF-8 -jar /app/app.jar"]
+# 方案 B:入口以 root 修正 bind mount 目录属主后降权运行(xianyu)
+COPY scripts/docker/docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["app.jar"]
