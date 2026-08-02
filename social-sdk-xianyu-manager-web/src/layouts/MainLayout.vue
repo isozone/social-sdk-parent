@@ -1248,24 +1248,33 @@ async function handleBrowserReset() {
   align-items: flex-start;
   gap: 16px;
   padding: 18px;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: linear-gradient(135deg, #fff7ed, #eef2ff);
   margin-bottom: 14px;
 }
-.vip-hero h3 { margin: 0 0 8px; font-size: 20px; color: #111827; }
-.vip-hero p { margin: 0; color: #6b7280; line-height: 1.6; }
+.vip-hero h3 { margin: 0 0 8px; font-size: 20px; color: var(--text-1); }
+.vip-hero p { margin: 0; color: var(--text-3); line-height: 1.6; }
 .vip-benefits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
-.vip-benefit { padding: 10px 12px; border-radius: 10px; background: #f8fafc; color: #374151; font-size: 13px; }
+.vip-benefit { padding: 10px 12px; border-radius: var(--radius-md); background: var(--bg-soft); color: var(--text-2); font-size: 13px; }
 .vip-plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.vip-plan { border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px; cursor: pointer; transition: all .2s; background: #fff; }
-.vip-plan:hover, .vip-plan.selected { border-color: #4f46e5; box-shadow: 0 10px 24px rgba(79, 70, 229, .12); transform: translateY(-1px); }
-.vip-plan-title { font-weight: 700; color: #111827; }
-.vip-plan-price { font-size: 22px; font-weight: 800; color: #ef4444; margin: 8px 0 4px; }
-.vip-plan-tag { font-size: 12px; color: #6b7280; }
+.vip-plan { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px; cursor: pointer; transition: all .2s; background: #fff; }
+.vip-plan:hover, .vip-plan.selected { border-color: var(--brand); box-shadow: var(--shadow-hover); transform: translateY(-1px); }
+.vip-plan-title { font-weight: 700; color: var(--text-1); }
+.vip-plan-price { font-size: 22px; font-weight: 800; color: var(--color-danger); margin: 8px 0 4px; }
+.vip-plan-tag { font-size: 12px; color: var(--text-3); }
 .vip-channels { margin-bottom: 14px; }
-.pay-info-box { border: 1px solid #e5e7eb; background: #0f172a; color: #e5e7eb; border-radius: 12px; padding: 12px; }
+.pay-info-box { border: 1px solid var(--border); background: #0f172a; color: #e5e7eb; border-radius: var(--radius-lg); padding: 12px; }
 .pay-info-title { font-weight: 700; margin-bottom: 8px; color: #fff; }
 .pay-info-box pre { white-space: pre-wrap; word-break: break-word; font-size: 12px; max-height: 180px; overflow: auto; }
+
+/* VIP 弹窗窄屏适配：套餐网格与权益列表降列 */
+@media (max-width: 640px) {
+  .vip-plans { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .vip-benefits { grid-template-columns: 1fr; }
+  .vip-hero { flex-direction: column; }
+  .vip-email-form { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+  .vip-email-form .el-form-item { margin-bottom: 0; }
+}
 
 /* 用户头像下拉 */
 .user-info {

@@ -95,7 +95,10 @@ public class SdkTestController {
     public ApiResponse<JsonNode> reviews(@RequestParam Long accountId,
                                           @RequestParam(defaultValue = "1") String page,
                                           @RequestParam(defaultValue = "20") String pageSize) {
-        return ApiResponse.ok(facade(accountId).getReviewList(null, page, pageSize));
+        // 底层接口要求 ratedUid 必填；取账号自身 userId 作为评价对象
+        XianyuAccount a = accountMapper.selectById(accountId);
+        String ratedUid = (a != null && a.getUserId() != null) ? String.valueOf(a.getUserId()) : null;
+        return ApiResponse.ok(facade(accountId).getReviewList(ratedUid, page, pageSize));
     }
 
     /** 退款/售后列表 — SDK mtop.taobao.idle.merchant.refund.list v1.0 */

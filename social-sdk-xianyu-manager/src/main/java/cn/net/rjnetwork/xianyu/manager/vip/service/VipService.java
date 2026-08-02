@@ -14,6 +14,7 @@ import cn.net.rjnetwork.xianyu.manager.vip.model.SdkDeployment;
 import cn.net.rjnetwork.xianyu.manager.vip.model.VipOrder;
 import cn.net.rjnetwork.xianyu.manager.vip.model.VipSubscription;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
@@ -727,11 +728,23 @@ public class VipService {
     }
 
     private VipOrder getLatestPendingOrder(Long localUserId) {
-        return orderMapper.selectOne(new LambdaQueryWrapper<VipOrder>()
+        // 只认 10 分钟内的待支付订单：防止历史遗留的 pending 订单让 header 永远卡在"待支付"
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(10);
+        VipOrder pending = orderMapper.selectOne(new LambdaQueryWrapper<VipOrder>()
                 .eq(VipOrder::getLocalUserId, localUserId)
                 .in(VipOrder::getStatus, "pending", "created", "pending_payment")
+                .gt(VipOrder::getCreatedAt, cutoff)
                 .orderByDesc(VipOrder::getId)
                 .last("LIMIT 1"));
+        if (pending == null) {
+            // 顺带把超时的待支付订单标记为 timeout，避免残留
+            orderMapper.update(null, new LambdaUpdateWrapper<VipOrder>()
+                    .eq(VipOrder::getLocalUserId, localUserId)
+                    .in(VipOrder::getStatus, "pending", "created", "pending_payment")
+                    .le(VipOrder::getCreatedAt, cutoff)
+                    .set(VipOrder::getStatus, "timeout"));
+        }
+        return pending;
     }
 
     private Long localUserId(AdminUser user) {

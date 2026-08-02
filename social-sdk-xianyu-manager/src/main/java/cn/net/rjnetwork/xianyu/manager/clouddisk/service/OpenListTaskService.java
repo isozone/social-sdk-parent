@@ -116,7 +116,8 @@ public class OpenListTaskService {
     }
 
     public synchronized CompletableFuture<Void> startInstallAsync() {
-        if (!"idle".equals(currentPhase)) {
+        // 允许从 failed/stopped 状态重试安装，避免安装失败后永久卡死
+        if (!"idle".equals(currentPhase) && !"failed".equals(currentPhase) && !"stopped".equals(currentPhase)) {
             throw new IllegalStateException("当前状态: " + currentPhase);
         }
         currentTaskId = UUID.randomUUID().toString();
@@ -132,6 +133,9 @@ public class OpenListTaskService {
             // 下载
             updatePhase("downloading", "正在下载 OpenList...", 0.1);
             Files.createDirectories(dataDir);
+            if (!Files.isWritable(dataDir)) {
+                throw new IOException("数据目录不可写: " + dataDir + " (Permission denied)，请检查目录属主/权限后重试");
+            }
             Path tempFile = dataDir.resolve("openlist.download");
             downloadFile(downloadUrl, tempFile);
 

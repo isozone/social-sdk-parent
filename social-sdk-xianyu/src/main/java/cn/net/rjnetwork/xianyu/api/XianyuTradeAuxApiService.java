@@ -231,7 +231,9 @@ public class XianyuTradeAuxApiService {
      * 卖家个人数据概览（曝光/想要/留言等）走 mtop.alibaba.idle.seller.pc.datacompass 域。</p>
      */
     public JsonNode getSellerSummary() {
-        return apiClient.callMtop("mtop.alibaba.idle.seller.pc.datacompass.singleuser.seller.summary", "1.0", "{}");
+        // 真验接口需要 dateType 业务参数(缺参会报 FAIL_SYS_BIZPARAM_MISSED)
+        return apiClient.callMtop("mtop.alibaba.idle.seller.pc.datacompass.singleuser.seller.summary", "1.0",
+                "{\"dateType\":\"7d\"}");
     }
 
     /**
@@ -240,7 +242,9 @@ public class XianyuTradeAuxApiService {
      * 卖家流量来源/分布走 mtop.alibaba.idle.seller.pc.datacompass.singleuser.browse.summary 域。</p>
      */
     public JsonNode getBrowseSummary() {
-        return apiClient.callMtop("mtop.alibaba.idle.seller.pc.datacompass.singleuser.browse.summary", "1.0", "{}");
+        // 真验接口需要 dateType + 站点参数(缺参会报 站点CODE不能为空)
+        return apiClient.callMtop("mtop.alibaba.idle.seller.pc.datacompass.singleuser.browse.summary", "1.0",
+                "{\"dateType\":\"7d\",\"siteCode\":\"xianyu\"}");
     }
 
     private static String toJson(Map<String, ?> map) {

@@ -58,12 +58,16 @@ FROM eclipse-temurin:17-jre
 # 改用 Chrome for Testing 官方 zip（国内走 npmmirror 镜像），解压后软链到 /usr/bin/chromium-browser。
 # 版本可用 --build-arg CHROME_VERSION=x.y.z 覆盖，或直接改下面的默认值。
 ARG CHROME_VERSION=146.0.7658.0
-RUN apt-get update \
+# 宿主机代理 fake-ip DNS 会污染 archive.ubuntu.com 解析(198.18.x.x 连不上)，
+# 构建前先把 apt 源切换到阿里云镜像，保证 apt-get 可用。
+RUN sed -i 's|//archive.ubuntu.com|//mirrors.aliyun.com|g; s|//security.ubuntu.com|//mirrors.aliyun.com|g' \
+        /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list 2>/dev/null || true \
+    && apt-get update \
     && apt-get install -y --no-install-recommends \
         curl ca-certificates unzip \
         fonts-liberation fonts-noto-cjk \
-        libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
-        libcups2 libdrm2 libgbm1 libasound2 libxkbcommon0 \
+        libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 \
+        libcups2t64 libdrm2 libgbm1 libasound2t64 libxkbcommon0 \
         libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libxshmfence1 \
     && curl -fsSL -o /tmp/chrome-linux64.zip \
         https://registry.npmmirror.com/-/binary/chrome-for-testing/${CHROME_VERSION}/linux64/chrome-linux64.zip \
