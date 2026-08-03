@@ -178,6 +178,31 @@ public class ChromeSession {
     }
 
     /**
+     * 附着已运行的 Chrome 进程（进程非本模块启动，无 Process 句柄）。
+     *
+     * <p>场景：应用重启后，旧 Chrome 进程仍存活（{@code profileDir} 未被清理），
+     * 直接复用 CDP 端口即可恢复容器，无需重启浏览器、登录态/页面状态原样保留。
+     *
+     * @param profile 需提前填好 cdpPort / profileDir / accountId；本方法会覆盖 cdpEndpoint / status / attached
+     * @return true = 附着成功（端口 CDP 就绪）；false = 端口无 CDP 服务，需走 {@link #launch(ChromeProfile)}
+     */
+    public boolean attach(ChromeProfile profile) {
+        int port = profile.getCdpPort();
+        if (!isCdpReady(port)) {
+            log.info("[SESSION] 端口无已运行 Chrome, 无法附着, accountId={}, port={}", profile.getAccountId(), port);
+            return false;
+        }
+        profile.setAttached(true);
+        profile.setStatus(ChromeProfile.ContainerStatus.RUNNING);
+        profile.setCdpEndpoint(String.format("http://127.0.0.1:%d", port));
+        profile.setLaunchedAt(LocalDateTime.now());
+        profile.setCrashCount(0);
+        log.info("[SESSION] 已附着已运行的 Chrome, accountId={}, port={}, profileDir={}",
+                profile.getAccountId(), port, profile.getProfileDir());
+        return true;
+    }
+
+    /**
      * 探测指定端口上的 CDP 是否已就绪（尝试 {@code /json/version}）。
      */
     public boolean isCdpReady(int port) {
@@ -502,6 +527,19 @@ public class ChromeSession {
             Files.createDirectories(dir);
             log.debug("[SESSION] 创建 profile 目录: {}", dir);
         }
+        // 清理残留锁文件：Chrome 异常退出后可能遗留 SingletonLock / SingletonSocket / SingletonCookie，
+        // 不清除会导致下次启动报 "profile in use"。仅清理锁文件，不碰其他用户数据。
+        for (String lockName : List.of("SingletonLock", "SingletonSocket", "SingletonCookie")) {
+            Path lock = dir.resolve(lockName);
+            try {
+                if (Files.exists(lock)) {
+                    Files.deleteIfExists(lock);
+                    log.warn("[SESSION] 已清理残留 Chrome 锁文件: {}", lock);
+                }
+            } catch (Exception e) {
+                log.warn("[SESSION] 清理锁文件失败(忽略): {}, err={}", lock, e.getMessage());
+            }
+        }
         profile.setProfileDir(dir.toString());
     }
 
@@ -542,6 +580,12 @@ public class ChromeSession {
             cmd.add("--no-default-browser-check");
             cmd.add("--force-color-profile=srgb");
             cmd.add("--lang=zh-CN");
+            // 减少遥测/崩溃上报痕迹（均为无害静默参数，不改变渲染行为）
+            cmd.add("--disable-breakpad");
+            cmd.add("--disable-component-update");
+            cmd.add("--no-pings");
+            cmd.add("--metrics-recording-only");
+            cmd.add("--password-store=basic");
         }
 
         if (config.isHeadless()) {

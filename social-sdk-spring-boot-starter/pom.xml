@@ -31,6 +31,14 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- SDK Riskbird (Optional: riskbird 企业信息查询 REST 能力) -->
+        <dependency>
+            <groupId>cn.net.rjnetwork</groupId>
+            <artifactId>social-sdk-riskbird</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+
         <!-- Spring Boot Starter -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

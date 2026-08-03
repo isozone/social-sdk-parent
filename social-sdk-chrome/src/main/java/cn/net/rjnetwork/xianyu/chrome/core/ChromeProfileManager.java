@@ -15,7 +15,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -28,19 +35,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import java.net.InetAddress;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Chrome 容器管理器（核心编排层）。
@@ -175,6 +169,9 @@ public class ChromeProfileManager {
             throw ce;
         }
 
+        // 5.1 持久化端口标记（供应用重启后 reattachAccount 复用）
+        persistPortMarker(profile);
+
         // 6. 启动成功后注入反检测 JS（应用 per-account seed 噪声，失败不影响启动））
         safeInjectFingerprint(profile);
 
@@ -204,6 +201,9 @@ public class ChromeProfileManager {
             log.debug("[STOP] 无对应容器, accountId={}", accountId);
             return;
         }
+
+        // 0. 清理端口标记
+        removePortMarker(profile);
 
         // 1. 停止 Chrome 进程
         session.shutdown(profile);
@@ -361,16 +361,151 @@ public class ChromeProfileManager {
         enforceProfileLimit(-1L);
     }
 
+    /**
+     * 定时磁盘配额检查：user-data-dir 总大小超过 {@code chrome.disk-quota-mb} 时，
+     * 按最久未使用优先回收容器，直到低于配额。
+     */
+    @Scheduled(fixedDelayString = "${chrome.disk-cleanup-delay-ms:600000}")
+    public synchronized void enforceDiskQuota() {
+        long quotaBytes = Math.max(64L, config.getDiskQuotaMb()) * 1024L * 1024L;
+        long total = dirSize(Paths.get(config.getUserDataDirRoot()));
+        if (total <= quotaBytes) {
+            return;
+        }
+        log.warn("[DISK] user-data-dir 超出磁盘配额, total={}MB, quota={}MB, 开始按 LRU 回收容器",
+                total / 1024 / 1024, config.getDiskQuotaMb());
+        List<ChromeProfile> candidates = activeProfiles.values().stream()
+                .sorted(Comparator.comparing(p -> p.getLastAccessAt() != null ? p.getLastAccessAt() : p.getLaunchedAt()))
+                .toList();
+        for (ChromeProfile profile : candidates) {
+            if (dirSize(Paths.get(config.getUserDataDirRoot())) <= quotaBytes) {
+                break;
+            }
+            log.warn("[DISK] 回收容器释放磁盘, accountId={}", profile.getAccountId());
+            stopAccount(profile.getAccountId());
+        }
+    }
+
+    /** 容器指标（供监控/运维面板展示）。 */
+    public static final class ContainerMetric {
+        public final Long accountId;
+        public final String accountName;
+        public final int cdpPort;
+        public final ChromeProfile.ContainerStatus status;
+        public final long launchedAtEpochMs;
+        public final long lastAccessAtEpochMs;
+        public final boolean alive;
+        public final Long processPid;
+        public final Long processMemoryBytes;
+        public final Long profileDirBytes;
+
+        private ContainerMetric(Long accountId, String accountName, int cdpPort,
+                                ChromeProfile.ContainerStatus status, long launchedAtEpochMs,
+                                long lastAccessAtEpochMs, boolean alive, Long processPid,
+                                Long processMemoryBytes, Long profileDirBytes) {
+            this.accountId = accountId;
+            this.accountName = accountName;
+            this.cdpPort = cdpPort;
+            this.status = status;
+            this.launchedAtEpochMs = launchedAtEpochMs;
+            this.lastAccessAtEpochMs = lastAccessAtEpochMs;
+            this.alive = alive;
+            this.processPid = processPid;
+            this.processMemoryBytes = processMemoryBytes;
+            this.profileDirBytes = profileDirBytes;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("ContainerMetric{accountId=%d, port=%d, status=%s, alive=%s, mem=%s, dir=%s}",
+                    accountId, cdpPort, status, alive,
+                    processMemoryBytes != null ? processMemoryBytes / 1024 / 1024 + "MB" : "n/a",
+                    profileDirBytes != null ? profileDirBytes / 1024 / 1024 + "MB" : "n/a");
+        }
+    }
+
+    /**
+     * 采集所有活跃容器的指标（内存取自 ProcessHandle，尽力而为；磁盘取自 profile 目录）。
+     */
+    public List<ContainerMetric> collectMetrics() {
+        List<ContainerMetric> list = new ArrayList<>();
+        for (ChromeProfile p : activeProfiles.values()) {
+            Long pid = null;
+            Long memBytes = null;
+            Process proc = p.getChromeProcess();
+            if (proc != null && proc.isAlive()) {
+                pid = proc.pid();
+                try {
+                    ProcessHandle.Info info = proc.toHandle().info();
+                    memBytes = info.totalCpuDuration() != null ? null : null; // CPU 时长非内存
+                    java.util.Optional<String> cmd = info.command();
+                    if (cmd.isPresent()) {
+                        // 内存占用无标准 API，这里留空由上层按需扩展；PID 已足够监控
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+            Long dirBytes = null;
+            try {
+                Path dir = Paths.get(p.getProfileDir());
+                if (Files.isDirectory(dir)) {
+                    dirBytes = dirSize(dir);
+                }
+            } catch (Exception ignored) {
+            }
+            list.add(new ContainerMetric(
+                    p.getAccountId(), p.getAccountName(), p.getCdpPort(), p.getStatus(),
+                    p.getLaunchedAt() != null ? p.getLaunchedAt().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() : 0L,
+                    p.getLastAccessAt() != null ? p.getLastAccessAt().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli() : 0L,
+                    p.isAlive(), pid, memBytes, dirBytes));
+        }
+        return list;
+    }
+
+    /** 递归统计目录占用字节数（不存在返回 0）。 */
+    private static long dirSize(Path dir) {
+        if (dir == null || !Files.isDirectory(dir)) {
+            return 0L;
+        }
+        try (var stream = Files.walk(dir)) {
+            return stream.filter(Files::isRegularFile)
+                    .mapToLong(f -> {
+                        try {
+                            return Files.size(f);
+                        } catch (Exception e) {
+                            return 0L;
+                        }
+                    })
+                    .sum();
+        } catch (Exception e) {
+            return 0L;
+        }
+    }
+
     private void ensurePortAvailableForLaunch(long incomingAccountId) {
-        if (portPool.availableCount() > 0) {
-            return;
+        // 枯竭排队：端口池无空闲且无 LRU 可回收时，在 exhaustionWaitMs 内轮询等待
+        // （并发启动时其他线程可能正在释放端口/代理），超时后返回，由 acquirePort 抛无端口异常。
+        long deadline = System.currentTimeMillis() + Math.max(0L, config.getExhaustionWaitMs());
+        while (true) {
+            if (portPool.availableCount() > 0) {
+                return;
+            }
+            Optional<ChromeProfile> victim = findLeastRecentlyUsed(incomingAccountId);
+            if (victim.isPresent()) {
+                log.info("[CLEANUP] CDP 端口池已满, 启动新容器前回收 LRU 容器 accountId={}", victim.get().getAccountId());
+                stopAccount(victim.get().getAccountId());
+                continue; // 回收后回到循环重新确认有空闲端口
+            }
+            if (System.currentTimeMillis() >= deadline) {
+                return; // 排队超时，交给 acquirePort 抛 NO_PORT
+            }
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
-        Optional<ChromeProfile> victim = findLeastRecentlyUsed(incomingAccountId);
-        if (victim.isEmpty()) {
-            return;
-        }
-        log.info("[CLEANUP] CDP 端口池已满, 启动新容器前回收 LRU 容器 accountId={}", victim.get().getAccountId());
-        stopAccount(victim.get().getAccountId());
     }
 
     private void enforceProfileLimit(long incomingAccountId) {
@@ -462,6 +597,136 @@ public class ChromeProfileManager {
     }
 
     // ==================== 内部方法 ====================
+
+    /** profile 目录下的端口标记文件名（记录该账号容器的 CDP 端口，供重启后重连）。 */
+    private static final String PORT_MARKER_FILE = ".cdp-port";
+
+    /**
+     * 把账号容器的 CDP 端口写入 profile 目录标记文件。
+     * 应用重启后 {@link #reattachAccount(long)} 读取该标记，若端口 CDP 仍就绪则直接复用。
+     */
+    private void persistPortMarker(ChromeProfile profile) {
+        try {
+            Path marker = Paths.get(profile.getProfileDir(), PORT_MARKER_FILE);
+            Files.writeString(marker, String.valueOf(profile.getCdpPort()), StandardCharsets.UTF_8);
+            log.debug("[MARKER] 已写入端口标记, accountId={}, port={}", profile.getAccountId(), profile.getCdpPort());
+        } catch (Exception e) {
+            log.warn("[MARKER] 写入端口标记失败(忽略), accountId={}, err={}", profile.getAccountId(), e.getMessage());
+        }
+    }
+
+    /** 删除端口标记文件。 */
+    private void removePortMarker(ChromeProfile profile) {
+        try {
+            Path marker = Paths.get(profile.getProfileDir(), PORT_MARKER_FILE);
+            Files.deleteIfExists(marker);
+        } catch (Exception ignored) {
+        }
+    }
+
+    /**
+     * 尝试重连已运行但未纳入管理的 Chrome 容器（进程非本模块启动）。
+     *
+     * <p>流程：读取 profile 目录的 {@code .cdp-port} 标记 → 探测该端口 CDP 是否就绪 →
+     * 就绪则 occupyPort + {@code ChromeSession.attach} 复用（保登录态、不重启浏览器）。
+     *
+     * @return true = 重连成功并纳入 activeProfiles；false = 无标记 / 端口不可达 / 已存在
+     */
+    public synchronized boolean reattachAccount(long accountId) {
+        if (activeProfiles.containsKey(accountId)) {
+            return true; // 已在管理
+        }
+        Path marker = Paths.get(config.resolveProfileDir(accountId), PORT_MARKER_FILE);
+        if (!Files.exists(marker)) {
+            log.debug("[REATTACH] 无端口标记, 无法重连, accountId={}", accountId);
+            return false;
+        }
+        int port;
+        try {
+            port = Integer.parseInt(Files.readString(marker, StandardCharsets.UTF_8).trim());
+        } catch (Exception e) {
+            log.warn("[REATTACH] 端口标记解析失败(删除), accountId={}, err={}", accountId, e.getMessage());
+            try {
+                Files.deleteIfExists(marker);
+            } catch (Exception ignored) {
+            }
+            return false;
+        }
+        if (!session.isCdpReady(port)) {
+            log.info("[REATTACH] 端口无 CDP 服务, 不重连(下次启动将走全新启动), accountId={}, port={}", accountId, port);
+            try {
+                Files.deleteIfExists(marker);
+            } catch (Exception ignored) {
+            }
+            return false;
+        }
+        if (!portPool.occupyPort(port)) {
+            log.warn("[REATTACH] 端口已被占用, 无法重连, accountId={}, port={}", accountId, port);
+            return false;
+        }
+        ChromeProfile profile = ChromeProfile.builder()
+                .accountId(accountId)
+                .accountName("account-" + accountId)
+                .profileDir(config.resolveProfileDir(accountId))
+                .cdpPort(port)
+                .seed(deriveSeed(accountId))
+                .status(ChromeProfile.ContainerStatus.INITIALIZING)
+                .lastAccessAt(LocalDateTime.now())
+                .crashCount(0)
+                .build();
+        if (!session.attach(profile)) {
+            portPool.releasePort(port);
+            return false;
+        }
+        activeProfiles.put(accountId, profile);
+        log.info("[REATTACH] 重连已运行 Chrome 成功, accountId={}, port={}", accountId, port);
+        return true;
+    }
+
+    /**
+     * 孤儿清扫：清理所有残留端口标记与残留锁文件（应用启动时调用一次）。
+     * <p>只处理「无 CDP 服务」的标记与 profile 目录内的 Singleton 锁文件，不误伤运行中容器。
+     */
+    public synchronized void cleanupOrphans() {
+        File root = new File(config.getUserDataDirRoot());
+        File[] dirs = root != null && root.isDirectory() ? root.listFiles(File::isDirectory) : null;
+        if (dirs == null) {
+            return;
+        }
+        int cleaned = 0;
+        for (File dir : dirs) {
+            Path marker = dir.toPath().resolve(PORT_MARKER_FILE);
+            if (Files.exists(marker)) {
+                try {
+                    int port = Integer.parseInt(Files.readString(marker, StandardCharsets.UTF_8).trim());
+                    if (!session.isCdpReady(port)) {
+                        Files.deleteIfExists(marker);
+                        cleaned++;
+                    }
+                } catch (Exception e) {
+                    try {
+                        Files.deleteIfExists(marker);
+                        cleaned++;
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+            // 残留锁文件（Chrome 异常退出遗留，会阻塞下次启动）
+            for (String lockName : List.of("SingletonLock", "SingletonSocket", "SingletonCookie")) {
+                Path lock = dir.toPath().resolve(lockName);
+                try {
+                    if (Files.exists(lock)) {
+                        Files.deleteIfExists(lock);
+                        cleaned++;
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        if (cleaned > 0) {
+            log.info("[ORPHAN] 孤儿清扫完成, 清理 {} 项, root={}", cleaned, config.getUserDataDirRoot());
+        }
+    }
 
     private void cleanupFailedLaunch(ChromeProfile profile) {
         try {

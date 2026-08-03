@@ -69,6 +69,15 @@ public class ChromeConfig {
     /** Chrome 容器空闲回收扫描间隔（毫秒），默认 5 分钟。 */
     private long idleCleanupDelayMs = 5 * 60 * 1000L;
 
+    /** user-data-dir 总磁盘配额（MB）；超过后按 LRU 回收容器以释放磁盘，默认 2048MB。 */
+    private long diskQuotaMb = 2048;
+
+    /** 磁盘配额检查扫描间隔（毫秒），默认 10 分钟。 */
+    private long diskCleanupDelayMs = 10 * 60 * 1000L;
+
+    /** 端口池/代理枯竭时排队等待时间（毫秒）；0 = 立即失败不等待，默认 5 秒。 */
+    private long exhaustionWaitMs = 5000;
+
     /**
      * 构建指定账号的目标 userDataDir 路径。
      */

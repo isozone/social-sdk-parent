@@ -20,6 +20,7 @@
         <module>social-sdk-proxys</module>
         <module>social-sdk-xianyu-manager</module>
         <module>social-sdk-chrome</module>
+        <module>social-sdk-riskbird</module>
     </modules>
 
     <properties>

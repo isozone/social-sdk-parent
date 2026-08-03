@@ -40,6 +40,12 @@ public class ChromeProfile {
     /** Chrome 进程 PID（未启动时为 null） */
     private Process chromeProcess;
 
+    /**
+     * 是否以「附着」方式复用已运行的 Chrome 进程（进程非本模块启动，无 Process 句柄）。
+     * true 时 {@link #isAlive()} 只看状态与 CDP 可达性，进程回收由健康检测/CDP 判断。
+     */
+    private boolean attached;
+
     /** 绑定的代理 URL（如 http://proxy:port 或 socks5://...） */
     private String proxyUrl;
 
