@@ -29,6 +29,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -546,58 +547,61 @@ public class ChromeSession {
     private List<String> buildLaunchCommand(ChromeProfile profile) {
         List<String> cmd = new ArrayList<>();
         cmd.add(detectChromeExecutable(profile.getAccountId()));
-        cmd.add("--remote-debugging-address=127.0.0.1");
-        cmd.add("--remote-debugging-port=" + profile.getCdpPort());
-        cmd.add("--user-data-dir=" + Paths.get(profile.getProfileDir()).toAbsolutePath().normalize());
-        cmd.add("--window-size=" + config.getWindowWidth() + "," + config.getWindowHeight());
+        // 其余参数统一收集后随机化顺序（可执行文件保持首位），
+        // 破坏「固定参数顺序」这一机器特征，同时便于精简/裁剪自动化痕迹参数。
+        List<String> args = new ArrayList<>();
+        args.add("--remote-debugging-address=127.0.0.1");
+        args.add("--remote-debugging-port=" + profile.getCdpPort());
+        args.add("--user-data-dir=" + Paths.get(profile.getProfileDir()).toAbsolutePath().normalize());
+        args.add("--window-size=" + config.getWindowWidth() + "," + config.getWindowHeight());
 
         if (profile.getProxyUrl() != null && !profile.getProxyUrl().isEmpty()) {
-            cmd.add("--proxy-server=" + profile.getProxyUrl());
+            args.add("--proxy-server=" + profile.getProxyUrl());
         }
 
         if (config.isHeadless()) {
             if ("legacy".equalsIgnoreCase(config.getHeadlessMode())) {
-                cmd.add("--headless");
+                args.add("--headless");
             } else {
-                cmd.add("--headless=new");
+                args.add("--headless=new");
             }
-            cmd.add("--disable-gpu");
-            cmd.add("--window-position=-32000,-32000");
+            args.add("--disable-gpu");
+            args.add("--window-position=-32000,-32000");
         }
 
         // 反检测启动参数
-        String[] args = config.getCustomLaunchArgs();
-        if (args != null && args.length > 0) {
-            for (String arg : args) {
+        String[] customArgs = config.getCustomLaunchArgs();
+        if (customArgs != null && customArgs.length > 0) {
+            for (String arg : customArgs) {
                 if (arg != null && !arg.isEmpty()) {
-                    cmd.add(arg);
+                    args.add(arg);
                 }
             }
         } else {
-            // 桌面默认只保留必要且常见的参数，避免 Docker/自动化参数组合暴露异常指纹。
-            cmd.add("--disable-blink-features=AutomationControlled");
-            cmd.add("--no-first-run");
-            cmd.add("--no-default-browser-check");
-            cmd.add("--force-color-profile=srgb");
-            cmd.add("--lang=zh-CN");
-            // 减少遥测/崩溃上报痕迹（均为无害静默参数，不改变渲染行为）
-            cmd.add("--disable-breakpad");
-            cmd.add("--disable-component-update");
-            cmd.add("--no-pings");
-            cmd.add("--metrics-recording-only");
-            cmd.add("--password-store=basic");
+            // 桌面默认参数：只保留必要/常见项。
+            // 已裁剪 --disable-breakpad / --disable-component-update / --no-pings /
+            // --metrics-recording-only / --password-store=basic 等自动化特征明显的参数，
+            // 降低被 chrome://version 或进程命令行识别为自动化的概率。
+            args.add("--disable-blink-features=AutomationControlled");
+            args.add("--no-first-run");
+            args.add("--no-default-browser-check");
+            args.add("--force-color-profile=srgb");
+            args.add("--lang=zh-CN");
         }
 
         if (config.isHeadless()) {
             // headless/Docker 环境才追加容器类参数，不污染本机桌面模式指纹。
-            cmd.add("--no-sandbox");
-            cmd.add("--disable-dev-shm-usage");
-            cmd.add("--disable-gpu-sandbox");
+            args.add("--no-sandbox");
+            args.add("--disable-dev-shm-usage");
+            args.add("--disable-gpu-sandbox");
         }
 
         // 不自动打开首页
-        cmd.add("about:blank");
+        args.add("about:blank");
 
+        // 参数顺序随机化（Chrome 不依赖参数顺序）
+        Collections.shuffle(args);
+        cmd.addAll(args);
         return cmd;
     }
 

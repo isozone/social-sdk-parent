@@ -67,8 +67,9 @@ public final class ChromeFingerprintEnhancer {
 
         return "(() => {\n"
                 + "  'use strict';\n"
-                + "  if (window.__enhancedAntiDetectApplied) return;\n"
-                + "  Object.defineProperty(window, '__enhancedAntiDetectApplied', { value: true, configurable: false });\n"
+                + "  // 防重入标记：不可枚举 + 隐蔽命名，避免被反检测脚本直接识别注入痕迹\n"
+                + "  try { if (window._f7z9a) return; } catch (e) {}\n"
+                + "  try { Object.defineProperty(window, '_f7z9a', { value: 1, enumerable: false, configurable: false }); } catch (e) {}\n"
                 + "  const TZ = '" + timezone + "';\n"
                 + "  const TZ_OFFSET_MIN = " + offsetMinutes + ";\n"
                 + "  const LAT = " + lat + ";\n"
