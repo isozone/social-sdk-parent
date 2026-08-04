@@ -220,10 +220,12 @@ public class ScheduledTasks {
 
     // ======================== 虚拟发货定时链路 ========================
 
-    /** 每分钟扫描待发货的虚拟订单，调 VirtualShipService.scanAndShip 自动发货 */
+    /** 每分钟扫描待发货的虚拟订单：先为已付款订单补建任务，再调 VirtualShipService.scanAndShip 自动发货 */
     @Scheduled(cron = "0 * * * * *")
     public void autoScanVirtualShip() {
         try {
+            // 兜底：订单同步解析漏建任务时，这里扫描已付款未发货的虚拟订单补建
+            virtualShipService.scanPaidOrdersAndCreateTasks();
             virtualShipService.scanAndShip();
         } catch (Exception e) {
             log.warn("[Schedule] virtual scanAndShip failed: {}", e.getMessage());

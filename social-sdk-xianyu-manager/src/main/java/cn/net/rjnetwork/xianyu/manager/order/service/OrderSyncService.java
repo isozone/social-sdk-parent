@@ -317,10 +317,67 @@ public class OrderSyncService {
     }
 
     /**
-     * 解析 sold 订单项（结构与 bought 类似但数据路径不同）
+     * 解析 sold 订单项 — sold 列表接口（mtop.taobao.idle.trade.merchant.sold.get）结构与 bought 完全不同：
+     * <ul>
+     *   <li>状态在 commonData.orderStatus（中文文本，如"待发货"/"已付款"），无 tradeStatusEnum；</li>
+     *   <li>标题在 itemVO.title，金额在 priceVO.totalPrice，买家在 buyerInfoVO；</li>
+     *   <li>时间在 commonData.createTime / paySuccessTime。</li>
+     * </ul>
      */
     private XianyuOrder parseSoldItem(JsonNode item, Long accountId, String type) {
-        return parseBoughtItem(item, accountId, type);
+        XianyuOrder order = new XianyuOrder();
+        order.setAccountId(accountId);
+        order.setType(type);
+        order.setRawData(item.toString());
+        order.setIsSeller(true);
+
+        // commonData：orderId / itemId / orderStatus（中文）/ createTime
+        JsonNode commonData = item.path("commonData");
+        if (commonData.isObject()) {
+            order.setOrderId(commonData.has("orderIdStr") ? commonData.path("orderIdStr").asText() : getText(commonData, "orderId"));
+            order.setItemId(getText(commonData, "itemId"));
+            order.setTradeStatusEnum(getText(commonData, "tradeStatusEnum"));
+            order.setOrderDetailUrl(getText(commonData, "orderDetailUrl"));
+
+            // 状态：优先 tradeStatusEnum，兜底中文 orderStatus（"待发货"=PAID，"待付款"=PENDING 等）
+            String tradeStatus = mapStatusFromEnum(getText(commonData, "tradeStatusEnum"));
+            order.setStatus(tradeStatus != null ? tradeStatus : mapStatusFromMsg(getText(commonData, "orderStatus")));
+
+            String createTime = getText(commonData, "createTime");
+            if (createTime != null && !createTime.isEmpty()) {
+                order.setOrderTime(parseDateTime(createTime));
+            }
+        }
+
+        // itemVO.title：商品标题
+        JsonNode itemVO = item.path("itemVO");
+        if (itemVO.isObject()) {
+            order.setItemTitle(getText(itemVO, "title"));
+        }
+
+        // priceVO.totalPrice：订单金额（兜底 auctionPrice）
+        JsonNode priceVO = item.path("priceVO");
+        if (priceVO.isObject()) {
+            String priceStr = getText(priceVO, "totalPrice");
+            if (priceStr == null || priceStr.isEmpty()) priceStr = getText(priceVO, "auctionPrice");
+            if (priceStr != null && !priceStr.isEmpty()) {
+                try {
+                    order.setAmount(new BigDecimal(priceStr));
+                } catch (NumberFormatException ignored) {}
+            }
+        }
+
+        // buyerInfoVO：买家昵称 + buyerId
+        JsonNode buyerInfo = item.path("buyerInfoVO");
+        if (buyerInfo.isObject()) {
+            order.setCounterpartyName(getText(buyerInfo, "userNick"));
+            String buyerId = getText(buyerInfo, "buyerId");
+            if (buyerId != null && !buyerId.isEmpty()) {
+                order.setBuyerId(buyerId);
+            }
+        }
+
+        return order;
     }
 
     /**
@@ -339,7 +396,7 @@ public class OrderSyncService {
      * 真实值来自 API: refund_success, buyer_to_confirm, trade_success 等
      */
     private String mapStatusFromEnum(String enumVal) {
-        if (enumVal == null || enumVal.isEmpty()) return "PENDING";
+        if (enumVal == null || enumVal.isEmpty()) return null; // 无枚举值 → 让调用方走 statusViewMsg/orderStatus 兜底
 
         switch (enumVal) {
             case "trade_success": return "COMPLETED";

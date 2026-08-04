@@ -178,6 +178,46 @@ public class VirtualShipService {
     }
 
     /**
+     * 扫描「已付款待发货」的虚拟订单，为缺失发货任务的订单补建任务。
+     * <p>兜底链路：订单同步解析出错（如 sold 结构字段路径不匹配）时，
+     * tryCreateVirtualShipTask 可能漏建任务，本方法定时补偿，确保已付款订单最终进入发货队列。
+     * 与 isReadyForVirtualShip 判定条件保持一致（type=SOLD / requireVirtualShip / 未发货 / 已付款）。</p>
+     *
+     * @return 本次补建的任务数
+     */
+    public int scanPaidOrdersAndCreateTasks() {
+        List<XianyuOrder> paidOrders = orderMapper.selectList(
+                new LambdaQueryWrapper<XianyuOrder>()
+                        .eq(XianyuOrder::getType, "SOLD")
+                        .eq(XianyuOrder::getRequireVirtualShip, true)
+                        .isNull(XianyuOrder::getVirtualShippedAt)
+                        .and(w -> w.eq(XianyuOrder::getStatus, "PAID")
+                                .or().eq(XianyuOrder::getStatus, "BUYER_TO_CONFIRM")
+                                .or().eq(XianyuOrder::getTradeStatusEnum, "paid")
+                                .or().eq(XianyuOrder::getTradeStatusEnum, "trade_paid")
+                                .or().eq(XianyuOrder::getTradeStatusEnum, "buyer_to_confirm"))
+                        .last("LIMIT 50"));
+        int created = 0;
+        for (XianyuOrder order : paidOrders) {
+            // 已存在任务则跳过（createShipTaskIfVirtual 内部也幂等）
+            VirtualShipTask existing = shipTaskMapper.selectOne(
+                    new LambdaQueryWrapper<VirtualShipTask>()
+                            .eq(VirtualShipTask::getOrderId, order.getId()));
+            if (existing != null) continue;
+            try {
+                createShipTaskIfVirtual(order.getId());
+                created++;
+            } catch (Exception e) {
+                log.warn("[VirtualShip] 补建发货任务失败 orderId={}: {}", order.getOrderId(), e.getMessage());
+            }
+        }
+        if (created > 0) {
+            log.info("[VirtualShip] 扫描待发货订单补建任务 {} 个", created);
+        }
+        return created;
+    }
+
+    /**
      * 扫描失败任务重试（最多重试 3 次），由 ScheduledTasks 统一调度。
      * <p>统一委托 AutoShipService，保持 MESSAGE_SENT 幂等标记语义一致。</p>
      */

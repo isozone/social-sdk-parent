@@ -209,7 +209,7 @@ public class XianyuProductEditApiService {
 
         // 5. 发布成功才算成功（下架原商品由调用方负责，本方法只负责发布）
         if (!isPublishSuccess(publishResult)) {
-            throw new IllegalStateException("改价/改库存：发布新商品失败，resp=" + publishResult);
+            throw new IllegalStateException("改价/改库存：" + describePublishFailure(publishResult));
         }
         return publishResult;
     }
@@ -272,7 +272,7 @@ public class XianyuProductEditApiService {
 
         // 5. 发布成功才下架原商品；失败抛异常保留原商品，避免丢失在售
         if (!isPublishSuccess(publishResult)) {
-            throw new IllegalStateException("改价：发布新商品失败，已保留原商品，resp=" + publishResult);
+            throw new IllegalStateException("改价：" + describePublishFailure(publishResult));
         }
         shelfOff(itemId);
 
@@ -339,7 +339,7 @@ public class XianyuProductEditApiService {
 
         // 4. 发布成功才下架原商品；失败抛异常保留原商品，避免丢失在售
         if (!isPublishSuccess(publishResult)) {
-            throw new IllegalStateException("改库存：发布新商品失败，已保留原商品，resp=" + publishResult);
+            throw new IllegalStateException("改库存：" + describePublishFailure(publishResult));
         }
         shelfOff(itemId);
 
@@ -378,7 +378,7 @@ public class XianyuProductEditApiService {
 
         // 发布成功才下架原商品；失败抛异常保留原商品，避免丢失在售
         if (!isPublishSuccess(publishResult)) {
-            throw new IllegalStateException("改原价：发布新商品失败，已保留原商品，resp=" + publishResult);
+            throw new IllegalStateException("改原价：" + describePublishFailure(publishResult));
         }
         shelfOff(itemId);
         return publishResult;
@@ -395,6 +395,29 @@ public class XianyuProductEditApiService {
             return r0.isEmpty() || r0.contains("SUCCESS");
         }
         return true;
+    }
+
+    /**
+     * 从闲鱼响应 ret 数组拿第一个错误码，识别风控拦截返清晰错误提示。
+     * 风控码特征：含 RGV587_ERROR / FAIL_SYS_USER_VALIDATE / punish / captcha，
+     * 闲鱼会返验证码挑战页（data.url 含 punish?action=captcha）。
+     */
+    private String describePublishFailure(JsonNode resp) {
+        if (resp == null) return "闲鱼返回空响应";
+        JsonNode ret = resp.path("ret");
+        if (!ret.isArray() || ret.size() == 0) return "闲鱼响应无 ret";
+        String r0 = ret.get(0).asText("");
+        // 风控拦截：返清晰提示让用户知道是闲鱼验拦不是 bug
+        if (r0.contains("RGV587_ERROR") || r0.contains("FAIL_SYS_USER_VALIDATE")
+                || r0.contains("punish") || r0.contains("captcha")) {
+            return "闲鱼风控拦截（验证码挑战），请稍后重试或在闲鱼 PC 端完成验证后重试";
+        }
+        // 令牌过期：提示重新登录
+        if (r0.contains("FAIL_SYS_TOKEN_EXOIRED") || r0.contains("TOKEN_EXPIRED")) {
+            return "闲鱼令牌过期，请重新登录账号后再试";
+        }
+        // 其他业务错误：透传原始码
+        return "闲鱼端返回错误: " + r0;
     }
 
     // ==================== 字段提取方法 ====================
