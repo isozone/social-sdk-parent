@@ -2,6 +2,7 @@ package cn.net.rjnetwork.xianyu.chrome.page;
 
 import cn.net.rjnetwork.xianyu.chrome.cdp.CdpCookieStore;
 import cn.net.rjnetwork.xianyu.chrome.cdp.CdpSession;
+import cn.net.rjnetwork.xianyu.chrome.human.HumanDelay;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -41,6 +42,10 @@ public class ChromePage implements Closeable {
 
     private final CdpSession session;
     private final String targetId;
+
+    /** 当前鼠标视口坐标（拟人轨迹起点跟踪，初始为页面中心偏左，模拟已悬停过页面）。 */
+    private volatile int lastMouseX = 400;
+    private volatile int lastMouseY = 300;
 
     public ChromePage(CdpSession session, String targetId) {
         this.session = session;
@@ -423,15 +428,56 @@ public class ChromePage implements Closeable {
         $(selector).scrollIntoView();
     }
 
-    /** 页面滚动到绝对坐标。 */
+    /**
+     * 页面滚动到绝对坐标（分步滚动，模拟真人滚动节奏）。
+     * 从当前滚动位置逐步滚向目标，每步 300~700px、步间随机停顿。
+     */
     public void scrollTo(int x, int y) throws IOException, TimeoutException {
-        evalBool("window.scrollTo(" + x + ", " + y + ") || true");
+        // 当前滚动位置
+        JsonNode cur = evaluate("({x: window.scrollX || 0, y: window.scrollY || 0})");
+        int curX = cur != null ? cur.path("x").asInt(0) : 0;
+        int curY = cur != null ? cur.path("y").asInt(0) : 0;
+        int targetX = x;
+        int targetY = y;
+        while (curY != targetY || curX != targetX) {
+            int stepX = (int) Math.signum(targetX - curX) * Math.min(Math.abs(targetX - curX), 300 + (int) (Math.random() * 400));
+            int stepY = (int) Math.signum(targetY - curY) * Math.min(Math.abs(targetY - curY), 300 + (int) (Math.random() * 400));
+            curX += stepX;
+            curY += stepY;
+            evalBool("window.scrollTo(" + curX + ", " + curY + ") || true");
+            try {
+                HumanDelay.sleep(60, 200);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 
-    // ==================== 真实输入合成（CDP Input 域） ====================
+    // ==================== 真实输入合成（CDP Input 域，拟人化） ====================
 
-    /** 在视口坐标 (x, y) 处执行一次完整鼠标点击（mousePressed + mouseReleased）。 */
+    /**
+     * 在视口坐标 (x, y) 处执行一次拟人鼠标点击。
+     *
+     * <p>拟人化：从上次鼠标位置走插值轨迹（多步 mouseMoved + 随机间隔）移动到目标，
+     * 按下后随机停留 60~180ms 再释放，避免「瞬时点击、无移动轨迹」的机器特征。
+     */
     public void mouseClick(int x, int y) throws IOException, TimeoutException {
+        // 1. 从当前鼠标位置插值移动到目标（模拟真人滑向目标的轨迹）
+        List<HumanDelay.TrajectoryPoint> trajectory = HumanDelay.mouseTrajectory(lastMouseX, lastMouseY, x, y);
+        for (HumanDelay.TrajectoryPoint p : trajectory) {
+            sendMouseMoved(p.x(), p.y());
+            try {
+                HumanDelay.sleep(10, 30);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        lastMouseX = x;
+        lastMouseY = y;
+
+        // 2. 按下
         ObjectNode pressed = JSON.createObjectNode();
         pressed.put("type", "mousePressed");
         pressed.put("x", x);
@@ -440,13 +486,27 @@ public class ChromePage implements Closeable {
         pressed.put("clickCount", 1);
         session.send("Input.dispatchMouseEvent", pressed);
 
+        // 3. 随机停留（真人按下到释放的间隔）
+        try {
+            HumanDelay.sleep(60, 180);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
+
+        // 4. 释放
         ObjectNode released = pressed.deepCopy();
         released.put("type", "mouseReleased");
         session.send("Input.dispatchMouseEvent", released);
     }
 
-    /** 鼠标移动到视口坐标 (x, y)。 */
+    /** 鼠标移动到视口坐标 (x, y)（更新跟踪坐标，供后续轨迹起点使用）。 */
     public void mouseMove(int x, int y) throws IOException, TimeoutException {
+        sendMouseMoved(x, y);
+        lastMouseX = x;
+        lastMouseY = y;
+    }
+
+    private void sendMouseMoved(int x, int y) throws IOException, TimeoutException {
         ObjectNode moved = JSON.createObjectNode();
         moved.put("type", "mouseMoved");
         moved.put("x", x);
@@ -455,14 +515,38 @@ public class ChromePage implements Closeable {
         session.send("Input.dispatchMouseEvent", moved);
     }
 
-    /** 向当前聚焦元素插入文本（中文等复杂文本用 insertText 最稳）。 */
+    /**
+     * 向当前聚焦元素插入文本，分批注入（模拟真人逐字符/短词的输入节奏）。
+     * 每批 1~3 字符，间隔 40~160ms 随机；整体开头先停顿 200~500ms。
+     */
     public void insertText(String text) throws IOException, TimeoutException {
-        ObjectNode params = JSON.createObjectNode();
-        params.put("text", text == null ? "" : text);
-        session.send("Input.insertText", params);
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        try {
+            HumanDelay.sleep(200, 500); // 输入前"思考"停顿
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+        int i = 0;
+        while (i < text.length()) {
+            int chunk = 1 + (int) (Math.random() * 3); // 1~3 字符/批
+            int end = Math.min(text.length(), i + chunk);
+            ObjectNode params = JSON.createObjectNode();
+            params.put("text", text.substring(i, end));
+            session.send("Input.insertText", params);
+            i = end;
+            try {
+                HumanDelay.sleep(40, 160);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 
-    /** 按下按键（Enter/Tab/Escape/Backspace/Delete/方向键等）。 */
+    /** 按下按键（Enter/Tab/Escape/Backspace/Delete/方向键等），keyDown 后随机间隔再 keyUp。 */
     public void pressKey(String key) throws IOException, TimeoutException {
         Integer vk = KEY_CODES.get(key);
         if (vk == null) {
@@ -475,6 +559,12 @@ public class ChromePage implements Closeable {
         down.put("windowsVirtualKeyCode", vk);
         down.put("nativeVirtualKeyCode", vk);
         session.send("Input.dispatchKeyEvent", down);
+
+        try {
+            HumanDelay.sleep(30, 120); // 按键停留
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
 
         ObjectNode up = down.deepCopy();
         up.put("type", "keyUp");

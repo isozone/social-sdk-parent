@@ -3,6 +3,7 @@ package cn.net.rjnetwork.xianyu.chrome.page;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cn.net.rjnetwork.xianyu.chrome.cdp.CdpSession;
+import cn.net.rjnetwork.xianyu.chrome.human.HumanDelay;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
@@ -141,22 +142,26 @@ public class PageElement {
         return this;
     }
 
-    /** 点击元素中心（真实鼠标事件）。 */
+    /** 点击元素中心（真实鼠标事件，中心带 ±4px 随机偏移避免机器特征）。 */
     public void click() throws IOException, TimeoutException {
         JsonNode point = center();
         if (point == null) {
             throw new IOException("元素不存在或不可见: " + selector);
         }
-        page.mouseClick(point.path("x").asInt(), point.path("y").asInt());
+        int x = point.path("x").asInt() + HumanDelay.clickOffset();
+        int y = point.path("y").asInt() + HumanDelay.clickOffset();
+        page.mouseClick(x, y);
     }
 
-    /** 点击元素中心偏移 (offsetX, offsetY) 的位置。 */
+    /** 点击元素中心偏移 (offsetX, offsetY) 的位置（附加随机偏移）。 */
     public void clickAt(int offsetX, int offsetY) throws IOException, TimeoutException {
         JsonNode point = center();
         if (point == null) {
             throw new IOException("元素不存在或不可见: " + selector);
         }
-        page.mouseClick(point.path("x").asInt() + offsetX, point.path("y").asInt() + offsetY);
+        int x = point.path("x").asInt() + offsetX + HumanDelay.clickOffset();
+        int y = point.path("y").asInt() + offsetY + HumanDelay.clickOffset();
+        page.mouseClick(x, y);
     }
 
     /** 鼠标悬停到元素中心。 */
