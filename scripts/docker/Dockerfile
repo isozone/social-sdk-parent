@@ -28,6 +28,7 @@ COPY social-sdk-proxys ./social-sdk-proxys
 COPY social-sdk-cdp-auth ./social-sdk-cdp-auth
 COPY social-sdk-xianyu-manager ./social-sdk-xianyu-manager
 COPY social-sdk-spring-boot-starter ./social-sdk-spring-boot-starter
+COPY social-sdk-riskbird ./social-sdk-riskbird
 
 # 复制前端源码（用于 Maven 插件构建）
 COPY social-sdk-xianyu-manager-web ./social-sdk-xianyu-manager-web
