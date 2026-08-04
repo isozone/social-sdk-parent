@@ -88,7 +88,7 @@
               <el-tag v-if="row.virtualShipTaskStatus" :type="shipTaskTagType(row.virtualShipTaskStatus)" size="small" style="margin-left: 4px;">
                 {{ shipTaskLabel(row.virtualShipTaskStatus) }}
               </el-tag>
-              <div v-if="row.virtualShipTaskError" style="font-size: 11px; color: #F56C6C; margin-top: 2px;" :title="row.virtualShipTaskError">
+              <div v-if="row.virtualShipTaskError" style="font-size: 11px; color: #F56C6C; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%;" :title="row.virtualShipTaskError">
                 {{ row.virtualShipTaskError }}
               </div>
               <div v-else-if="row.virtualShipExecuteAt && !row.virtualShippedAt" style="font-size: 11px; color: var(--text-3); margin-top: 2px;">

@@ -125,8 +125,10 @@ public class AutoShipService {
     /**
      * 处理单个发货任务 —— A8 主链路入口。
      * 由 VirtualShipService.scanAndShip 对每个 PENDING task 调一次，也可管理端手动触发。
+     * <p>事务边界：本方法<b>不</b>用 @Transactional——发货链路逐步独立落库（每步各自释放连接），
+     * 不该一个长事务包到底占着唯一连接让前端别的请求全线等 30s 超时（现网症结 runningSqlCount 1: UPDATE xianyu_order raw_data 大字段卡死）。
+     * 需要原子性的子步骤（固化 MESSAGE_SENT 标记等）用 markMessageSent 的独立小事务。</p>
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processShipTask(VirtualShipTask task) {
         long t0 = System.currentTimeMillis();
         task.setStatus("PROCESSING");
@@ -329,7 +331,11 @@ public class AutoShipService {
             order.setDeliverContent(deliverText);
             order.setStatus("SHIPPED");
             order.setUpdatedAt(LocalDateTime.now());
-            orderMapper.updateById(order);
+            // 关键：只更发货 4 字段，不碰 raw_data 大字段——BaseMapper.updateById 会 UPDATE 全列含 raw_data
+            // （闲鱼订单原始 JSON，大字段），SQLite 写大字段慢 + 占着写锁 → 别的请求等不到连接 → 全线 30s 超时
+            // （现网症结 runningSqlCount 1: UPDATE xianyu_order ... raw_data=? 卡死）。
+            orderMapper.updateShipFields(order.getId(), order.getStatus(), order.getDeliverContent(),
+                    order.getVirtualShippedAt(), order.getUpdatedAt());
 
             audit.setStatus(messageAlreadySent ? "SUCCESS" : "SENT_PENDING_ACK");
             audit.setDurationMs(System.currentTimeMillis() - t0);
@@ -655,6 +661,32 @@ public class AutoShipService {
         task.setStatus("FAILED");
         task.setErrorMessage(reason);
         taskMapper.updateById(task);
+    }
+
+    /**
+     * 把订单落库写得「够稳」：遇 SQLITE_BUSY（SQLite WAL 模式下写仍单线程，竞争写锁会抛 database is locked）
+     * 重试若干次，绝不因写锁让真发出去的帧回滚。
+     * <p>真发帧（第 4 步）已成功后，order 标 SHIPPED 只是本地状态固化，不该因写锁竞争把整个 REQUIRES_NEW
+     * 事务回滚抹掉 messageId/sentAt 落库 + 帧已真发的成果。</p>
+     * <p>重试间隔退避 50ms→200ms，最多 5 次；仍不行就抛——但这是极少数情况（busy_timeout=120s 应能兜住），
+     * 抛了也比静默回滚强（上层可见 errorMessage）。</p>
+     */
+    private void persistOrderSafely(XianyuOrder order) {
+        if (order == null) return;
+        Exception last = null;
+        for (int attempt = 0; attempt < 5; attempt++) {
+            try {
+                orderMapper.updateById(order);
+                return;
+            } catch (Exception e) {
+                String msg = e.getMessage() == null ? "" : e.getMessage().toLowerCase();
+                boolean isBusy = msg.contains("database is locked") || msg.contains("sqlite_busy");
+                if (!isBusy) throw new RuntimeException("persistOrderSafely 非写锁错：" + e.getMessage(), e);
+                last = e;
+                try { Thread.sleep(50L * (attempt + 1) * (attempt + 1)); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+            }
+        }
+        throw new RuntimeException("persistOrderSafely 重试耗尽仍 SQLITE_BUSY：" + (last != null ? last.getMessage() : ""), last);
     }
 
     private void finalizeSkip(VirtualShipTask task, DeliveryLog audit, String reason) {
