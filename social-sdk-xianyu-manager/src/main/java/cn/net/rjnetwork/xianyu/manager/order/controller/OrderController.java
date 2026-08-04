@@ -8,6 +8,8 @@ import cn.net.rjnetwork.xianyu.manager.order.service.OrderSyncService;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/orders")
 public class OrderController {
@@ -51,6 +53,12 @@ public class OrderController {
         XianyuOrder order = orderService.getById(id);
         if (order == null) return ApiResponse.fail("NOT_FOUND", "Order not found");
         return ApiResponse.ok(order);
+    }
+
+    /** 订单详情：聚合订单 + 商品 + 自动发货记录 + 物流，给前端详情抽屉用 */
+    @GetMapping("/{id}/detail")
+    public ApiResponse<Map<String, Object>> getOrderDetail(@PathVariable Long id) {
+        return ApiResponse.ok(orderService.getOrderDetail(id));
     }
 
     @PostMapping("/{id}/delivery")

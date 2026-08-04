@@ -736,6 +736,30 @@ public class VirtualShipService {
         processShipTask(task);
     }
 
+    /**
+     * 人工发货重试：允许 PENDING / FAILED / 消息已发待平台确认(MESSAGE_SENT) 的任务重置为 PENDING 并立即重跑。
+     * <p>关键语义：MESSAGE_SENT 标记（errorMessage 以 "MESSAGE_SENT:" 开头）保留不清，
+     * AutoShipService 识别后只补 dummyDelivery 平台确认，不重复匹配卡券/重发 IM；
+     * FAILED 非 MESSAGE_SENT 任务则走完整发货链路（重新匹配卡券/模板 → 发消息 → 平台确认）。</p>
+     */
+    @Transactional
+    public void retryTaskForShip(Long taskId) {
+        VirtualShipTask task = shipTaskMapper.selectById(taskId);
+        if (task == null) {
+            throw new IllegalArgumentException("Task not found: " + taskId);
+        }
+        String st = task.getStatus();
+        boolean msgSent = task.getErrorMessage() != null && task.getErrorMessage().startsWith("MESSAGE_SENT:");
+        boolean retriable = "PENDING".equals(st) || "FAILED".equals(st) || msgSent;
+        if (!retriable) {
+            throw new IllegalStateException("任务当前状态不可重试: " + st + "（仅 PENDING/FAILED/消息已发待确认 可人工发货）");
+        }
+        task.setStatus("PENDING");
+        task.setExecuteAt(null); // 立即执行，跳过延迟窗口
+        taskMapper.updateById(task);
+        processShipTask(task);
+    }
+
     public List<VirtualCardPool> listCards(Long productId, String status) {
         LambdaQueryWrapper<VirtualCardPool> wrapper = new LambdaQueryWrapper<>();
         if (productId != null) wrapper.eq(VirtualCardPool::getProductId, productId);

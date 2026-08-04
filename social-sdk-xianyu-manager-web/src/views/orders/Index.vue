@@ -100,16 +100,26 @@
           </template>
         </el-table-column>
         <el-table-column v-if="activeTab !== 'BOUGHT'" prop="deliverContent" label="发货内容快照" min-width="200" show-overflow-tooltip />
-        <el-table-column v-if="activeTab !== 'BOUGHT'" label="操作" width="100" fixed="right">
+        <el-table-column v-if="activeTab !== 'BOUGHT'" label="操作" width="240" fixed="right">
           <template #default="{ row }">
             <el-button
-              v-if="row.status === 'PAID' && activeTab === 'SOLD'"
+              v-if="canManualShip(row)"
+              size="small"
+              type="primary"
+              :loading="row._manualShipping"
+              @click="manualShip(row)"
+            >
+              人工发货
+            </el-button>
+            <el-button
+              v-else-if="row.status === 'PAID' && activeTab === 'SOLD' && row.goodsType !== 'VIRTUAL' && !row.requireVirtualShip"
               size="small"
               type="success"
               @click="deliver(row)"
             >
               发货
             </el-button>
+            <el-button size="small" @click="showDetail(row)">详情</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -343,6 +353,36 @@ async function handleDelivery() {
       await loadOrders()
     }
   } catch (e) {}
+}
+
+// 是否可人工发货：虚拟商品 + 未发货，且满足 已付款 / 任务失败 / 消息已发待平台确认(MESSAGE_SENT) 任一状态
+function canManualShip(row) {
+  if (activeTab.value !== 'SOLD') return false
+  if (!(row.requireVirtualShip || row.goodsType === 'VIRTUAL')) return false
+  if (row.virtualShippedAt) return false
+  if (row.status === 'PAID') return true
+  if (row.virtualShipTaskStatus === 'FAILED') return true
+  if (row.virtualShipTaskError && String(row.virtualShipTaskError).startsWith('MESSAGE_SENT')) return true
+  return false
+}
+
+// 人工发货：按订单创建/触发虚拟发货任务并立即执行（走自动发货链路）
+async function manualShip(row) {
+  if (!row.id) return ElMessage.warning('订单缺少 ID')
+  row._manualShipping = true
+  try {
+    const res = await api.post('/virtual-ship/cards/send', { orderId: row.id })
+    if (res.success) {
+      ElMessage.success('已触发人工发货，发货结果稍后更新')
+      await loadOrders()
+    } else {
+      ElMessage.error(res.message || '人工发货失败')
+    }
+  } catch (e) {
+    ElMessage.error('人工发货失败：' + (e?.message || ''))
+  } finally {
+    row._manualShipping = false
+  }
 }
 
 onMounted(async () => {

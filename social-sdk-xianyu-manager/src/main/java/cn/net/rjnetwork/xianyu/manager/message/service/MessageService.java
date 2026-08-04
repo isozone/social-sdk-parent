@@ -1375,6 +1375,19 @@ public class MessageService {
         }
         String sessionId = request.getSessionId();
         String buyerId = request.getBuyerId();
+        // 有 buyerId 时优先反查本地真实会话：闲鱼 IM 会话 ID(cid) 与用户 ID 不同，
+        // 不能拿 buyerId 硬拼 @goofish（会发进不存在的假会话）。本地消息表里该买家的
+        // 真实会话（INCOMING/OUTGOING 任一方向的最新消息）优先，无历史才兜底拼接。
+        if (buyerId != null && !buyerId.isBlank()) {
+            String realSession = messageMapper.selectSessionIdByBuyer(
+                    request.getAccountId(),
+                    stripGoofishSuffix(buyerId),
+                    ensureGoofishSuffix(buyerId));
+            if (realSession != null && !realSession.isBlank()) {
+                sessionId = realSession;
+                request.setSessionId(sessionId);
+            }
+        }
         if ((sessionId == null || sessionId.isBlank()) && buyerId != null && !buyerId.isBlank()) {
             sessionId = normalizeCid(buyerId);
             request.setSessionId(sessionId);

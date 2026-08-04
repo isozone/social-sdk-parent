@@ -143,7 +143,7 @@ public class VirtualShipController {
             return ApiResponse.fail("BAD_REQUEST", "request body required");
         }
         if (request.getTaskId() != null) {
-            shipService.triggerTask(request.getTaskId());
+            shipService.retryTaskForShip(request.getTaskId());
             return ApiResponse.ok(Map.of("taskId", request.getTaskId(), "triggered", true));
         }
         if (request.getOrderId() != null) {
@@ -151,14 +151,12 @@ public class VirtualShipController {
             if (task == null) {
                 return ApiResponse.fail("NOT_VIRTUAL", "订单无需虚拟发货或商品非虚拟类型");
             }
-            // 新建任务可能仍是 PENDING（有 delay），立即触发一次
-            if ("PENDING".equals(task.getStatus())) {
-                shipService.triggerTask(task.getId());
-            }
+            // 人工发货：PENDING/FAILED/消息已发待确认 均可重试（补 dummyDelivery 不重发 IM）
+            shipService.retryTaskForShip(task.getId());
             return ApiResponse.ok(Map.of(
                     "taskId", task.getId(),
                     "orderId", request.getOrderId(),
-                    "status", task.getStatus() != null ? task.getStatus() : "PENDING",
+                    "status", "TRIGGERED",
                     "triggered", true
             ));
         }

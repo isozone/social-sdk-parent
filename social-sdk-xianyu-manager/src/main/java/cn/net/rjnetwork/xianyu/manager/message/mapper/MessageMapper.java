@@ -43,4 +43,13 @@ public interface MessageMapper extends BaseMapper<XianyuMessage> {
                                           @Param("sessionId") String sessionId,
                                           @Param("selfBare") String selfBare,
                                           @Param("selfFull") String selfFull);
+
+    // 按买家 userId 反查真实会话：闲鱼 IM 会话 ID(cid) 与用户 ID 不同，不能用 buyerId 硬拼 @goofish。
+    // 取该买家最近一条消息的 session_id（bare/full 两种 sender_id 形式都匹配，兼容历史脏数据）。
+    @Select("SELECT session_id FROM xianyu_message WHERE account_id = #{accountId} AND deleted = 0 " +
+            "AND (sender_id = #{buyerBare} OR sender_id = #{buyerFull}) " +
+            "ORDER BY message_time DESC, id DESC LIMIT 1")
+    String selectSessionIdByBuyer(@Param("accountId") Long accountId,
+                                  @Param("buyerBare") String buyerBare,
+                                  @Param("buyerFull") String buyerFull);
 }
