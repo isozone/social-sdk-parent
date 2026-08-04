@@ -20,7 +20,7 @@ public class VirtualShipTask extends BaseEntity {
 
     private Long productId;
 
-    /** PENDING / PROCESSING / SHIPPED / FAILED / SKIPPED */
+    /** PENDING / PROCESSING / SENT_PENDING_ACK / SUCCESS / FAILED / SKIPPED / RETRY_EXHAUSTED */
     private String status;
 
     private Integer retryCount;
@@ -34,4 +34,14 @@ public class VirtualShipTask extends BaseEntity {
     private java.time.LocalDateTime executeAt;
 
     private java.time.LocalDateTime processedAt;
+
+    /**
+     * 发货消息对应的闲鱼 IM 帧 mid（sendByReceiverScope 发出时本地生成）。
+     * 服务端送达回执帧会带同一 mid，据此匹配把 SENT_PENDING_ACK → SUCCESS。
+     * 空表示未发出或无需回执（重试只补 dummyDelivery 的后续轮次）。
+     */
+    private String messageId;
+
+    /** 发货消息发出时间（SENT_PENDING_ACK 起算点，超时未收 ack 由 ShipAckTimeoutTask 转 FAILED）。 */
+    private java.time.LocalDateTime sentAt;
 }

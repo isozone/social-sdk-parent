@@ -61,6 +61,11 @@ public class MessageService {
     private final AuditService auditService;
     /** 风控暂停保护（BOT-A6）—— 识别风控码后暂停账号 + 写 risk_log。可选注入避免循环依赖。 */
     private RiskControlProtector riskControlProtector;
+    /**
+     * 虚拟发货主链路（A8）。@Lazy 避循环依赖：AutoShipService 已注入本 MessageService，
+     * 本服务反向回写送达 ack（markShipSuccessByMessageId）必须走 Lazy 代理。
+     */
+    private cn.net.rjnetwork.xianyu.manager.virtual.service.AutoShipService autoShipService;
     @org.springframework.beans.factory.annotation.Autowired
     private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
 
@@ -90,6 +95,13 @@ public class MessageService {
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     public void setRiskControlProtector(RiskControlProtector riskControlProtector) {
         this.riskControlProtector = riskControlProtector;
+    }
+
+    /** Spring 注入 AutoShipService（@Lazy 避启动期循环依赖：AutoShipService 已注入本 MessageService）。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    public void setAutoShipService(@org.springframework.context.annotation.Lazy
+                                    cn.net.rjnetwork.xianyu.manager.virtual.service.AutoShipService autoShipService) {
+        this.autoShipService = autoShipService;
     }
 
     /** 返回会话摘要：sessionId、对方昵称、头像、最后消息时间、未读数（从缓存的 session 列表补） */
@@ -342,6 +354,17 @@ public class MessageService {
         accsClient.removePushListener(listenerKey);
         accsClient.addPushListener(listenerKey, frame -> {
             try {
+                // ① 发货送达回执匹配：帧 headers.mid 与本地 SENT_PENDING_ACK task.messageId 同即送达成功
+                // sendByReceiverScope 服务端回执帧带原 mid（XianyuImAccsClient.handleFrame 会把无 pending 匹配的帧推给所有 listener）
+                String ackMid = frame.path("headers").path("mid").asText("");
+                if (!ackMid.isBlank() && autoShipService != null) {
+                    try {
+                        autoShipService.markShipSuccessByMessageId(ackMid);
+                    } catch (Exception ae) {
+                        log.warn("[MESSAGE] markShipSuccessByMessageId failed mid={} err={}", ackMid, ae.getMessage());
+                    }
+                }
+
                 JsonNode body = frame.path("body");
                 if (body.isMissingNode() || body.isNull()) return;
 
@@ -1482,13 +1505,18 @@ public class MessageService {
         // 异步帧立即返回合成 ack（code=200, async=true），发送是否真正成功要靠
         // pushListener 监听 sendByReceiverScope 回执或买家侧确认。
         // 这里只要 WSS 写出没抛异常就认为「已发出」，落本地 OUTGOING 记录。
+        // 注意：合成响应里带 mid（sendFrameAsync 写入的帧 mid），取出落到 msg.msgId，
+        // 上游（虚拟发货）据此存进 virtual_ship_task.message_id，pushListener 收到回执按 mid 匹配回写 SUCCESS。
+        String sentMid = sendResp.path("mid").asText("");
 
         // 构造本地落库记录
         XianyuMessage msg = new XianyuMessage();
         msg.setAccountId(request.getAccountId());
         msg.setSessionId(request.getSessionId());
-        // 生成客户端 msgId（与闲鱼服务端 msgId 不同），避免与 pushListener 拉回的消息冲突
-        msg.setMsgId("local-out-" + System.currentTimeMillis() + "-" + request.getAccountId());
+        // 优先用 sendFrameAsync 合成响应里的 mid；拿不到时回退到本地合成 msgId。
+        // mid 也是帧的唯一标识，且服务端回执帧会带同一 mid，能用于送达匹配。
+        msg.setMsgId(!sentMid.isBlank() ? sentMid
+                : "local-out-" + System.currentTimeMillis() + "-" + request.getAccountId());
         msg.setSenderId(selfUserId);
         msg.setSenderName(acc.getDisplayName() != null ? acc.getDisplayName() : acc.getAccountName());
         msg.setContent(request.getContent());

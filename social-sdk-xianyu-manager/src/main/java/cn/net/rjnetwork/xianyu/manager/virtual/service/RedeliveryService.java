@@ -163,10 +163,10 @@ public class RedeliveryService {
         return RenewOutcome.EXHAUSTED;
     }
 
-    /** 收集待补发 task：FAILED/SKIPPED 且 retryCount < maxRetry 且 executeAt 已到。 */
+    /** 收集待补发 task：FAILED/SKIPPED/SENT_PENDING_ACK(超时由 ShipAckTimeoutTask 转过来) 且 retryCount < maxRetry 且 executeAt 已到。 */
     private List<VirtualShipTask> collectCandidates() {
         return taskMapper.selectList(new LambdaQueryWrapper<VirtualShipTask>()
-                .in(VirtualShipTask::getStatus, "FAILED", "SKIPPED")
+                .in(VirtualShipTask::getStatus, "FAILED", "SKIPPED", "SENT_PENDING_ACK")
                 .and(w -> w.isNull(VirtualShipTask::getExecuteAt)
                         .or().le(VirtualShipTask::getExecuteAt, LocalDateTime.now())));
     }

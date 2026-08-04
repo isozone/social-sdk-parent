@@ -268,7 +268,11 @@ public class AutoShipService {
                     req.setSessionId(normalizeCid(buyerId));
                     req.setContent(deliverText);
                     req.setAutoReply(false);
-                    messageService.sendMessage(req);
+                    // 拿到刚发出的帧 mid（MessageService.sendMessage 已把 sendFrameAsync 合成响应的 mid 落到返回值）。
+                    // mid 存进 task.messageId，供 pushListener 收到服务端送达回执时按 mid 匹配回写 SUCCESS。
+                    XianyuMessage sentMsg = messageService.sendMessage(req);
+                    task.setMessageId(sentMsg != null ? sentMsg.getMsgId() : null);
+                    task.setSentAt(LocalDateTime.now());
                 } catch (Exception e) {
                     if (matched != null) releaseShipCard(matched.getId());
                     finalizeFail(task, audit, "FAILED", "发送失败：" + e.getMessage());
@@ -276,8 +280,11 @@ public class AutoShipService {
                     return;
                 }
 
-                // 消息已发出：独立事务固化内容 + MESSAGE_SENT 标记（卡券已在发送前 CAS 预占）。
-                // dummyDelivery 失败时重试只补平台确认，不重复发卡/重发 IM。
+                // 消息帧已写出：独立事务固化内容 + MESSAGE_SENT 标记 + 标 task SENT_PENDING_ACK。
+                // 卡券已在发送前 CAS 预占；dummyDelivery 失败时重试只补平台确认，不重复发卡/重发 IM。
+                // 关键：不在这里立即标 SUCCESS——闲鱼 IM 是异步帧，写帧成功 ≠ 送达。
+                // 真正的 SUCCESS 由 MessageService.pushListener 收到服务端送达回执（同 mid）后回写，
+                // 或由 ShipAckTimeoutTask 超时兜底转 FAILED。
                 self.markMessageSent(matched, order, task, deliverText);
             } else {
                 audit.setDeliverContent(deliverText);
@@ -299,7 +306,10 @@ public class AutoShipService {
                 return;
             }
 
-            // 6. 落库 + 标订单 SHIPPED + 标 task SUCCESS
+            // 6. 落库 + 标订单 SHIPPED + 标 task。
+            // 分两路：
+            //  - 首轮发新消息（messageId 非空 + sentAt 刚写入）：标 SENT_PENDING_ACK，等服务端送达回执才 SUCCESS。
+            //  - 重试只补 dummyDelivery（messageAlreadySent=true，没发新消息）：dummy 成功就是真成功，直接 SUCCESS。
             if (matched != null && !"USED".equals(matched.getStatus())) {
                 matched.setStatus("USED");
                 matched.setUsedOrderId(task.getOrderId());
@@ -313,17 +323,28 @@ public class AutoShipService {
             order.setUpdatedAt(LocalDateTime.now());
             orderMapper.updateById(order);
 
-            audit.setStatus("SUCCESS");
+            audit.setStatus(messageAlreadySent ? "SUCCESS" : "SENT_PENDING_ACK");
             audit.setDurationMs(System.currentTimeMillis() - t0);
             deliveryLogMapper.insert(audit);
 
-            task.setStatus("SUCCESS");
-            task.setErrorMessage(null);
-            task.setProcessedAt(LocalDateTime.now());
-            taskMapper.updateById(task);
-            publishShipSuccess(task, order, deliverText);
-            log.info("[A8] order {} shipped{}", task.getOrderId(),
-                    matched != null ? " via card " + matched.getId() : " (retry dummyDelivery only)");
+            if (messageAlreadySent) {
+                // 重试补 dummyDelivery 轮次：消息上一轮已发，本轮 dummy 成功即真成功
+                task.setStatus("SUCCESS");
+                task.setErrorMessage(null);
+                task.setProcessedAt(LocalDateTime.now());
+                taskMapper.updateById(task);
+                publishShipSuccess(task, order, deliverText);
+            } else {
+                // 首轮发消息：帧已写出但未收送达回执，标 SENT_PENDING_ACK。
+                // SUCCESS 由 pushListener 收回执回写；超时未收由 ShipAckTimeoutTask 转 FAILED。
+                task.setStatus("SENT_PENDING_ACK");
+                task.setErrorMessage("MESSAGE_SENT: pending server ack");
+                taskMapper.updateById(task);
+                // 不推 VIRTUAL_SHIP_SUCCESS —— 没真送达就不该报喜
+            }
+            log.info("[A8] order {} shipped{} messageId={}", task.getOrderId(),
+                    matched != null ? " via card " + matched.getId() : " (retry dummyDelivery only)",
+                    task.getMessageId());
         } catch (Exception e) {
             finalizeFail(task, audit, "FAILED", e.getClass().getSimpleName() + ": " + e.getMessage());
             publishShipFailed(task, null, e.getClass().getSimpleName() + ": " + e.getMessage());
@@ -346,6 +367,41 @@ public class AutoShipService {
             task.setErrorMessage("MESSAGE_SENT: pending dummyDelivery");
             taskMapper.updateById(task);
         }
+    }
+
+    /**
+     * 收到闲鱼服务端送达回执后，按 messageId 匹配本地 SENT_PENDING_ACK 的 task 回写 SUCCESS。
+     * <p>由 MessageService.pushListener 收到 sendByReceiverScope 的服务端 ack 帧（带同 mid）时调用。
+     * 幂等：只对 SENT_PENDING_ACK 状态的 task 生效，已 SUCCESS/FAILED 的不动。</p>
+     * <p>独立事务：避免外层消息同步事务回滚抹掉送达确认。</p>
+     *
+     * @param messageId 发送时存入的帧 mid（sendFrameAsync 合成响应里的 mid）
+     * @return 是否真回写成功（true=确有 SENT_PENDING_ACK task 命中并改为 SUCCESS；false=无命中或状态已变）
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean markShipSuccessByMessageId(String messageId) {
+        if (messageId == null || messageId.isBlank()) return false;
+        List<VirtualShipTask> candidates = taskMapper.selectList(new LambdaQueryWrapper<VirtualShipTask>()
+                .eq(VirtualShipTask::getMessageId, messageId)
+                .eq(VirtualShipTask::getStatus, "SENT_PENDING_ACK"));
+        if (candidates.isEmpty()) return false;
+        boolean any = false;
+        for (VirtualShipTask task : candidates) {
+            XianyuOrder order = orderMapper.selectById(task.getOrderId());
+            String deliverText = order != null ? order.getDeliverContent() : "";
+            task.setStatus("SUCCESS");
+            task.setErrorMessage(null);
+            task.setProcessedAt(LocalDateTime.now());
+            taskMapper.updateById(task);
+            if (order != null) {
+                // order 在 processShipTask 第 6 步已标 SHIPPED + virtualShippedAt，此处不动 order 避免脏写
+                publishShipSuccess(task, order, deliverText);
+            }
+            any = true;
+            log.info("[A8] ship success confirmed by server ack, order={} messageId={}",
+                    task.getOrderId(), messageId);
+        }
+        return any;
     }
 
     /** 发送失败时释放已 CAS 预占但未实际发出的卡券。 */
@@ -615,6 +671,40 @@ public class AutoShipService {
             eventPublisher.publishEvent(new NotifyEvent(type, task.getAccountId(), accountName, vars));
         } catch (Exception ignored) {
         }
+    }
+
+    /**
+     * 扫超期未收服务端送达 ack 的 SENT_PENDING_ACK task，转 FAILED + 推通知。
+     * <p>由 ShipAckTimeoutTask 定时调用。判定：status=SENT_PENDING_ACK 且 sentAt 已过 {@code staleSeconds} 秒。
+     * 转 FAILED 后会被 RedeliveryService.collectCandidates 扫到（已纳入 SENT_PENDING_ACK），按指数退避重发。</p>
+     * <p>幂等：只动 SENT_PENDING_ACK 状态的 task，已 SUCCESS（收到 ack）/ FAILED（已转）的不动。</p>
+     *
+     * @param staleSeconds 发出后多少秒未收 ack 即判超时
+     * @return 本次扫到的超期 task 数（已转 FAILED 的）
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public int markStaleSentPendingAckAsFailed(int staleSeconds) {
+        LocalDateTime cutoff = LocalDateTime.now().minusSeconds(Math.max(staleSeconds, 1));
+        List<VirtualShipTask> stales = taskMapper.selectList(new LambdaQueryWrapper<VirtualShipTask>()
+                .eq(VirtualShipTask::getStatus, "SENT_PENDING_ACK")
+                .isNotNull(VirtualShipTask::getSentAt)
+                .lt(VirtualShipTask::getSentAt, cutoff));
+        if (stales.isEmpty()) return 0;
+        for (VirtualShipTask task : stales) {
+            task.setStatus("FAILED");
+            // 保留原 MESSAGE_SENT 前缀语义：上一轮 errorMessage 已是 "MESSAGE_SENT: pending server ack"，
+            // 此处追加超时原因，让 RedeliveryService 走「只补 dummyDelivery」分支还是「重发」分支能据此判断
+            String prev = task.getErrorMessage();
+            String reason = "送达回执超时未收（" + staleSeconds + "s），判定服务端静默丢帧";
+            task.setErrorMessage(prev == null || prev.isBlank() ? reason
+                    : (prev.startsWith("MESSAGE_SENT:") ? prev + " | " + reason : reason));
+            taskMapper.updateById(task);
+            XianyuOrder order = orderMapper.selectById(task.getOrderId());
+            publishShipFailed(task, order, reason);
+            log.warn("[A8] ship ack timeout, order={} messageId={} sentAt={} → FAILED",
+                    task.getOrderId(), task.getMessageId(), task.getSentAt());
+        }
+        return stales.size();
     }
 
     /** 批次入口：扫所有 PENDING task 跑一遍，给 VirtualShipService.scanAndShip 调。 */

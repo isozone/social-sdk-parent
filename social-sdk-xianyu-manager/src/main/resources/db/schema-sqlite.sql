@@ -484,9 +484,13 @@ CREATE TABLE IF NOT EXISTS virtual_ship_task (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     processed_at DATETIME,
-    deleted INTEGER DEFAULT 0
+    deleted INTEGER DEFAULT 0,
+    message_id VARCHAR(128),
+    sent_at DATETIME
 );
 CREATE INDEX idx_virtual_ship_task_status ON virtual_ship_task(status);
+CREATE INDEX idx_virtual_ship_task_message_id ON virtual_ship_task(message_id);
+CREATE INDEX idx_virtual_ship_task_sent_at ON virtual_ship_task(sent_at);
 CREATE INDEX idx_xianyu_order_require_virtual_ship ON xianyu_order(require_virtual_ship);
 
 -- ======================== AI 客服 ========================
