@@ -4,6 +4,7 @@ import cn.net.rjnetwork.xianyu.captcha.model.CaptchaResult;
 import cn.net.rjnetwork.xianyu.captcha.service.XianyuCaptchaSolver;
 import cn.net.rjnetwork.xianyu.chrome.cdp.CdpCookieStore;
 import cn.net.rjnetwork.xianyu.chrome.cdp.CdpSession;
+import cn.net.rjnetwork.xianyu.chrome.human.HumanDelay;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -176,7 +177,7 @@ public class CaptchaWatcher implements Closeable {
                 } catch (Exception e) {
                     log.warn("[WATCHER] 监测轮询异常: {}", e.getMessage());
                     try {
-                        Thread.sleep(1_000);
+                        HumanDelay.sleep(800, 1500);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
                         break;

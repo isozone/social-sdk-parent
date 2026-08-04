@@ -10,6 +10,7 @@ import cn.net.rjnetwork.riskbird.model.RiskbirdSearchResult;
 import cn.net.rjnetwork.xianyu.chrome.cdp.CdpCookieStore;
 import cn.net.rjnetwork.xianyu.chrome.cdp.CdpSession;
 import cn.net.rjnetwork.xianyu.chrome.core.ChromeBrowser;
+import cn.net.rjnetwork.xianyu.chrome.human.HumanDelay;
 import cn.net.rjnetwork.xianyu.chrome.network.ChromeNetwork;
 import cn.net.rjnetwork.xianyu.chrome.page.ChromePage;
 import cn.net.rjnetwork.xianyu.chrome.session.ChromeSnapshotService;
@@ -82,7 +83,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
         try (ChromePage page = chromeBrowser.openPage(accountId)) {
             page.navigate(config.getLoginSuccessUrl());
             // 等 SPA 渲染稳定（登录入口 / 事件绑定就绪），避免过早交互无效
-            Thread.sleep(2500);
+            HumanDelay.sleep(2000, 3500);
             page.waitForSelector(config.getLoginEntrySelector(), config.getSearchTimeoutMs());
 
             // 触发登录 popover：真实鼠标点击登录入口（hover 亦可），让 popover 内容挂载到 DOM。
@@ -91,7 +92,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
             boolean shown = false;
             for (int attempt = 0; attempt < 3 && !shown; attempt++) {
                 page.click(config.getLoginEntrySelector());
-                Thread.sleep(1500);
+                HumanDelay.sleep(1200, 2200);
                 shown = page.exists(config.getLoginTryButtonSelector());
             }
             if (!shown) {
@@ -104,7 +105,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
             if (!clickedTry) {
                 throw new IOException("未找到「登录试试」按钮, accountId=" + accountId);
             }
-            Thread.sleep(1500); // 等二维码异步渲染
+            HumanDelay.sleep(1200, 2200); // 等二维码异步渲染
 
             // 等待二维码图片出现并返回其 URL
             page.waitForSelector(config.getQrImageSelector(), config.getSearchTimeoutMs());
@@ -303,7 +304,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
             // 3. 解析结果列表（total 出现但卡片未就绪时多等一轮）
             List<String> texts = pg.texts(config.getSearchResultItemSelector());
             if (texts.isEmpty()) {
-                Thread.sleep(1500);
+                HumanDelay.sleep(1000, 2000);
                 texts = pg.texts(config.getSearchResultItemSelector());
             }
             List<RiskbirdCompany> companies = new ArrayList<>();
@@ -339,19 +340,19 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
             throws IOException, TimeoutException, InterruptedException {
         if (filter.getProvince() != null && !filter.getProvince().isBlank()) {
             clickFilterItem(pg, filter.getProvince(), "省份");
-            Thread.sleep(1200);
+            HumanDelay.sleep(900, 1800);
         }
         if (filter.getCity() != null && !filter.getCity().isBlank()) {
             clickFilterItem(pg, filter.getCity(), "地市");
-            Thread.sleep(1200);
+            HumanDelay.sleep(900, 1800);
         }
         if (filter.getIndustry() != null && !filter.getIndustry().isBlank()) {
             clickFilterItem(pg, filter.getIndustry(), "行业");
-            Thread.sleep(1200);
+            HumanDelay.sleep(900, 1800);
         }
         if (filter.getStatus() != null && !filter.getStatus().isBlank()) {
             clickFilterItem(pg, filter.getStatus(), "状态");
-            Thread.sleep(1200);
+            HumanDelay.sleep(900, 1800);
         }
     }
 
@@ -392,7 +393,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
             if (!clicked) {
                 log.warn("[RISKBIRD] 详情页未找到「知识产权」tab, company={}", companyName);
             }
-            Thread.sleep(3000); // 等知识产权区异步加载
+            HumanDelay.sleep(2500, 4000); // 等知识产权区异步加载
             // 从「商标信息」数据区开始截取（tab 栏的「知识产权|999+」在数据区之前，定位到数据区更准确）
             String rawText = page.evalString("(() => { "
                     + "const t = document.body.innerText || ''; "
@@ -614,7 +615,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
                 pg.waitForLoadState(20);
             }
             // 等异步 XHR 到达并捕获
-            Thread.sleep(1_500);
+            HumanDelay.sleep(1200, 2500);
             // 遍历抓到的请求，找 URL 含关键字的接口，取其响应体解析（只处理 XHR/Fetch 类型）
             for (ChromeNetwork.RequestRecord r : net.snapshot()) {
                 String rt = r.resourceType == null ? "" : r.resourceType;
