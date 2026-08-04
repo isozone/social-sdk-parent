@@ -631,13 +631,22 @@ const deliverForm = reactive({
   message: ''
 })
 
+// 各发货类型的发货消息模板预填（与 placeholder 占位符一致，留空走默认格式）
+const deliverMessageDefaults = {
+  CARD: '您的卡密已发放：\n卡号：${cardCode}\n密码：${cardPassword}\n请在【闲鱼】-【我的】-【卡券】中查看，有问题随时联系客服~',
+  ACCOUNT: '您的账号已发货：\n账号：${account}\n密码：${password}\n服务器：${server}\n请及时登录修改密码，有问题随时联系客服~',
+  LINK: '感谢购买【${itemTitle}】！\n下载链接：${link}\n订单号：${orderId}\n链接长期有效，建议尽早保存~',
+  FILE: '您的文件已发货：\n下载链接：${link}\n提取码：${extractCode}\n有效期：7天，请尽快下载保存~'
+}
+
 const onDeliverTypeChange = () => {
   // 切换发货类型时清空上次的字段，避免类型间串数据
   deliverForm.link = ''
   deliverForm.cardsText = ''
   deliverForm.accountsText = ''
   deliverForm.filePath = ''
-  deliverForm.message = ''
+  // 预填该发货类型的默认发货消息模板，省手敲占位符
+  deliverForm.message = deliverMessageDefaults[localForm.deliverType] || ''
 }
 
 const deliverMessagePlaceholder = computed(() => {

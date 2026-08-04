@@ -1124,6 +1124,32 @@ public class MessageService {
         JsonNode content = messageNode.path("content");
         int contentType = content.path("contentType").asInt(0);
 
+        // 0. 系统 tip 消息（如 "你已发货"/"订单已付款" 等平台通知）：contentType=14 且带 tip 字段。
+        //    这类不是买家真实消息，标记 SYSTEM 供自动回复过滤，避免 AI 对着系统通知乱回复。
+        if (contentType == 14 && content.has("tip")) {
+            entity.setMsgType("SYSTEM");
+            String tip = content.path("tip").path("tip").asText("");
+            if (tip.isEmpty()) tip = content.path("tip").asText("");
+            return tip.isEmpty() ? "【系统消息】" : "【系统消息】" + tip;
+        }
+        // 0b. 兼容 content 为字符串形式 JSON 的结构（如 "{\"contentType\":14,\"tip\":{...}}"）
+        if (content.isTextual()) {
+            String raw = content.asText("");
+            if (raw.trim().startsWith("{")) {
+                try {
+                    JsonNode parsed = MAPPER.readTree(raw);
+                    if (parsed.path("contentType").asInt(0) == 14 && parsed.has("tip")) {
+                        entity.setMsgType("SYSTEM");
+                        String tip = parsed.path("tip").path("tip").asText("");
+                        if (tip.isEmpty()) tip = parsed.path("tip").asText("");
+                        return tip.isEmpty() ? "【系统消息】" : "【系统消息】" + tip;
+                    }
+                } catch (Exception ignored) {
+                    // 解析失败按普通文本处理
+                }
+            }
+        }
+
         // 1. custom.data base64 -> JSON（文本/图片/视频通用封装）
         if (content.has("custom") && content.path("custom").has("data")) {
             String decodedText = "";
@@ -1530,6 +1556,18 @@ public class MessageService {
      */
     public String autoReplyIfNeeded(Long accountId, XianyuMessage incomingMessage) {
         if (incomingMessage == null || !"INCOMING".equals(incomingMessage.getDirection())) {
+            return null;
+        }
+        // 系统消息（tip/提醒，如"你已发货"）不是买家真实消息，不触发自动回复
+        if ("SYSTEM".equals(incomingMessage.getMsgType())) {
+            log.info("[MESSAGE] auto reply skipped (system message): msgId={} session={}", incomingMessage.getMsgId(), incomingMessage.getSessionId());
+            return null;
+        }
+        // 无内容（图片等媒体消息可能无文本）或无发送者，不触发自动回复
+        if (incomingMessage.getContent() == null || incomingMessage.getContent().isBlank()) {
+            return null;
+        }
+        if (incomingMessage.getSenderId() == null || incomingMessage.getSenderId().isBlank()) {
             return null;
         }
         // 消息级去重：同一 msgId 只触发一次自动回复（WSS 推送 + 轮询同步两条路径都会调本方法）

@@ -58,9 +58,10 @@
             <span v-else style="color: #c0c4cc;">未关联</span>
           </template>
         </el-table-column>
-        <el-table-column :label="activeTab === 'SOLD' ? '买家' : '卖家'" width="120">
+        <el-table-column :label="activeTab === 'ALL' ? '对手方' : (activeTab === 'SOLD' ? '买家' : '卖家')" width="140">
           <template #default="{ row }">
             <span>{{ row.counterpartyName || '—' }}</span>
+            <span v-if="activeTab === 'ALL'" style="color: #c0c4cc; font-size: 12px; margin-left: 4px;">（{{ row.type === 'SOLD' ? '买家' : '卖家' }}）</span>
           </template>
         </el-table-column>
         <el-table-column label="金额" width="100">
@@ -100,25 +101,38 @@
           </template>
         </el-table-column>
         <el-table-column v-if="activeTab !== 'BOUGHT'" prop="deliverContent" label="发货内容快照" min-width="200" show-overflow-tooltip />
-        <el-table-column v-if="activeTab !== 'BOUGHT'" label="操作" width="240" fixed="right">
+        <el-table-column label="操作" width="240" fixed="right">
           <template #default="{ row }">
-            <el-button
-              v-if="canManualShip(row)"
-              size="small"
-              type="primary"
-              :loading="row._manualShipping"
-              @click="manualShip(row)"
-            >
-              人工发货
-            </el-button>
-            <el-button
-              v-else-if="row.status === 'PAID' && activeTab === 'SOLD' && row.goodsType !== 'VIRTUAL' && !row.requireVirtualShip"
-              size="small"
-              type="success"
-              @click="deliver(row)"
-            >
-              发货
-            </el-button>
+            <!-- 卖家视角：卖出订单未闭环时始终显示发货入口 -->
+            <template v-if="row.type === 'SOLD' && !isOrderClosed(row)">
+              <el-button
+                v-if="row.requireVirtualShip || row.goodsType === 'VIRTUAL'"
+                size="small"
+                type="primary"
+                :loading="row._manualShipping"
+                @click="manualShip(row)"
+              >
+                人工发货
+              </el-button>
+              <el-button
+                v-else
+                size="small"
+                type="success"
+                @click="deliver(row)"
+              >
+                发货
+              </el-button>
+            </template>
+            <!-- 买家视角：买入订单跳闲鱼查看 -->
+            <template v-else>
+              <el-button
+                v-if="row.orderDetailUrl"
+                size="small"
+                @click="openXianyu(row.orderDetailUrl)"
+              >
+                查看闲鱼
+              </el-button>
+            </template>
             <el-button size="small" @click="showDetail(row)">详情</el-button>
           </template>
         </el-table-column>
@@ -150,6 +164,113 @@
         <el-button type="primary" @click="handleDelivery">确认发货</el-button>
       </template>
     </el-dialog>
+
+    <!-- 订单详情抽屉 -->
+    <el-drawer v-model="showDetailDrawer" title="订单详情" size="620px" v-loading="detailLoading">
+      <template v-if="detail">
+        <div v-if="detail.order?.orderDetailUrl" style="margin-bottom: 12px;">
+          <el-button size="small" @click="openXianyu(detail.order.orderDetailUrl)">在闲鱼查看原订单</el-button>
+        </div>
+        <el-descriptions :column="2" border size="small">
+          <el-descriptions-item label="订单ID">{{ detail.order?.id }}</el-descriptions-item>
+          <el-descriptions-item label="订单号">{{ detail.order?.orderId }}</el-descriptions-item>
+          <el-descriptions-item label="商品ID">{{ detail.order?.itemId || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="商品标题">{{ detail.order?.itemTitle || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="方向">{{ detail.order?.type === 'SOLD' ? '我卖出的' : '我买到的' }}</el-descriptions-item>
+          <el-descriptions-item label="状态">
+            <el-tag :type="statusTagType(detail.order?.status)" size="small">
+              {{ statusLabel(detail.order?.status, detail.order?.tradeStatusEnum) }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="金额">¥{{ detail.order?.amount ?? '0.00' }}</el-descriptions-item>
+          <el-descriptions-item label="对手方">{{ detail.order?.counterpartyName || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="下单时间">{{ formatTime(detail.order?.orderTime) }}</el-descriptions-item>
+          <el-descriptions-item label="更新时间">{{ formatTime(detail.order?.updatedAt) }}</el-descriptions-item>
+          <el-descriptions-item label="物流单号">{{ detail.order?.trackingNo || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="虚拟发货">
+            <template v-if="detail.order?.goodsType === 'VIRTUAL' || detail.order?.requireVirtualShip">
+              <el-tag v-if="detail.order?.virtualShippedAt" type="success" size="small">已发货 {{ formatTime(detail.order?.virtualShippedAt) }}</el-tag>
+              <el-tag v-else type="warning" size="small">待发货</el-tag>
+            </template>
+            <span v-else style="color: #c0c4cc;">—</span>
+          </el-descriptions-item>
+          <el-descriptions-item v-if="detailType === 'BOUGHT'" label="自动确认收货">
+            {{ formatTime(detail.order?.autoReceiptAt) }}
+          </el-descriptions-item>
+        </el-descriptions>
+
+        <!-- 关联商品 -->
+        <div class="detail-section-title">关联商品</div>
+        <template v-if="detail.product">
+          <el-descriptions :column="2" border size="small">
+            <el-descriptions-item label="商品ID">{{ detail.product.id }}</el-descriptions-item>
+            <el-descriptions-item label="标题">{{ detail.product.title }}</el-descriptions-item>
+            <el-descriptions-item label="类型">
+              <el-tag size="small" :type="detail.product.goodsType === 'VIRTUAL' ? 'warning' : 'info'">
+                {{ detail.product.goodsType === 'VIRTUAL' ? '虚拟' : '实物' }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="发货类型">{{ deliverTypeLabel(detail.product.deliverType) }}</el-descriptions-item>
+            <el-descriptions-item label="售价">¥{{ detail.product.price }}</el-descriptions-item>
+            <el-descriptions-item label="库存">{{ detail.product.stock }}</el-descriptions-item>
+            <el-descriptions-item label="商品状态">{{ productStatusLabel(detail.product.status) }}</el-descriptions-item>
+            <el-descriptions-item label="发货内容模板" :span="2">
+              <div style="white-space: pre-wrap; word-break: break-all; font-family: monospace; font-size: 12px;">
+                {{ detail.product.deliverContentTemplate || '—' }}
+              </div>
+            </el-descriptions-item>
+          </el-descriptions>
+        </template>
+        <el-empty v-else description="未关联本地商品" :image-size="60" />
+
+        <!-- 自动发货记录（仅卖家订单展示：记录的是本店发货任务） -->
+        <template v-if="detailType === 'SOLD'">
+          <div class="detail-section-title">自动发货记录</div>
+          <template v-if="detail.shipTasks && detail.shipTasks.length">
+            <el-table :data="detail.shipTasks" size="small" border>
+              <el-table-column prop="id" label="任务ID" width="70" />
+              <el-table-column label="状态" width="90">
+                <template #default="{ row }">
+                  <el-tag size="small" :type="shipTaskTagType(row.status)">{{ shipTaskLabel(row.status) }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="创建时间" width="150">
+                <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
+              </el-table-column>
+              <el-table-column label="执行时间" width="150">
+                <template #default="{ row }">{{ formatTime(row.processedAt) }}</template>
+              </el-table-column>
+              <el-table-column label="错误信息" min-width="150" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <span style="color: #F56C6C;">{{ row.errorMessage || '—' }}</span>
+                </template>
+              </el-table-column>
+            </el-table>
+          </template>
+          <el-empty v-else description="暂无自动发货记录" :image-size="60" />
+        </template>
+        <!-- 买家视角：收货信息 -->
+        <template v-else>
+          <div class="detail-section-title">收货信息</div>
+          <el-descriptions :column="2" border size="small">
+            <el-descriptions-item label="卖家">{{ detail.order?.counterpartyName || '—' }}</el-descriptions-item>
+            <el-descriptions-item label="物流单号">{{ detail.order?.trackingNo || '—' }}</el-descriptions-item>
+            <el-descriptions-item label="自动确认收货时间">{{ formatTime(detail.order?.autoReceiptAt) }}</el-descriptions-item>
+          </el-descriptions>
+        </template>
+
+        <!-- 物流轨迹（预留） -->
+        <div class="detail-section-title">物流轨迹</div>
+        <template v-if="detail.order?.trackingNo">
+          <el-timeline>
+            <el-timeline-item timestamp="已发货">
+              物流单号：{{ detail.order.trackingNo }}（轨迹详情接口待接入）
+            </el-timeline-item>
+          </el-timeline>
+        </template>
+        <el-empty v-else description="暂无物流信息" :image-size="60" />
+      </template>
+    </el-drawer>
   </div>
 </template>
 
@@ -158,6 +279,7 @@ import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import api from '@/api/request'
+import { getOrderDetail } from '@/api/order'
 
 // ===== 账号选择 =====
 const accounts = ref([])
@@ -178,6 +300,13 @@ const syncing = ref(false)
 // ===== 发货 =====
 const showDeliverDialog = ref(false)
 const deliverForm = ref({ orderId: null, trackingNo: '' })
+
+// ===== 订单详情 =====
+const showDetailDrawer = ref(false)
+const detailLoading = ref(false)
+const detail = ref(null)
+/** 当前详情订单方向（SOLD/BOUGHT），决定抽屉展示的信息区块 */
+const detailType = ref('SOLD')
 
 // 时间格式化
 function formatTime(t) {
@@ -334,10 +463,21 @@ async function syncOrders() {
   finally { syncing.value = false }
 }
 
+// 是否已闭环（终态订单不再提供发货操作）：交易成功 / 已关闭 / 退款成功
+function isOrderClosed(row) {
+  return row.status === 'COMPLETED' || row.status === 'CLOSED' || row.status === 'REFUNDED'
+}
+
 // 发货
 function deliver(row) {
   deliverForm.value = { orderId: row.id, trackingNo: '' }
   showDeliverDialog.value = true
+}
+
+// 打开闲鱼原订单链接（买家/卖家订单都可用）
+function openXianyu(url) {
+  if (!url) return
+  window.open(url, '_blank')
 }
 
 async function handleDelivery() {
@@ -353,17 +493,6 @@ async function handleDelivery() {
       await loadOrders()
     }
   } catch (e) {}
-}
-
-// 是否可人工发货：虚拟商品 + 未发货，且满足 已付款 / 任务失败 / 消息已发待平台确认(MESSAGE_SENT) 任一状态
-function canManualShip(row) {
-  if (activeTab.value !== 'SOLD') return false
-  if (!(row.requireVirtualShip || row.goodsType === 'VIRTUAL')) return false
-  if (row.virtualShippedAt) return false
-  if (row.status === 'PAID') return true
-  if (row.virtualShipTaskStatus === 'FAILED') return true
-  if (row.virtualShipTaskError && String(row.virtualShipTaskError).startsWith('MESSAGE_SENT')) return true
-  return false
 }
 
 // 人工发货：按订单创建/触发虚拟发货任务并立即执行（走自动发货链路）
@@ -382,6 +511,37 @@ async function manualShip(row) {
     ElMessage.error('人工发货失败：' + (e?.message || ''))
   } finally {
     row._manualShipping = false
+  }
+}
+
+// 商品发货类型标签
+function deliverTypeLabel(t) {
+  return { CARD: '卡密', ACCOUNT: '账号', LINK: '链接', FILE: '网盘文件' }[t] || t || '—'
+}
+
+// 商品状态标签
+function productStatusLabel(s) {
+  return { ON_SALE: '在售', OFF_SALE: '已下架', DRAFT: '草稿', PENDING: '待发布' }[s] || s || '—'
+}
+
+// 订单详情：拉订单 + 商品 + 自动发货记录 + 物流
+async function showDetail(row) {
+  if (!row.id) return ElMessage.warning('订单缺少 ID')
+  detailType.value = row.type === 'BOUGHT' ? 'BOUGHT' : 'SOLD'
+  showDetailDrawer.value = true
+  detailLoading.value = true
+  detail.value = null
+  try {
+    const res = await getOrderDetail(row.id)
+    if (res.success) {
+      detail.value = res.data || {}
+    } else {
+      ElMessage.error(res.message || '加载详情失败')
+    }
+  } catch (e) {
+    ElMessage.error('加载详情失败：' + (e?.message || ''))
+  } finally {
+    detailLoading.value = false
   }
 }
 

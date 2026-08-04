@@ -737,10 +737,12 @@ public class VirtualShipService {
     }
 
     /**
-     * 人工发货重试：允许 PENDING / FAILED / 消息已发待平台确认(MESSAGE_SENT) 的任务重置为 PENDING 并立即重跑。
+     * 人工发货重试：只要订单未闭环即可重试，不限制任务状态。
+     * <p>PENDING / FAILED / 消息已发待平台确认(MESSAGE_SENT) / 已发货(SUCCESS) 等任意状态都允许重置为 PENDING 并立即重跑，
+     * 用于买家未收到卡密等情况下的补发/重发；仅当订单已闭环（COMPLETED/CLOSED/REFUNDED）时拒绝。</p>
      * <p>关键语义：MESSAGE_SENT 标记（errorMessage 以 "MESSAGE_SENT:" 开头）保留不清，
      * AutoShipService 识别后只补 dummyDelivery 平台确认，不重复匹配卡券/重发 IM；
-     * FAILED 非 MESSAGE_SENT 任务则走完整发货链路（重新匹配卡券/模板 → 发消息 → 平台确认）。</p>
+     * 其余状态（含 SUCCESS 重发）则走完整发货链路（重新匹配卡券/模板 → 发消息 → 平台确认）。</p>
      */
     @Transactional
     public void retryTaskForShip(Long taskId) {
@@ -748,15 +750,17 @@ public class VirtualShipService {
         if (task == null) {
             throw new IllegalArgumentException("Task not found: " + taskId);
         }
-        String st = task.getStatus();
-        boolean msgSent = task.getErrorMessage() != null && task.getErrorMessage().startsWith("MESSAGE_SENT:");
-        boolean retriable = "PENDING".equals(st) || "FAILED".equals(st) || msgSent;
-        if (!retriable) {
-            throw new IllegalStateException("任务当前状态不可重试: " + st + "（仅 PENDING/FAILED/消息已发待确认 可人工发货）");
+        // 以订单是否闭环为准：未闭环不限制任务状态（含 SUCCESS 可补发/重发）
+        XianyuOrder order = task.getOrderId() == null ? null : orderMapper.selectById(task.getOrderId());
+        if (order == null) {
+            throw new IllegalArgumentException("任务关联订单不存在，无法人工发货");
+        }
+        if ("COMPLETED".equals(order.getStatus()) || "CLOSED".equals(order.getStatus()) || "REFUNDED".equals(order.getStatus())) {
+            throw new IllegalStateException("订单已闭环（交易成功/已关闭/退款成功），不可再人工发货");
         }
         task.setStatus("PENDING");
         task.setExecuteAt(null); // 立即执行，跳过延迟窗口
-        taskMapper.updateById(task);
+        shipTaskMapper.updateById(task);
         processShipTask(task);
     }
 
