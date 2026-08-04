@@ -9,6 +9,7 @@ import cn.net.rjnetwork.xianyu.manager.account.renew.task.TokenRenewalTask;
 import cn.net.rjnetwork.xianyu.manager.message.service.ImMessageWatcherService;
 import cn.net.rjnetwork.xianyu.manager.virtual.task.ConfirmReceiptTask;
 import cn.net.rjnetwork.xianyu.manager.virtual.task.RedeliveryTask;
+import cn.net.rjnetwork.xianyu.manager.virtual.task.ShipAckTimeoutTask;
 import cn.net.rjnetwork.xianyu.manager.task.service.ScheduledTaskService;
 import cn.net.rjnetwork.xianyu.manager.order.rate.task.AutoRateTask;
 import cn.net.rjnetwork.xianyu.manager.order.rate.task.RedFlowerTask;
@@ -51,6 +52,7 @@ public class ScheduledTasks {
     private final TokenRenewalTask tokenRenewalTask;
     private final RedeliveryTask redeliveryTask;
     private final ConfirmReceiptTask confirmReceiptTask;
+    private final ShipAckTimeoutTask shipAckTimeoutTask;
     private final ScheduledTaskService scheduledTaskService;
     private final AutoRateTask autoRateTask;
     private final RedFlowerTask redFlowerTask;
@@ -70,6 +72,7 @@ public class ScheduledTasks {
                           TokenRenewalTask tokenRenewalTask,
                           RedeliveryTask redeliveryTask,
                           ConfirmReceiptTask confirmReceiptTask,
+                          ShipAckTimeoutTask shipAckTimeoutTask,
                           ScheduledTaskService scheduledTaskService,
                           AutoRateTask autoRateTask,
                           RedFlowerTask redFlowerTask,
@@ -90,6 +93,7 @@ public class ScheduledTasks {
         this.tokenRenewalTask = tokenRenewalTask;
         this.redeliveryTask = redeliveryTask;
         this.confirmReceiptTask = confirmReceiptTask;
+        this.shipAckTimeoutTask = shipAckTimeoutTask;
         this.scheduledTaskService = scheduledTaskService;
         this.autoRateTask = autoRateTask;
         this.redFlowerTask = redFlowerTask;
