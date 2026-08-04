@@ -383,18 +383,24 @@ function shipTaskLabel(status) {
   return {
     PENDING: '任务待执行',
     PROCESSING: '执行中',
+    SENT_PENDING_ACK: '已发出·待送达',
     SHIPPED: '任务已完成',
+    SUCCESS: '已送达',
     FAILED: '任务失败',
-    SKIPPED: '已跳过'
+    SKIPPED: '已跳过',
+    RETRY_EXHAUSTED: '重试耗尽'
   }[status] || status
 }
 function shipTaskTagType(status) {
   return {
     PENDING: 'warning',
     PROCESSING: 'primary',
+    SENT_PENDING_ACK: 'warning',
     SHIPPED: 'success',
+    SUCCESS: 'success',
     FAILED: 'danger',
-    SKIPPED: 'info'
+    SKIPPED: 'info',
+    RETRY_EXHAUSTED: 'danger'
   }[status] || 'info'
 }
 

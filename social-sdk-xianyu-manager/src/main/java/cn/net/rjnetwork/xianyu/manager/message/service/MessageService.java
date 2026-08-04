@@ -1424,21 +1424,31 @@ public class MessageService {
         }
         String sessionId = request.getSessionId();
         String buyerId = request.getBuyerId();
-        // 有 buyerId 时优先反查本地真实会话：闲鱼 IM 会话 ID(cid) 与用户 ID 不同，
-        // 不能拿 buyerId 硬拼 @goofish（会发进不存在的假会话）。本地消息表里该买家的
-        // 真实会话（INCOMING/OUTGOING 任一方向的最新消息）优先，无历史才兜底拼接。
-        if (buyerId != null && !buyerId.isBlank()) {
-            String realSession = messageMapper.selectSessionIdByBuyer(
-                    request.getAccountId(),
-                    stripGoofishSuffix(buyerId),
-                    ensureGoofishSuffix(buyerId));
-            if (realSession != null && !realSession.isBlank()) {
-                sessionId = realSession;
-                request.setSessionId(sessionId);
+        // 反查真实会话：闲鱼 IM 会话 ID(cid) 与用户 ID 不同，绝不能拿 buyerId 硬拼 @goofish 假会话
+        // （假会话在服务端不存在，消息"发出去"但买家收不到，本地却标记成功）。
+        // 反查优先级：① 按订单号 —— 下单后订单会话会自动收到"我已拍下/已付款"卡片消息，
+        //              其内容（fleamarket://order_detail?id=xxx）含闲鱼订单号，是订单→会话最可靠锚点；
+        //            ② 按买家 userId 最近一条消息所在会话。
+        // 都查不到 → 直接抛错，绝不兜底假发，让上层明确失败而不是假成功。
+        if ((sessionId == null || sessionId.isBlank())
+                && ((request.getOrderId() != null && !request.getOrderId().isBlank())
+                    || (buyerId != null && !buyerId.isBlank()))) {
+            String realSession = null;
+            if (request.getOrderId() != null && !request.getOrderId().isBlank()) {
+                realSession = messageMapper.selectSessionIdByOrderId(
+                        request.getAccountId(), "%" + request.getOrderId() + "%");
             }
-        }
-        if ((sessionId == null || sessionId.isBlank()) && buyerId != null && !buyerId.isBlank()) {
-            sessionId = normalizeCid(buyerId);
+            if ((realSession == null || realSession.isBlank()) && buyerId != null && !buyerId.isBlank()) {
+                realSession = messageMapper.selectSessionIdByBuyer(
+                        request.getAccountId(),
+                        stripGoofishSuffix(buyerId),
+                        ensureGoofishSuffix(buyerId));
+            }
+            if (realSession == null || realSession.isBlank()) {
+                throw new IllegalStateException("找不到买家真实会话（本地无该订单/买家消息记录），"
+                        + "无法发送发货消息，请先同步该买家会话消息后重试");
+            }
+            sessionId = realSession;
             request.setSessionId(sessionId);
         }
 

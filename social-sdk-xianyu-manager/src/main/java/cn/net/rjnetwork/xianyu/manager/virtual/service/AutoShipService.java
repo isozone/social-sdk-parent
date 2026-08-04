@@ -9,6 +9,7 @@ import cn.net.rjnetwork.xianyu.manager.clouddisk.model.CloudStorageAccount;
 import cn.net.rjnetwork.xianyu.manager.clouddisk.model.CloudStorageFile;
 import cn.net.rjnetwork.xianyu.manager.clouddisk.service.CloudStorageService;
 import cn.net.rjnetwork.xianyu.manager.message.dto.MessageSendRequest;
+import cn.net.rjnetwork.xianyu.manager.message.model.XianyuMessage;
 import cn.net.rjnetwork.xianyu.manager.message.service.MessageService;
 import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
 import cn.net.rjnetwork.xianyu.manager.order.mapper.OrderMapper;
@@ -265,7 +266,9 @@ public class AutoShipService {
                     MessageSendRequest req = new MessageSendRequest();
                     req.setAccountId(account.getId());
                     req.setBuyerId(buyerId);
-                    req.setSessionId(normalizeCid(buyerId));
+                    // 不传 normalizeCid(buyerId) 假会话（服务端不存在该会话，买家收不到但本地假成功）。
+                    // 传闲鱼订单号，由 MessageService 按订单号反查订单会话的真实会话 ID。
+                    req.setOrderId(order.getOrderId());
                     req.setContent(deliverText);
                     req.setAutoReply(false);
                     // 拿到刚发出的帧 mid（MessageService.sendMessage 已把 sendFrameAsync 合成响应的 mid 落到返回值）。

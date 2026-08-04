@@ -41,7 +41,8 @@ public class DefaultVirtualMessageSender implements VirtualMessageSender {
         MessageSendRequest req = new MessageSendRequest();
         req.setAccountId(order.getAccountId());
         req.setBuyerId(buyerId);
-        req.setSessionId(normalizeCid(buyerId));
+        // 不传 normalizeCid(buyerId) 假会话：传闲鱼订单号，由 MessageService 反查订单会话真实会话
+        req.setOrderId(order.getOrderId());
         req.setContent(content);
         req.setAutoReply(false);
         try {

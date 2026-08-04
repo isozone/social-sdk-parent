@@ -52,4 +52,13 @@ public interface MessageMapper extends BaseMapper<XianyuMessage> {
     String selectSessionIdByBuyer(@Param("accountId") Long accountId,
                                   @Param("buyerBare") String buyerBare,
                                   @Param("buyerFull") String buyerFull);
+
+    // 按闲鱼订单号反查真实会话：下单后闲鱼会自动在订单会话里推送"我已拍下/已付款"卡片消息，
+    // 其内容（fleamarket://order_detail?id=xxx）包含闲鱼订单号，是订单→会话最可靠的关联锚点。
+    // 用于虚拟发货定位买家真实会话，替代用 buyerId 硬拼 @goofish 的假会话。
+    // pattern 由调用方拼好 "%orderId%"，避免 CONCAT 在 SQLite/MySQL/PG 方言不一致。
+    @Select("SELECT session_id FROM xianyu_message WHERE account_id = #{accountId} AND deleted = 0 " +
+            "AND content LIKE #{pattern} " +
+            "ORDER BY message_time DESC, id DESC LIMIT 1")
+    String selectSessionIdByOrderId(@Param("accountId") Long accountId, @Param("pattern") String pattern);
 }

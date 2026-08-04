@@ -246,6 +246,20 @@ public class ScheduledTasks {
         }
     }
 
+    /**
+     * 每 2 分钟扫超期未收服务端送达 ack 的 SENT_PENDING_ACK task，转 FAILED + 推通知。
+     * 转出的 FAILED task 会被 retryFailedShipTasks（每 5 分钟）按指数退避重发。
+     * 默认 staleSeconds=300（由 xianyu.virtual-ship.ack-stale-seconds 配置）。
+     */
+    @Scheduled(cron = "0 0/2 * * * *")
+    public void runShipAckTimeout() {
+        try {
+            shipAckTimeoutTask.runScheduled();
+        } catch (Exception e) {
+            log.warn("[Schedule] shipAckTimeout failed: {}", e.getMessage());
+        }
+    }
+
     /** 每天凌晨 3 点扫描超期未确认收货的订单，自动确认（auto_confirm_days 由配置控制） */
     @Scheduled(cron = "0 0 3 * * *")
     public void autoConfirmReceipt() {
