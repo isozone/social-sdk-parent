@@ -158,6 +158,7 @@ public class VirtualShipService {
 
         VirtualShipTask task = new VirtualShipTask();
         task.setOrderId(orderId);
+        task.setAccountId(order.getAccountId()); // 必须写 accountId，否则 AutoShipService 发货时查不到账号
         task.setProductId(product.getId());
         task.setStatus("PENDING");
         task.setRetryCount(0);
