@@ -2,6 +2,7 @@ package cn.net.rjnetwork.starter.platform.riskbird.controller;
 
 import cn.net.rjnetwork.starter.platform.common.exception.StarterApiException;
 import cn.net.rjnetwork.starter.platform.common.model.StarterApiResponse;
+import cn.net.rjnetwork.starter.platform.riskbird.dto.RiskbirdBizQueryRequest;
 import cn.net.rjnetwork.starter.platform.riskbird.dto.RiskbirdLoginRequest;
 import cn.net.rjnetwork.starter.platform.riskbird.dto.RiskbirdSearchRequest;
 import cn.net.rjnetwork.starter.platform.riskbird.service.RiskbirdConsoleService;
@@ -144,6 +145,24 @@ public class RiskbirdConsoleController {
             return StarterApiResponse.ok(service.queryCompany(accountId, name));
         } catch (Exception e) {
             throw new StarterApiException("RISKBIRD_COMPANY_FAILED", e.getMessage(), e);
+        }
+    }
+
+    // ==================== 业务组合接口 ====================
+
+    /**
+     * 业务组合查询：按省份/地市/行业筛选检索某类企业 → 逐条取详情（电话/邮箱）→ 查商标/软著。
+     * 对应业务：「按省份/地市检索有电话的某类企业，再查其商标和软著」。
+     *
+     * <p>body 示例：{@code {"keyword":"软件","province":"浙江","city":"杭州","maxCompanies":5,"onlyWithPhone":true}}
+     */
+    @PostMapping("/accounts/{accountId}/biz/companies-with-ip")
+    public StarterApiResponse<?> queryCompaniesWithIp(@PathVariable("accountId") long accountId,
+                                                      @RequestBody(required = false) RiskbirdBizQueryRequest request) {
+        try {
+            return StarterApiResponse.ok(service.queryCompaniesWithIp(accountId, request));
+        } catch (Exception e) {
+            throw new StarterApiException("RISKBIRD_BIZ_QUERY_FAILED", e.getMessage(), e);
         }
     }
 

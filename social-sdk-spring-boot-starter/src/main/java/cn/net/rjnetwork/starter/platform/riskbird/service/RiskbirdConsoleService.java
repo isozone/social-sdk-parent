@@ -52,6 +52,12 @@ public class RiskbirdConsoleService {
         this.sdk = new RiskbirdSdk(config, chromeBrowser);
     }
 
+    /** 测试用构造：直接注入已装配的 RiskbirdSdk（如 mock driver 工厂）。 */
+    public RiskbirdConsoleService(RiskbirdConsoleProperties properties, RiskbirdSdk sdk) {
+        this.properties = properties;
+        this.sdk = sdk;
+    }
+
     /** 健康检查（返回账号容器配置摘要）。 */
     public Map<String, Object> health() {
         return Map.of(
@@ -113,6 +119,64 @@ public class RiskbirdConsoleService {
     /** 是否已登录。 */
     public boolean isLoggedIn(long accountId) throws Exception {
         return api(accountId).isLoggedIn();
+    }
+
+    /**
+     * 业务组合查询：按省份/地市/行业筛选检索企业 → 逐条取详情（电话/邮箱）→ 查商标/软著。
+     * 对应业务：「按省份/地市检索有电话的某类企业，再查其商标和软著」。
+     *
+     * @return 每条含企业详情（电话）+ 知识产权（商标/软著/专利）的组合结果
+     */
+    public List<Map<String, Object>> queryCompaniesWithIp(
+            long accountId, RiskbirdBizQueryRequest request) throws Exception {
+        if (request == null || request.getKeyword() == null || request.getKeyword().isBlank()) {
+            throw new IllegalArgumentException("keyword 不能为空");
+        }
+        int max = request.getMaxCompanies() == null ? 5
+                : Math.max(1, Math.min(20, request.getMaxCompanies()));
+        boolean onlyWithPhone = request.getOnlyWithPhone() == null || request.getOnlyWithPhone();
+
+        RiskbirdSearchFilter filter = RiskbirdSearchFilter.builder()
+                .province(request.getProvince())
+                .city(request.getCity())
+                .industry(request.getIndustry())
+                .build();
+        RiskbirdSearchResult list = api(accountId).search(
+                RiskbirdConfig.QueryType.COMPANY, request.getKeyword(), 1, filter);
+        if (!list.isSuccess() || list.getCompanies().isEmpty()) {
+            return List.of();
+        }
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (RiskbirdCompany c : list.getCompanies()) {
+            if (out.size() >= max) {
+                break;
+            }
+            try {
+                // 详情（含电话/邮箱）
+                RiskbirdCompany detail = api(accountId).queryCompany(c.getName(), c.getEntId());
+                if (onlyWithPhone && (detail.getPhone() == null || detail.getPhone().isBlank())) {
+                    continue; // 业务过滤：只要「有电话」的企业
+                }
+                // 知识产权（商标/软著/专利）
+                RiskbirdIntellectualProperty ip =
+                        api(accountId).queryIntellectualProperty(c.getName(), c.getEntId());
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("company", detail);
+                item.put("phone", detail.getPhone());
+                item.put("email", detail.getEmail());
+                item.put("trademarks", ip.getTrademarks());
+                item.put("softCopyrights", ip.getSoftCopyrights());
+                item.put("patents", ip.getPatents());
+                out.add(item);
+            } catch (Exception e) {
+                log.warn("[RISKBIRD-BIZ] 单条企业处理失败(跳过), company={}, err={}", c.getName(), e.getMessage());
+            }
+        }
+        log.info("[RISKBIRD-BIZ] 业务组合查询完成, keyword={}, province={}, city={}, 命中={}/{}",
+                request.getKeyword(), request.getProvince(), request.getCity(),
+                out.size(), list.getCompanies().size());
+        return out;
     }
 
     /** 提取登录态 Cookie（持久化复用）。 */
