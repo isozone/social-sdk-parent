@@ -1429,10 +1429,11 @@ public class MessageService {
         // 反查优先级：① 按订单号 —— 下单后订单会话会自动收到"我已拍下/已付款"卡片消息，
         //              其内容（fleamarket://order_detail?id=xxx）含闲鱼订单号，是订单→会话最可靠锚点；
         //            ② 按买家 userId 最近一条消息所在会话。
-        // 都查不到 → 直接抛错，绝不兜底假发，让上层明确失败而不是假成功。
-        if ((sessionId == null || sessionId.isBlank())
-                && ((request.getOrderId() != null && !request.getOrderId().isBlank())
-                    || (buyerId != null && !buyerId.isBlank()))) {
+        // 关键：不论调用方有没有传 sessionId，只要能传 orderId/buyerId，就优先反查真 cid 覆盖之——
+        //       避免上游（旧版 AutoShipService）传 normalizeCid(buyerId) 假会话绕过反查、走假 cid 发帧。
+        //       前端手动发送场景 sessionId 是用户从会话列表选的真 cid，反查查到的也是同一个，覆盖无副作用。
+        if ((request.getOrderId() != null && !request.getOrderId().isBlank())
+                || (buyerId != null && !buyerId.isBlank())) {
             String realSession = null;
             if (request.getOrderId() != null && !request.getOrderId().isBlank()) {
                 realSession = messageMapper.selectSessionIdByOrderId(
@@ -1444,12 +1445,16 @@ public class MessageService {
                         stripGoofishSuffix(buyerId),
                         ensureGoofishSuffix(buyerId));
             }
-            if (realSession == null || realSession.isBlank()) {
+            if (realSession != null && !realSession.isBlank()) {
+                // 反查到真 cid → 覆盖调用方传的任何 sessionId（含假 cid 兜底）
+                sessionId = realSession;
+                request.setSessionId(sessionId);
+            } else if (sessionId == null || sessionId.isBlank()) {
+                // 反查查不到 且 调用方也没传 sessionId → 直接抛错，绝不兜底假发
                 throw new IllegalStateException("找不到买家真实会话（本地无该订单/买家消息记录），"
                         + "无法发送发货消息，请先同步该买家会话消息后重试");
             }
-            sessionId = realSession;
-            request.setSessionId(sessionId);
+            // 反查查不到 但 调用方传了 sessionId（如前端手动发送选的真 cid）→ 沿用调用方传的，不抛错
         }
 
         XianyuMessage peerMsg = sessionId == null || sessionId.isBlank() ? null : messageMapper.selectLatestPeerMessage(

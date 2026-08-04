@@ -293,9 +293,13 @@ public class AutoShipService {
                 audit.setDeliverContent(deliverText);
             }
 
-            // 5. 闲鱼侧无需物流确认发货（失败不标本地成功；已发消息的重试只补这一步）
+            // 5. 闲鱼侧无需物流确认发货（dummy 平台侧辅助确认）。
+            // 关键降级：dummy 失败不回滚、不阻塞发货——消息已真发给买家（第 4 步），dummy 只是平台侧状态标记，
+            // 可以后台补。如果 dummy 失败就 finalizeFail+return，会把已真发的消息落库全回滚，买家收不到但本地 FAILED。
+            // 现改为：dummy 失败仅记 audit 警告 + 推通知让运营后台补，task 继续走第 6 步标 SENT_PENDING_ACK。
             XianyuAccount account = accountMapper.selectById(task.getAccountId());
             if (account == null) {
+                // 账号不存在是真硬错，不能降级（消息上面第 4 步已用账号发出去，这里理论上不会触发）
                 finalizeFail(task, audit, "FAILED", "账号不存在");
                 publishShipFailed(task, order, "账号不存在");
                 return;
@@ -303,10 +307,11 @@ public class AutoShipService {
             try {
                 confirmDummyDelivery(account, order);
             } catch (Exception e) {
-                String reason = "MESSAGE_SENT: dummyDelivery 失败：" + e.getMessage();
-                finalizeFail(task, audit, "FAILED", reason);
-                publishShipFailed(task, order, reason);
-                return;
+                log.warn("[A8] order {} dummyDelivery failed (降级为后台补，不阻塞发货): {}",
+                        task.getOrderId(), e.getMessage());
+                publishNotify(task, order, "AUTO_SHIP_DUMMY_FAILED",
+                        "dummyDelivery 平台侧确认失败，需后台人工补：" + truncate(e.getMessage(), 200));
+                // 不 return、不 finalizeFail——继续走第 6 步标 SENT_PENDING_ACK，真发消息才是发货本质
             }
 
             // 6. 落库 + 标订单 SHIPPED + 标 task。

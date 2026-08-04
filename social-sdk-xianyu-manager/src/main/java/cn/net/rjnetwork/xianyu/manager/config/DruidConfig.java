@@ -47,8 +47,8 @@ public class DruidConfig {
         if (username != null && !username.isBlank()) ds.setUsername(username);
         if (password != null && !password.isBlank()) ds.setPassword(password);
 
-        // ===== 池大小：SQLite 单连接最优；MySQL/PG 可并发 =====
-        int maxActive = databaseProvider != null ? databaseProvider.maxActive() : 1;
+        // ===== 池大小：SQLite WAL 模式 2 连接（嵌套事务各拿独立连接，最小化写锁竞争）；MySQL/PG 可更高 =====
+        int maxActive = databaseProvider != null ? databaseProvider.maxActive() : 2;
         ds.setInitialSize(1);
         ds.setMinIdle(1);
         ds.setMaxActive(maxActive);

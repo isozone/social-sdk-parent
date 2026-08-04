@@ -19,7 +19,7 @@ public interface DatabaseProvider {
     /** Druid 连接初始化 SQL（SQLite 走 PRAGMA，MySQL/PG 走 SET 优化） */
     String[] connectionInitSqls();
 
-    /** Druid 最大活动连接数（SQLite 单连接最优，MySQL/PG 可并发） */
+    /** Druid 最大活动连接数（SQLite WAL 模式下 2（最小化写锁竞争），MySQL/PG 可更高） */
     int maxActive();
 
     /** Druid 验证查询（SQLite 用 SELECT 1，MySQL/PG 也兼容） */

@@ -743,8 +743,11 @@ public class VirtualShipService {
      * <p>关键语义：MESSAGE_SENT 标记（errorMessage 以 "MESSAGE_SENT:" 开头）保留不清，
      * AutoShipService 识别后只补 dummyDelivery 平台确认，不重复匹配卡券/重发 IM；
      * 其余状态（含 SUCCESS 重发）则走完整发货链路（重新匹配卡券/模板 → 发消息 → 平台确认）。</p>
+     * <p><b>事务边界</b>：本方法不标 @Transactional——避免外层事务占住唯一 DB 连接，
+     * 内层 {@link AutoShipService#processShipTask} 的 REQUIRES_NEW 想拿新连接等不到
+     * → 死锁 30s 抛 GetConnectionTimeoutException（现网症结）。
+     * 重置 task 状态用 {@link #resetTaskForRetry} 独立小事务固化，processShipTask 自己管自己的事务。</p>
      */
-    @Transactional
     public void retryTaskForShip(Long taskId) {
         VirtualShipTask task = shipTaskMapper.selectById(taskId);
         if (task == null) {
@@ -758,10 +761,27 @@ public class VirtualShipService {
         if ("COMPLETED".equals(order.getStatus()) || "CLOSED".equals(order.getStatus()) || "REFUNDED".equals(order.getStatus())) {
             throw new IllegalStateException("订单已闭环（交易成功/已关闭/退款成功），不可再人工发货");
         }
+        // 人工发货语义：买家没收到 → 我要重发。必须走完整发货链路（重新匹配卡券/模板 → 发消息 → 平台确认），
+        // 不能继承上一轮的「已发」标记。否则 processShipTask 的 messageAlreadySent 判断会认 errorMessage
+        // 里残留的 "MESSAGE_SENT:" 前缀，整段真发消息被跳过 → 只补 dummyDelivery → 买家永远收不到。
+        // 同步清 messageId/sentAt：上一轮发出的帧 mid 已无效（服务端可能丢了），这轮会拿新 mid。
+        // 用独立小事务固化重置，避免外层 @Transactional 占住唯一连接让内层 REQUIRES_NEW 死锁。
+        self.resetTaskForRetry(task);
+        processShipTask(task);
+    }
+
+    /**
+     * 独立事务固化「人工发货重置」：清 errorMessage/messageId/sentAt + 标 PENDING + 立即执行。
+     * <p>从 {@link #retryTaskForShip} 抽出，避免外层事务占连接让内层 processShipTask 的 REQUIRES_NEW 死锁。</p>
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void resetTaskForRetry(VirtualShipTask task) {
         task.setStatus("PENDING");
         task.setExecuteAt(null); // 立即执行，跳过延迟窗口
+        task.setErrorMessage(null);
+        task.setMessageId(null);
+        task.setSentAt(null);
         shipTaskMapper.updateById(task);
-        processShipTask(task);
     }
 
     public List<VirtualCardPool> listCards(Long productId, String status) {

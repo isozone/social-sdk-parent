@@ -15,5 +15,5 @@ spring:
     username:
     password:
 
-# SQLite 单连接最优：max-active 由 SqliteProvider 控制（=1）
-# 用户无需手动调，见 SqliteProvider.maxActive()
+# SQLite WAL 模式 2 连接：max-active 由 SqliteProvider 控制（=2）
+# 嵌套事务各拿独立连接，又最小化写锁竞争；busy_timeout=120s 让等写锁别轻易超时

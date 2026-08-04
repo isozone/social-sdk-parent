@@ -71,7 +71,7 @@ java -jar xianyu-manager.jar \
 
 - **`DatabaseProvider` 接口**（`config/db/`）：方言抽象，定义 `schemaFile()` / `connectionInitSqls()` / `maxActive()` / `validationQuery()` 等。
 - **三实现**：`SqliteProvider` / `MysqlProvider` / `PostgresProvider` 均通过 `@ConditionalOnProperty(prefix="bitefu.wall", name="db-type")` 激活。
-- **`DruidConfig`**：从 `DatabaseProvider` 拿连接初始化 SQL 和 maxActive，SQLite 单连接最优，MySQL/PG 并发 20。
+- **`DruidConfig`**：从 `DatabaseProvider` 拿连接初始化 SQL 和 maxActive，SQLite WAL 模式 2 连接，MySQL/PG 并发 20。
 - **`DatabaseInitializer`**：按当前 `DatabaseProvider.schemaFile()` 加载对应 schema 文件，启动时自动建表。
 - **三套 schema**：方言差异已处理（SQLite `INTEGER PRIMARY KEY` / MySQL `BIGINT AUTO_INCREMENT` / PG `BIGSERIAL`；`DATETIME` → `TIMESTAMP`；外键引用列类型对齐）。
 
