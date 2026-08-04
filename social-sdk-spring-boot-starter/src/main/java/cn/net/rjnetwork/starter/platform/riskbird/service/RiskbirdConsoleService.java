@@ -72,6 +72,19 @@ public class RiskbirdConsoleService {
         return sdk.account(accountId).api();
     }
 
+    /**
+     * 扫码登录：返回二维码图片 URL（形如 {@code /riskbird-api/createQrCode?uuid=xxx}）。
+     * 业务侧展示二维码给用户扫码后，调用 {@link #waitQrLogin(long)} 轮询登录态。
+     */
+    public String prepareQrLogin(long accountId) throws Exception {
+        return api(accountId).prepareQrLogin();
+    }
+
+    /** 等待扫码完成（默认 120s），成功后提取登录态 Cookie（token + userinfo）。 */
+    public cn.net.rjnetwork.riskbird.model.RiskbirdLoginResult waitQrLogin(long accountId) throws Exception {
+        return api(accountId).waitQrLogin(null);
+    }
+
     /** Cookie 登录（免扫码；需 token + userinfo 的已登录 Cookie）。 */
     public RiskbirdLoginResult loginWithCookie(long accountId, String cookieHeader) throws Exception {
         if (cookieHeader == null || cookieHeader.isBlank()) {

@@ -150,9 +150,12 @@ public class RuleService {
                 logService.log(accountId, null, "AI_REPLY", "AI", null, message, aiReply, true);
                 return aiReply;
             }
+            // AI 调用失败（返回 null），记日志，继续走兜底而非直接"未命中"
+            log.warn("[RuleService] AI reply returned null for account {}, will try fallback", accountId);
         }
 
         // 3. 兜底自动回复（最低优先级）
+        // AI 接管开启但调用失败时，这里也能兜住，避免"未命中"不回复
         if (config != null && Boolean.TRUE.equals(config.getAutoReplyEnabled())
                 && config.getFallbackReply() != null && !config.getFallbackReply().isEmpty()) {
             logService.log(accountId, null, "AUTO_FALLBACK", "AUTO", null, message, config.getFallbackReply(), true);
@@ -202,6 +205,7 @@ public class RuleService {
      */
     private String callAiReply(XianyuAutoReplyConfig config, String message) {
         if (config == null || config.getAiModelId() == null) {
+            log.warn("[RuleService] callAiReply skipped: aiModelId is null (account config not set?)");
             return null;
         }
         try {
@@ -211,7 +215,8 @@ public class RuleService {
             String reply = aiChatService.chat(config.getAiModelId(), systemPrompt, message);
             return (reply != null && !reply.isBlank()) ? reply.trim() : null;
         } catch (Exception e) {
-            log.warn("[RuleService] AI reply failed: {}", e.getMessage());
+            // 打全异常堆栈，便于排查 AI 调用失败的真实原因（API Key 错、网络超时、模型名错等）
+            log.error("[RuleService] AI reply failed: modelId={}, error={}", config.getAiModelId(), e.getMessage(), e);
             return null;
         }
     }

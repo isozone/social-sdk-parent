@@ -151,6 +151,10 @@ public class ProductService {
         product.setDescription(request.getDescription());
         product.setImages(toJsonArray(request.getImages()));
         product.setVideos(toJsonArray(request.getVideos()));
+        // 虚拟商品字段回写，否则落库默认 PHYSICAL、发货信息丢失
+        product.setGoodsType(request.getGoodsType() != null ? request.getGoodsType() : "PHYSICAL");
+        product.setDeliverType(request.getDeliverType());
+        product.setDeliverContentTemplate(request.getDeliverContentTemplate());
         product.setStatus("DRAFT");
         product.setViewCount(0);
         product.setFavoriteCount(0);
@@ -163,23 +167,24 @@ public class ProductService {
         XianyuPublishApiService publishApi = new XianyuPublishApiService(mtopClient);
 
         // 4. 步骤 A：AI 推荐分类（title + 图片信息；图片信息从本地 images URL 拼不出闲鱼 CDN 的 url/height/width，传空让 AI 只按标题推荐）
+        // 真接口：mtop.taobao.idle.kgraph.property.recommend v2.0（闲鱼 PC 发布页 p_publish-index.js 真抓验证）
+        // 响应路径：data.categoryPredictResult，含 catId/catName/channelCatId/tbCatId（部分版本带 leafId）
         JsonNode catResp = publishApi.recommendCategory(
                 request.getTitle() != null ? request.getTitle() : "",
                 new ArrayList<>()
-
         );
-        // 解析 categoryPredictResult → catDTO
-        Map<String, String> catDTO = new LinkedHashMap<>();
-        JsonNode catPredict = catResp != null ? catResp.path("data").path("categoryPredictResult") : null;
-        if (catPredict != null && !catPredict.isMissingNode()) {
-            catDTO.put("catId", pickText(catPredict, "catId"));
-            catDTO.put("catName", pickText(catPredict, "catName"));
-            catDTO.put("channelCatId", pickText(catPredict, "channelCatId"));
-            catDTO.put("tbCatId", pickText(catPredict, "tbCatId"));
+        if (logger.isDebugEnabled()) {
+            logger.debug("[PUBLISH] recommendCategory resp: {}", catResp);
         }
-        // 若用户在前端表单里显式传了 categoryId，覆盖 AI 推荐结果（用户指定优先）
-        if (request.getCategoryId() != null && !request.getCategoryId().isBlank()) {
-            catDTO.put("catId", request.getCategoryId());
+        Map<String, String> catDTO = buildItemCatDTO(catResp, request.getCategoryId());
+        if (catDTO.get("channelCatId") == null || catDTO.get("channelCatId").isBlank()
+                || catDTO.get("catId") == null || catDTO.get("catId").isBlank()) {
+            logger.error("[PUBLISH] 类目信息不完整，catDTO={}, recommendResp={}", catDTO,
+                    catResp != null ? catResp.toString().substring(0, Math.min(500, catResp.toString().length())) : "null");
+            throw new IllegalStateException("发布失败：未能获取有效的闲鱼类目信息（channelCatId/catId 缺失），请完善商品标题后重试，或检查 AI 推荐分类接口是否正常");
+        }
+        if (logger.isDebugEnabled()) {
+            logger.debug("[PUBLISH] final itemCatDTO: {}", catDTO);
         }
 
         // 5. 步骤 B：拿默认所在地（itemAddrDTO 必填）
@@ -266,12 +271,21 @@ public class ProductService {
             product.setVideos(toJsonArray(xianyuVideoUrls));
         }
 
-        // 7. 步骤 D：运费设置（默认按距离计费，templateId=-100；前端暂时未提供运费选项，用保守默认）
+        // 7. 步骤 D：运费设置
+        // 虚拟商品（goodsType=VIRTUAL）不收运费：supportFreight=false、免邮
+        // 实物商品默认按距离计费，templateId=-100
         Map<String, Object> deliverySettings = new LinkedHashMap<>();
-        deliverySettings.put("supportFreight", true);
-        deliverySettings.put("canFreeShipping", false);
-        deliverySettings.put("onlyTakeSelf", false);
-        deliverySettings.put("templateId", "-100");  // 按距离计费
+        boolean isVirtual = "VIRTUAL".equalsIgnoreCase(request.getGoodsType());
+        if (isVirtual) {
+            deliverySettings.put("supportFreight", false);
+            deliverySettings.put("canFreeShipping", true);
+            deliverySettings.put("onlyTakeSelf", false);
+        } else {
+            deliverySettings.put("supportFreight", true);
+            deliverySettings.put("canFreeShipping", false);
+            deliverySettings.put("onlyTakeSelf", false);
+            deliverySettings.put("templateId", "-100");  // 按距离计费
+        }
 
         // 8. 步骤 E：价格转分（元 → 分）
         String priceInCent = null;
@@ -417,6 +431,39 @@ public class ProductService {
             }
         }
         return null;
+    }
+
+    /**
+     * 从 AI 推荐分类响应构造 itemCatDTO（闲鱼 PC 发布页 p_publish-index.js 真抓验证）。
+     * itemCatDTO 必填 5 字段：catId/catName/channelCatId/leafId/tbCatId。
+     * 缺 channelCatId 闲鱼端必报 FAIL_BIZ_CHANNEL_CAT_ID_PATH_QUERY_ERROR。
+     *
+     * @param catResp recommendCategory 响应（data.categoryPredictResult 或 data.result.categoryPredictResult）
+     * @param userCategoryId 用户显式指定的 catId（可空，非空时覆盖 AI 推荐的 catId）
+     * @return catDTO map（可能含空值，调用方负责校验）
+     */
+    Map<String, String> buildItemCatDTO(JsonNode catResp, String userCategoryId) {
+        Map<String, String> catDTO = new LinkedHashMap<>();
+        JsonNode catPredict = null;
+        if (catResp != null) {
+            // 优先 data.categoryPredictResult（真抓主路径），兜底 data.result.categoryPredictResult
+            catPredict = catResp.path("data").path("categoryPredictResult");
+            if (catPredict == null || catPredict.isMissingNode()) {
+                catPredict = catResp.path("data").path("result").path("categoryPredictResult");
+            }
+        }
+        if (catPredict != null && !catPredict.isMissingNode()) {
+            catDTO.put("catId", pickText(catPredict, "catId"));
+            catDTO.put("catName", pickText(catPredict, "catName"));
+            catDTO.put("channelCatId", pickText(catPredict, "channelCatId"));
+            catDTO.put("leafId", pickText(catPredict, "leafId"));
+            catDTO.put("tbCatId", pickText(catPredict, "tbCatId"));
+        }
+        // 用户显式传 categoryId 时覆盖 catId（用户指定优先）
+        if (userCategoryId != null && !userCategoryId.isBlank()) {
+            catDTO.put("catId", userCategoryId);
+        }
+        return catDTO;
     }
 
     /** 从 JsonNode 拿指定字段文本值，缺失返空串 */

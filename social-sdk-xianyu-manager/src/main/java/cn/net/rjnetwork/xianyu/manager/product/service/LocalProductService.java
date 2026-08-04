@@ -269,6 +269,10 @@ public class LocalProductService {
         createReq.setDescription(item.getDescription());
         createReq.setImages(parseJsonArray(item.getImages()));
         createReq.setVideos(parseJsonArray(item.getVideos()));
+        // 虚拟商品字段透传，否则 ProductService.create 落库时默认 PHYSICAL、发货信息丢失
+        createReq.setGoodsType(item.getGoodsType());
+        createReq.setDeliverType(item.getDeliverType());
+        createReq.setDeliverContentTemplate(item.getDeliverContentTemplate());
         XianyuProduct published = productService.create(createReq);
 
         // 虚拟商品：发布成功后自动建卡密池/账号池（库存联动）

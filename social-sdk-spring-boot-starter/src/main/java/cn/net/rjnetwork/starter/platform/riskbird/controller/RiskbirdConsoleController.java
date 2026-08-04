@@ -69,6 +69,30 @@ public class RiskbirdConsoleController {
         }
     }
 
+    /**
+     * 获取扫码登录二维码（返回二维码图片 URL，形如 /riskbird-api/createQrCode?uuid=xxx）。
+     * 业务侧展示二维码给用户扫码后，轮询调用 {@code GET /accounts/{id}/logged-in} 判断登录态，
+     * 登录成功后调用 {@code GET /accounts/{id}/cookie} 提取登录态 Cookie。
+     */
+    @GetMapping("/accounts/{accountId}/qr")
+    public StarterApiResponse<?> prepareQrLogin(@PathVariable("accountId") long accountId) {
+        try {
+            return StarterApiResponse.ok(service.prepareQrLogin(accountId));
+        } catch (Exception e) {
+            throw new StarterApiException("RISKBIRD_QR_FAILED", e.getMessage(), e);
+        }
+    }
+
+    /** 等待扫码完成（最长 120s），返回登录结果。 */
+    @PostMapping("/accounts/{accountId}/qr/wait")
+    public StarterApiResponse<?> waitQrLogin(@PathVariable("accountId") long accountId) {
+        try {
+            return StarterApiResponse.ok(service.waitQrLogin(accountId));
+        } catch (Exception e) {
+            throw new StarterApiException("RISKBIRD_QR_WAIT_FAILED", e.getMessage(), e);
+        }
+    }
+
     /** 提取登录态 Cookie（持久化复用）。 */
     @GetMapping("/accounts/{accountId}/cookie")
     public StarterApiResponse<?> extractCookie(@PathVariable("accountId") long accountId) {
