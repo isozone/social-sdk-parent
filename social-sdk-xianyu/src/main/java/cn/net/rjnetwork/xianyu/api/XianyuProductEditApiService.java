@@ -122,7 +122,115 @@ public class XianyuProductEditApiService {
      * @param price     新价格（元，如 "99.00"），内部转分后传给发布接口
      * @return 新商品的发布结果，data 含新 itemId
      */
+    /**
+     * 发布新商品（直传字段版）— 绕开 getProductDetail，直接用调用方传入的本地 DB 字段发布。
+     * <p><b>背景：</b>改价/改库存链路原本要先调 mtop.taobao.idle.pc.detail 拉原商品详情再发新商品，
+     * 三个问题：① 闲鱼风控易拦详情接口（RGV587_ERROR::SM::哎哟喂,被挤爆啦）；
+     * ② 详情响应字段路径不稳导致库存/价格提取错（兜底成 1/0.02）；③ 多一次接口调用增加风控触发概率。
+     * 本地 DB 在发布时已存了正确字段，直接用即可。</p>
+     *
+     * <p><b>类目兜底：</b>本地 DB 只存 categoryId（部分账号连这都没），缺 channelCatId/leafId/tbCatId/catName，
+     * 用 DEFAULT fallback 类目 50023914（与 ProductService.buildItemCatDTO 同源）兜底，发布能通；
+     * 类目若重要可在前端让用户显式选。</p>
+     *
+     * @param title           标题（本地 DB）
+     * @param description     描述（本地 DB，可空）
+     * @param priceCent       售价（分，本地 DB 元 × 100）
+     * @param origPriceCent   原价（分，本地 DB 元 × 100，可空传 "0"）
+     * @param stock           库存（本地 DB）
+     * @param imageUrls       图片 URL 列表（本地 DB，至少 1 张，闲鱼端必填）
+     * @param catId           类目 ID（本地 DB，可空 → 用默认 50023914）
+     * @param goodsType       商品类型 PHYSICAL/VIRTUAL（本地 DB，可空 → 默认 PHYSICAL）
+     * @param deliverType     发货方式 CARD/ACCOUNT/LINK/FILE（本地 DB，虚拟商品用，可空）
+     * @param deliverContentTemplate 发货内容模板（本地 DB，虚拟商品用，可空）
+     * @return 新商品的发布结果，data 含新 itemId
+     */
+    public JsonNode republishWithLocalFields(
+            String title, String description,
+            String priceCent, String origPriceCent, String stock,
+            List<String> imageUrls,
+            String catId, String goodsType, String deliverType, String deliverContentTemplate) {
+        if (publishApiService == null) {
+            throw new IllegalStateException("republishWithLocalFields 需要 XianyuPublishApiService");
+        }
+        if (title == null || title.isBlank()) {
+            throw new IllegalStateException("改价/改库存：本地 DB 标题为空，无法发布");
+        }
+        if (imageUrls == null || imageUrls.isEmpty()) {
+            // 闲鱼端必报 FAIL_BIZ_ITEM_NO_PICS，本地没图就显式抛错让用户知道
+            throw new IllegalStateException("改价/改库存：本地 DB 无图片，无法发布（闲鱼端必填至少 1 张图）");
+        }
+
+        // 1. 图片 URL → publishItem 需要的 imageInfoList（含 url/height/width）
+        List<Map<String, Object>> images = new ArrayList<>();
+        for (String url : imageUrls) {
+            if (url == null || url.isBlank()) continue;
+            Map<String, Object> img = new LinkedHashMap<>();
+            img.put("url", url);
+            img.put("height", 800);
+            img.put("width", 800);
+            images.add(img);
+        }
+        if (images.isEmpty()) {
+            throw new IllegalStateException("改价/改库存：本地 DB 图片 URL 全空，无法发布");
+        }
+
+        // 2. 类目 DTO：本地 categoryId 优先，缺则用默认兜底类目 50023914
+        String effectiveCatId = (catId != null && !catId.isBlank()) ? catId : "50023914";
+        Map<String, String> catDTO = new LinkedHashMap<>();
+        catDTO.put("catId", effectiveCatId);
+        catDTO.put("catName", "其他");
+        catDTO.put("channelCatId", effectiveCatId);
+        catDTO.put("leafId", effectiveCatId);
+        catDTO.put("tbCatId", effectiveCatId);
+
+        // 3. 标签/地址/运费：用默认值（本地 DB 没存这些字段，发布时也是用默认值）
+        List<Map<String, Object>> labelExtList = new ArrayList<>();  // 无标签
+        Map<String, Object> addrDTO = new LinkedHashMap<>();        // 默认地址（闲鱼端用账号默认收货地址）
+        // 运费：虚拟商品免邮，实物默认按距离计费
+        Map<String, Object> deliverySettings = new LinkedHashMap<>();
+        boolean isVirtual = "VIRTUAL".equalsIgnoreCase(goodsType);
+        if (isVirtual) {
+            deliverySettings.put("supportFreight", false);
+            deliverySettings.put("canFreeShipping", true);
+            deliverySettings.put("onlyTakeSelf", false);
+        } else {
+            deliverySettings.put("supportFreight", true);
+            deliverySettings.put("canFreeShipping", false);
+            deliverySettings.put("onlyTakeSelf", false);
+            deliverySettings.put("templateId", "-100");  // 按距离计费
+        }
+
+        // 4. 调 publishItem 发新商品（itemId=null → pcMainPublish 场景，真抓验证闲鱼 PC 端无编辑重发）
+        JsonNode publishResult = publishApiService.publishItem(
+            null, title, description, priceCent, origPriceCent, stock,
+            images, catDTO, labelExtList, addrDTO, deliverySettings
+        );
+
+        // 5. 发布成功才算成功（下架原商品由调用方负责，本方法只负责发布）
+        if (!isPublishSuccess(publishResult)) {
+            throw new IllegalStateException("改价/改库存：发布新商品失败，resp=" + publishResult);
+        }
+        return publishResult;
+    }
+
     public JsonNode updatePrice(String itemId, String price) {
+        return updatePrice(itemId, price, null, null);
+    }
+
+    /**
+     * 改价（值覆盖版）— 与 {@link #updatePrice(String, String)} 相同流程，但允许调用方显式传
+     * 本地 DB 已存的 stock / 原价（分），SDK 优先用传入值而非从闲鱼详情重新提取。
+     * <p>背景：闲鱼详情响应里库存/原价字段路径不可靠（真抓多次验证位置不固定），
+     * 本地 DB 存的是正确值（发布时写入），改价时直接透传，避免库存被兜底成 1、原价变 0.1。</p>
+     *
+     * @param itemId           要改价的原商品 id
+     * @param price            新价格（元，如 "99.00"），内部转分后传给发布接口
+     * @param stockOverride    原商品库存（本地 DB 值，非空则覆盖从详情提取）
+     * @param origPriceCentOverride 原价（分，本地 DB 值，非空则覆盖从详情提取）
+     * @return 新商品的发布结果，data 含新 itemId
+     */
+    public JsonNode updatePrice(String itemId, String price, String stockOverride, String origPriceCentOverride) {
         if (productApiService == null || publishApiService == null) {
             throw new IllegalStateException(
                 "updatePrice 需要 XianyuProductApiService 和 XianyuPublishApiService，请使用三参数构造函数"
@@ -138,8 +246,11 @@ public class XianyuProductEditApiService {
         // 2. 提取原商品字段，构造发布参数
         String title = extractTitle(itemDO);
         String description = extractDescription(itemDO);
-        String origPriceCent = extractOriginalPrice(itemDO);   // 原价保留
-        String stock = extractStock(itemDO, detail);            // 库存不变（透传 detail 兜底）
+        // 原价/库存：优先用调用方传入的本地 DB 值（可靠），否则才从详情提取（兜底）
+        String origPriceCent = (origPriceCentOverride != null && !origPriceCentOverride.isEmpty())
+                ? origPriceCentOverride : extractOriginalPrice(itemDO);
+        String stock = (stockOverride != null && !stockOverride.isEmpty())
+                ? stockOverride : extractStock(itemDO, detail);
         List<Map<String, Object>> images = extractImages(itemDO, detail);
         Map<String, String> catDTO = extractCatDTO(itemDO, detail);
         List<Map<String, Object>> labelExtList = extractLabelExtList(itemDO);
@@ -178,6 +289,22 @@ public class XianyuProductEditApiService {
      * @return 新商品的发布结果，data 含新 itemId
      */
     public JsonNode updateStock(String itemId, String stock) {
+        return updateStock(itemId, stock, null, null);
+    }
+
+    /**
+     * 改库存（值覆盖版）— 与 {@link #updateStock(String, String)} 相同流程，但允许调用方显式传
+     * 本地 DB 已存的售价（分）/ 原价（分），SDK 优先用传入值而非从闲鱼详情重新提取。
+     * <p>背景：闲鱼详情响应里价格字段路径不可靠（真抓多次验证位置不固定），
+     * 本地 DB 存的是正确值（发布时写入），改库存时直接透传，避免价格被兜底成 0.02、原价变 0.1。</p>
+     *
+     * @param itemId          要改库存的原商品 id
+     * @param stock           新库存数量（如 "50"），直接传给发布接口的 quantity
+     * @param priceCentOverride    售价（分，本地 DB 值，非空则覆盖从详情提取）
+     * @param origPriceCentOverride 原价（分，本地 DB 值，非空则覆盖从详情提取）
+     * @return 新商品的发布结果，data 含新 itemId
+     */
+    public JsonNode updateStock(String itemId, String stock, String priceCentOverride, String origPriceCentOverride) {
         if (productApiService == null || publishApiService == null) {
             throw new IllegalStateException(
                 "updateStock 需要 XianyuProductApiService 和 XianyuPublishApiService，请使用三参数构造函数"
@@ -193,8 +320,11 @@ public class XianyuProductEditApiService {
         // 2. 提取原商品字段，构造发布参数
         String title = extractTitle(itemDO);
         String description = extractDescription(itemDO);
-        String priceCent = extractPrice(itemDO);                // 价格不变
-        String origPriceCent = extractOriginalPrice(itemDO);   // 原价保留
+        // 售价/原价：优先用调用方传入的本地 DB 值（可靠），否则才从详情提取（兜底）
+        String priceCent = (priceCentOverride != null && !priceCentOverride.isEmpty())
+                ? priceCentOverride : extractPrice(itemDO);
+        String origPriceCent = (origPriceCentOverride != null && !origPriceCentOverride.isEmpty())
+                ? origPriceCentOverride : extractOriginalPrice(itemDO);
         List<Map<String, Object>> images = extractImages(itemDO, detail);
         Map<String, String> catDTO = extractCatDTO(itemDO, detail);
         List<Map<String, Object>> labelExtList = extractLabelExtList(itemDO);
@@ -279,30 +409,47 @@ public class XianyuProductEditApiService {
         return itemDO.path("desc").asText(itemDO.path("description").asText(""));
     }
 
-    /** 提取售价（分），从 priceInfo.price 或 soldPrice 拿 */
+    /**
+     * 提取售价（分）— 真抓验证（2026-08-04 p_publish-index.js bundle）：闲鱼价格在
+     * itemPriceDTO.priceInCent（嵌套对象，单位分）。旧版 priceInfo.price / soldPrice / price
+     * 三个字段在真实响应里取不到 → 返回 "0" → 改库存后价格变 0.02 元的 bug。
+     */
     private String extractPrice(JsonNode itemDO) {
-        // getProductDetail 返回的 price 已经在 priceInfo.price（分）
+        // 1. 真抓主路径：itemDO.itemPriceDTO.priceInCent（分）
+        JsonNode priceInCent = itemDO.path("itemPriceDTO").path("priceInCent");
+        if (!priceInCent.isMissingNode() && !priceInCent.isNull() && priceInCent.asLong() > 0) {
+            return String.valueOf(priceInCent.asLong());
+        }
+        // 2. 兜底：priceInfo.price（分）
         JsonNode priceNode = itemDO.path("priceInfo").path("price");
-        if (!priceNode.isMissingNode() && priceNode.asLong() > 0) {
+        if (!priceNode.isMissingNode() && !priceNode.isNull() && priceNode.asLong() > 0) {
             return String.valueOf(priceNode.asLong());
         }
-        // 兜底：soldPrice 字段（分）
+        // 3. 兜底：soldPrice 字段（分）
         JsonNode soldPrice = itemDO.path("soldPrice");
-        if (!soldPrice.isMissingNode() && soldPrice.asLong() > 0) {
+        if (!soldPrice.isMissingNode() && !soldPrice.isNull() && soldPrice.asLong() > 0) {
             return String.valueOf(soldPrice.asLong());
         }
-        // 再兜底：price 字段（可能带小数点，是元）
+        // 4. 再兜底：price 字段（可能带小数点，是元）
         JsonNode price = itemDO.path("price");
-        if (!price.isMissingNode() && price.asDouble() > 0) {
+        if (!price.isMissingNode() && !price.isNull() && price.asDouble() > 0) {
             return priceToCent(price.asText());
         }
         return "0";
     }
 
-    /** 提取原价（分） */
+    /**
+     * 提取原价（分）— 真抓：itemDO.itemPriceDTO.origPriceInCent（嵌套对象，分）
+     */
     private String extractOriginalPrice(JsonNode itemDO) {
+        // 1. 真抓主路径：itemDO.itemPriceDTO.origPriceInCent（分）
+        JsonNode origInCent = itemDO.path("itemPriceDTO").path("origPriceInCent");
+        if (!origInCent.isMissingNode() && !origInCent.isNull() && origInCent.asLong() > 0) {
+            return String.valueOf(origInCent.asLong());
+        }
+        // 2. 兜底：originalPrice（分）
         JsonNode origPrice = itemDO.path("originalPrice");
-        if (!origPrice.isMissingNode() && origPrice.asLong() > 0) {
+        if (!origPrice.isMissingNode() && !origPrice.isNull() && origPrice.asLong() > 0) {
             return String.valueOf(origPrice.asLong());
         }
         // 无原价时用售价兜底
@@ -584,16 +731,17 @@ public class XianyuProductEditApiService {
     // ==================== 商品删除 ====================
 
     /**
-     * 删除商品 — 真实接口 mtop.alibaba.idle.seller.pc.item.delete v1.0
-     * <p>真实抓包验证（参考项目 xianyu-auto-reply 已真验通）：
-     * 闲鱼 PC 卖家中心删除商品走 mtop.alibaba.idle.seller.pc.item.delete 域，
-     * 之前抓到的 com.taobao.idle.item.delete 是详情页按钮 onClick 姿妹接口（也存在但走 App WebView），
-     * 这里用参考项目真验通的 PC 域接口名。</p>
+     * 删除商品 — 真实接口 com.taobao.idle.item.delete v1.1
+     * <p>真抓验证（2026-08-04 闲鱼 PC 商品详情页 bundle p_item-index.js）：
+     * "删除" 按钮 onClick handler 源码直接调
+     * {@code ev.G({api:"com.taobao.idle.item.delete", v:"1.1", data:{itemId: eM}})}。
+     * 之前用的 mtop.alibaba.idle.seller.pc.item.delete 是参考项目验证的，本项目真抓确认不对，
+     * 闲鱼 PC 端删除商品走 com.taobao.idle.item.delete v1.1。</p>
      */
     public JsonNode deleteProduct(String itemId) {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("itemId", itemId != null ? itemId : "");
-        return apiClient.callMtop("mtop.alibaba.idle.seller.pc.item.delete", "1.0", toJson(data));
+        return apiClient.callMtop("com.taobao.idle.item.delete", "1.1", toJson(data));
     }
 
     /**

@@ -852,30 +852,70 @@ public class ProductService {
         XianyuPublishApiService publishApi = new XianyuPublishApiService(mtopClient);
         XianyuProductEditApiService editApi = new XianyuProductEditApiService(mtopClient, productApi, publishApi);
 
-        // 3. 调 SDK updatePrice：发新商品 + 下架原商品（真抓验证闲鱼 PC 端无编辑重发场景，必走此路径）
-        JsonNode pubResp = editApi.updatePrice(itemId, price.toPlainString());
+        // 3. 绕开详情接口，直接用本地 DB 字段发新商品（避免闲鱼风控拦详情 + 字段提取错）
+        //    本地 DB 在发布时已存了正确字段，直接用即可
+        List<String> imageUrls = extractImageUrlsFromLocal(product);
+        String newPriceCent = String.valueOf(price.movePointRight(2).longValue());  // 元→分
+        String origPriceCent = product.getOriginalPrice() != null
+                ? String.valueOf(product.getOriginalPrice().movePointRight(2).longValue()) : "0";
+        String stock = product.getStock() != null ? String.valueOf(product.getStock()) : "1";
+
+        JsonNode pubResp;
+        try {
+            pubResp = editApi.republishWithLocalFields(
+                product.getTitle(), product.getDescription(),
+                newPriceCent, origPriceCent, stock,
+                imageUrls,
+                product.getCategoryId(), product.getGoodsType(),
+                product.getDeliverType(), product.getDeliverContentTemplate());
+        } catch (IllegalStateException e) {
+            // 风控拦或必填字段缺，抛清晰错误给用户
+            throw new IllegalStateException(e.getMessage());
+        }
         if (!isMtopSuccess(pubResp)) {
-            throw new IllegalStateException("Xianyu updatePrice (republish new + shelf off old) failed: " + safeMtopMsg(pubResp));
+            throw new IllegalStateException("Xianyu updatePrice (republish new) failed: " + safeMtopMsg(pubResp));
         }
 
-        // 4. 解析新商品 itemId
+        // 4. 下架原商品（发新成功后才下架，避免丢失在售）
+        try { editApi.shelfOff(itemId); } catch (Exception e) { /* 下架失败不影响主流程，新商品已发 */ }
+
+        // 5. 解析新商品 itemId
         String newItemId = parseItemIdFromPublishResp(pubResp);
 
-        // 5. 更新本地 DB：原商品标记下架（闲鱼已自动下架，本地同步状态）
+        // 6. 更新本地 DB：原商品标记下架（闲鱼已自动下架，本地同步状态）
         product.setStatus("OFF_SALE");
         product.setPrice(price);
         product.setUpdatedAt(LocalDateTime.now());
         productMapper.updateById(product);
 
-        // 6. 同步新商品信息到本地（如果有新 itemId 则 upsert 新记录，否则通过 syncFromXianyu 拉回）
+        // 7. 同步新商品信息到本地（如果有新 itemId 则 upsert 新记录，否则通过 syncFromXianyu 拉回）
         if (newItemId != null && !newItemId.isEmpty()) {
             syncSingleItem(account.getId(), newItemId);
         } else {
-            // 发布接口未返回新 itemId，通过列表同步拉回
             try { syncFromXianyu(account.getId()); } catch (Exception e) { /* 不影响主流程 */ }
         }
 
         return product;
+    }
+
+    /** 从本地 DB 提取图片 URL 列表：images（JSON array）优先，兜底 imageUrl（主图） */
+    private List<String> extractImageUrlsFromLocal(XianyuProduct product) {
+        List<String> urls = new ArrayList<>();
+        if (product.getImages() != null && !product.getImages().isBlank()) {
+            try {
+                JsonNode arr = MAPPER.readTree(product.getImages());
+                if (arr.isArray()) {
+                    for (JsonNode n : arr) {
+                        String u = n.asText("");
+                        if (!u.isBlank()) urls.add(u);
+                    }
+                }
+            } catch (Exception ignored) { }
+        }
+        if (urls.isEmpty() && product.getImageUrl() != null && !product.getImageUrl().isBlank()) {
+            urls.add(product.getImageUrl());
+        }
+        return urls;
     }
 
     /** 从 JsonNode 拿指定字段 int 值，缺失返 0 */
@@ -916,26 +956,45 @@ public class ProductService {
         XianyuPublishApiService publishApi = new XianyuPublishApiService(mtopClient);
         XianyuProductEditApiService editApi = new XianyuProductEditApiService(mtopClient, productApi, publishApi);
 
-        // 3. 调 SDK updateStock：获取详情 → 改库存 → 发布新商品 → 下架原商品
-        JsonNode pubResp = editApi.updateStock(itemId, String.valueOf(stock));
+        // 3. 绕开详情接口，直接用本地 DB 字段发新商品（避免闲鱼风控拦详情 + 字段提取错）
+        //    售价/原价直接用本地 DB 值（发布时写入的正确值）
+        List<String> imageUrls = extractImageUrlsFromLocal(product);
+        String priceCent = product.getPrice() != null
+                ? String.valueOf(product.getPrice().movePointRight(2).longValue()) : "0";
+        String origPriceCent = product.getOriginalPrice() != null
+                ? String.valueOf(product.getOriginalPrice().movePointRight(2).longValue()) : "0";
+
+        JsonNode pubResp;
+        try {
+            pubResp = editApi.republishWithLocalFields(
+                product.getTitle(), product.getDescription(),
+                priceCent, origPriceCent, String.valueOf(stock),
+                imageUrls,
+                product.getCategoryId(), product.getGoodsType(),
+                product.getDeliverType(), product.getDeliverContentTemplate());
+        } catch (IllegalStateException e) {
+            throw new IllegalStateException(e.getMessage());
+        }
         if (!isMtopSuccess(pubResp)) {
-            throw new IllegalStateException("Xianyu updateStock (republish new + shelf off old) failed: " + safeMtopMsg(pubResp));
+            throw new IllegalStateException("Xianyu updateStock (republish new) failed: " + safeMtopMsg(pubResp));
         }
 
-        // 4. 解析新商品 itemId
+        // 4. 下架原商品（发新成功后才下架，避免丢失在售）
+        try { editApi.shelfOff(itemId); } catch (Exception e) { /* 下架失败不影响主流程 */ }
+
+        // 5. 解析新商品 itemId
         String newItemId = parseItemIdFromPublishResp(pubResp);
 
-        // 5. 更新本地 DB：原商品标记下架（闲鱼已自动下架，本地同步状态）
+        // 6. 更新本地 DB：原商品标记下架（闲鱼已自动下架，本地同步状态）
         product.setStatus("OFF_SALE");
         product.setStock(stock);
         product.setUpdatedAt(LocalDateTime.now());
         productMapper.updateById(product);
 
-        // 6. 同步新商品信息到本地（如果有新 itemId 则 upsert 新记录，否则通过 syncFromXianyu 拉回）
+        // 7. 同步新商品信息到本地（如果有新 itemId 则 upsert 新记录，否则通过 syncFromXianyu 拉回）
         if (newItemId != null && !newItemId.isEmpty()) {
             syncSingleItem(account.getId(), newItemId);
         } else {
-            // 发布接口未返回新 itemId，通过列表同步拉回
             try { syncFromXianyu(account.getId()); } catch (Exception e) { /* 不影响主流程 */ }
         }
 
