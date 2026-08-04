@@ -409,6 +409,10 @@ public class DatabaseInitializer {
         ensureColumn("virtual_ship_task", "error_message", "TEXT");
         ensureColumn("virtual_ship_task", "execute_at", "DATETIME");
         ensureColumn("virtual_ship_task", "processed_at", "DATETIME");
+        // virtual_ship_task 发货送达回执链路新增列（幂等）：sent_at 在 sqlite/mysql 写 DATETIME、postgres 写 TIMESTAMP，
+        // 现网 ensureColumn 第三参数 DDL 方言无关（PG 把 DATETIME 当 TIMESTAMP 兼容），照 processed_at 写法即可。
+        ensureColumn("virtual_ship_task", "message_id", "VARCHAR(128)");
+        ensureColumn("virtual_ship_task", "sent_at", "DATETIME");
         // virtual_ship_config 早期 schema 缺列，旧库 ALTER 补齐（幂等）
         ensureColumn("virtual_ship_config", "account_id", "BIGINT");
         ensureColumn("virtual_ship_config", "enabled", "INTEGER DEFAULT 0");
