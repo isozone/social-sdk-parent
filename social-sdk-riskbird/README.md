@@ -166,6 +166,7 @@ social-sdk:
 | POST | `/accounts/{id}/persons` | 人员查询（`{keyword, maxResults}`） |
 | POST | `/accounts/{id}/trademark` | 商标查询（`{keyword, page}`） |
 | GET | `/accounts/{id}/company?name=&entId=` | 企业详情（含电话/邮箱） |
+| POST | `/accounts/{id}/biz/companies-with-ip` | **业务组合**：按省份/地市/行业筛选检索企业 → 逐条取详情（电话）→ 查商标/软著/专利（body: `{keyword, province, city, industry, maxCompanies, onlyWithPhone}`） |
 | DELETE | `/accounts/{id}` | 关闭账号会话 |
 
 示例：
@@ -187,6 +188,11 @@ curl -X POST localhost:8080/api/social-sdk/riskbird/accounts/1001/persons \
 
 # 企业详情（电话/邮箱）
 curl 'localhost:8080/api/social-sdk/riskbird/accounts/1001/company?name=阿里巴巴（中国）有限公司'
+
+# 业务组合：按省份/地市筛选某类企业 → 逐条取详情（电话）→ 查商标/软著/专利
+curl -X POST localhost:8080/api/social-sdk/riskbird/accounts/1001/biz/companies-with-ip \
+  -H 'Content-Type: application/json' \
+  -d '{"keyword":"软件","province":"浙江","city":"杭州","industry":"软件和信息技术服务业","maxCompanies":5,"onlyWithPhone":true}'
 ```
 
 ## 测试

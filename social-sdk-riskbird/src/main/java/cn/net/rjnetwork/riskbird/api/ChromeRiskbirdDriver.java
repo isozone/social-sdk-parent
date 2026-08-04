@@ -280,7 +280,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
             pg.waitForLoadState(20);
             // 1. 页面点击筛选项（省份 → 地市 → 行业 → 状态）
             applyFilter(pg, filter);
-            // 2. 轮询等待「总数」或「未登录提示」
+            // 2. 轮询等待「总数」且结果项渲染完成（筛选后结果为 SPA 异步渲染，total 出现时卡片可能未就绪）
             Integer total = null;
             long deadline = System.currentTimeMillis() + config.getSearchTimeoutMs();
             while (System.currentTimeMillis() < deadline) {
@@ -290,7 +290,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
                             .error("未登录或查询次数已达上限，请先扫码登录").channel("dom").build();
                 }
                 total = parseTotalCount(bodyText);
-                if (total != null) {
+                if (total != null && total > 0 && pg.count(config.getSearchResultItemSelector()) > 0) {
                     break;
                 }
                 Thread.sleep(500);
@@ -300,8 +300,12 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
                         .error("筛选后未命中结果（可能未登录、额度受限或无匹配企业）").channel("dom")
                         .total(total == null ? 0 : total).build();
             }
-            // 3. 解析结果列表
+            // 3. 解析结果列表（total 出现但卡片未就绪时多等一轮）
             List<String> texts = pg.texts(config.getSearchResultItemSelector());
+            if (texts.isEmpty()) {
+                Thread.sleep(1500);
+                texts = pg.texts(config.getSearchResultItemSelector());
+            }
             List<RiskbirdCompany> companies = new ArrayList<>();
             for (String t : texts) {
                 if (t == null || t.contains("个人中心") || t.contains("扫码下载")
@@ -389,10 +393,12 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
                 log.warn("[RISKBIRD] 详情页未找到「知识产权」tab, company={}", companyName);
             }
             Thread.sleep(3000); // 等知识产权区异步加载
+            // 从「商标信息」数据区开始截取（tab 栏的「知识产权|999+」在数据区之前，定位到数据区更准确）
             String rawText = page.evalString("(() => { "
                     + "const t = document.body.innerText || ''; "
-                    + "const i = t.indexOf('知识产权'); "
-                    + "return i >= 0 ? t.substring(i, Math.min(t.length, i + 3000)) : ''; })()");
+                    + "let i = t.indexOf('商标信息'); "
+                    + "if (i < 0) { i = t.indexOf('知识产权'); } "
+                    + "return i >= 0 ? t.substring(i, Math.min(t.length, i + 6000)) : ''; })()");
             return parseIntellectualProperty(rawText);
         } finally {
             profile.release();
