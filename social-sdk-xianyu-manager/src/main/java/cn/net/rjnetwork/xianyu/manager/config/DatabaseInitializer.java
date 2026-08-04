@@ -344,6 +344,21 @@ public class DatabaseInitializer {
                         logger.debug("schema stmt skipped (already exists): {}", sql.substring(0, Math.min(80, sql.length())));
                         continue;
                     }
+                    // 老库升级期：schema 文件里「CREATE INDEX ON 新列」对还没 ALTER 补列的旧表会抛
+                    // no such column / does not exist / unknown column。这是升级期正常情况——
+                    // 后续 ensureColumn 会幂等补列，不该当硬错冒泡跳掉 ensure* 兜底链。
+                    // 必须放 skip 而非冒泡，否则 ensureVirtualColumns() 会被整个跳过（现网症结）。
+                    boolean newColumnNotYetAdded = msg.contains("no such column")
+                            || msg.contains("no such column:")
+                            || msg.contains("unknown column")
+                            || msg.contains("does not exist")
+                            || msg.contains("column") && (msg.contains("not found") || msg.contains("missing"));
+                    if (newColumnNotYetAdded && sql.trim().toUpperCase().startsWith("CREATE INDEX")) {
+                        skip++;
+                        logger.debug("schema CREATE INDEX skipped (column not yet ALTER-ed, ensureColumn will backfill): {}",
+                                sql.substring(0, Math.min(80, sql.length())));
+                        continue;
+                    }
                     if (firstHardError == null) firstHardError = ex;
                     logger.error("schema stmt FAILED (hard error): {} | sql: {}", ex.getMessage(),
                             sql.substring(0, Math.min(120, sql.length())));
