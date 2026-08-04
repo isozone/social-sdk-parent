@@ -74,6 +74,8 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ApiResponse<Void> handleGeneralException(Exception e) {
         logger.error("Unexpected error", e);
-        return ApiResponse.fail("INTERNAL_ERROR", "An unexpected error occurred");
+        // 透传真实异常 message，避免用户只看到 "An unexpected error occurred" 无法定位根因
+        String msg = e.getMessage() != null && !e.getMessage().isBlank() ? e.getMessage() : e.getClass().getSimpleName();
+        return ApiResponse.fail("INTERNAL_ERROR", msg);
     }
 }

@@ -841,29 +841,17 @@ public class ProductService {
         XianyuPublishApiService publishApi = new XianyuPublishApiService(mtopClient);
         XianyuProductEditApiService editApi = new XianyuProductEditApiService(mtopClient, productApi, publishApi);
 
-        // 3. 调 SDK updatePrice：获取详情 → 改价 → 发布新商品 → 下架原商品
+        // 3. 调 SDK updatePrice：编辑重发改价（传 itemId，scene=pcEdit，itemId 保留，浏览量/收藏不清零）
         JsonNode pubResp = editApi.updatePrice(itemId, price.toPlainString());
         if (!isMtopSuccess(pubResp)) {
-            throw new IllegalStateException("Xianyu updatePrice (republish new + shelf off old) failed: " + safeMtopMsg(pubResp));
+            throw new IllegalStateException("Xianyu updatePrice (edit republish) failed: " + safeMtopMsg(pubResp));
         }
 
-        // 4. 解析新商品 itemId
-        String newItemId = parseItemIdFromPublishResp(pubResp);
-
-        // 5. 更新本地 DB：原商品标记下架（闲鱼已自动下架，本地同步状态）
-        product.setStatus("OFF_SALE");
+        // 4. 编辑重发 itemId 不变，不需要解析新 itemId / 下架原商品 / 同步新记录
+        //    只更新本地 DB 价格字段
         product.setPrice(price);
         product.setUpdatedAt(LocalDateTime.now());
         productMapper.updateById(product);
-
-
-        // 6. 同步新商品信息到本地（如果有新 itemId 则 upsert 新记录，否则通过 syncFromXianyu 拉回）
-        if (newItemId != null && !newItemId.isEmpty()) {
-            syncSingleItem(account.getId(), newItemId);
-        } else {
-            // 发布接口未返回新 itemId，通过列表同步拉回
-            try { syncFromXianyu(account.getId()); } catch (Exception e) { /* 不影响主流程 */ }
-        }
 
         return product;
     }

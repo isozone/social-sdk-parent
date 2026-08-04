@@ -140,7 +140,7 @@ public class XianyuProductEditApiService {
         String description = extractDescription(itemDO);
         String origPriceCent = extractOriginalPrice(itemDO);   // 原价保留
         String stock = extractStock(itemDO);                    // 库存不变
-        List<Map<String, Object>> images = extractImages(itemDO);
+        List<Map<String, Object>> images = extractImages(itemDO, detail);
         Map<String, String> catDTO = extractCatDTO(itemDO, detail);
         List<Map<String, Object>> labelExtList = extractLabelExtList(itemDO);
         Map<String, Object> addrDTO = extractAddrDTO(itemDO);
@@ -149,18 +149,19 @@ public class XianyuProductEditApiService {
         // 3. 价格：元 → 分
         String newPriceCent = priceToCent(price);
 
-        // 4. 发布新商品（itemId=null → pcMainPublish 场景，生成新商品）
+        // 4. 编辑重发改价：传 itemId 调 publishItem 重载版，闲鱼按「编辑已有商品」处理，
+        //    itemId 保留，浏览量/收藏不清零，scene=pcEdit。比"发新商品+下架原商品"更稳，
+        //    避免新发商品类目/图片/标签任一字段提取错就抛错。
         JsonNode publishResult = publishApiService.publishItem(
-            null, title, description, newPriceCent, origPriceCent, stock,
+            itemId, title, description, newPriceCent, origPriceCent, stock,
             images, catDTO, labelExtList, addrDTO, deliverySettings
         );
 
-        // 5. 发布成功才下架原商品；失败抛异常保留原商品，避免丢失在售
+        // 5. 编辑重发失败抛异常（保留原商品在售，不会下架）
         if (!isPublishSuccess(publishResult)) {
-            throw new IllegalStateException("改价：发布新商品失败，已保留原商品，resp=" + publishResult);
+            throw new IllegalStateException("改价：编辑重发失败，原商品保留在售，resp=" + publishResult);
         }
-        shelfOff(itemId);
-
+        // 编辑重发不需要下架原商品（itemId 保留，闲鱼已就地改价）
         return publishResult;
     }
 
@@ -191,7 +192,7 @@ public class XianyuProductEditApiService {
         String description = extractDescription(itemDO);
         String priceCent = extractPrice(itemDO);                // 价格不变
         String origPriceCent = extractOriginalPrice(itemDO);   // 原价保留
-        List<Map<String, Object>> images = extractImages(itemDO);
+        List<Map<String, Object>> images = extractImages(itemDO, detail);
         Map<String, String> catDTO = extractCatDTO(itemDO, detail);
         List<Map<String, Object>> labelExtList = extractLabelExtList(itemDO);
         Map<String, Object> addrDTO = extractAddrDTO(itemDO);
@@ -229,7 +230,7 @@ public class XianyuProductEditApiService {
         String description = extractDescription(itemDO);
         String priceCent = extractPrice(itemDO);                // 售价不变
         String stock = extractStock(itemDO);                    // 库存不变
-        List<Map<String, Object>> images = extractImages(itemDO);
+        List<Map<String, Object>> images = extractImages(itemDO, detail);
         Map<String, String> catDTO = extractCatDTO(itemDO, detail);
         List<Map<String, Object>> labelExtList = extractLabelExtList(itemDO);
         Map<String, Object> addrDTO = extractAddrDTO(itemDO);
@@ -314,43 +315,83 @@ public class XianyuProductEditApiService {
         return "1"; // 默认 1
     }
 
-    /** 提取图片列表 → publishItem 需要的 imageInfoList（含 url/height/width） */
+    /**
+     * 提取图片列表 → publishItem 需要的 imageInfoList（含 url/height/width）
+     * <p>真实抓包验证（2026-08-04 调 mtop.taobao.idle.pc.detail）：图片在 {@code itemDO.imageInfos[]}，
+     * 每项含 url / major / photoSearchUrl 等；主图兜底在 {@code trackParams.mainPic}（在 detail 根不在 itemDO）。
+     * 旧版 picInfo / picPath / picDetailDO 字段在真实响应里不存在，仅保留兼容兜底。</p>
+     */
     private List<Map<String, Object>> extractImages(JsonNode itemDO) {
+        return extractImages(itemDO, null);
+    }
+
+    /** 重载版：detail 传入以兜底 trackParams.mainPic（imageInfos 也空时用） */
+    private List<Map<String, Object>> extractImages(JsonNode itemDO, JsonNode detail) {
         List<Map<String, Object>> images = new ArrayList<>();
-        // 主图：picInfo / picPath
-        JsonNode picInfo = itemDO.path("picInfo");
-        if (picInfo.isArray() && !picInfo.isEmpty()) {
-            for (JsonNode pic : picInfo) {
-                addImageFromPicNode(images, pic);
-            }
-        } else if (itemDO.path("picPath").isValueNode()) {
-            // 单图形式
-            Map<String, Object> img = new LinkedHashMap<>();
-            img.put("url", itemDO.path("picPath").asText(""));
-            img.put("height", itemDO.path("picHeight").asInt(800));
-            img.put("width", itemDO.path("picWidth").asInt(800));
-            images.add(img);
-        }
-        // 详情图：picDetailDO / imageList
-        JsonNode picDetailDO = itemDO.path("picDetailDO");
-        if (picDetailDO.isArray() && !picDetailDO.isEmpty()) {
-            for (JsonNode pic : picDetailDO) {
-                addImageFromPicNode(images, pic);
-            }
-        }
-        JsonNode imageList = itemDO.path("imageList");
-        if (imageList.isArray() && !imageList.isEmpty()) {
-            for (JsonNode img : imageList) {
+
+        // 1. 真抓主路径：itemDO.imageInfos[]（每项含 url / major / 尺寸）
+        JsonNode imageInfos = itemDO.path("imageInfos");
+        if (imageInfos.isArray() && !imageInfos.isEmpty()) {
+            for (JsonNode img : imageInfos) {
+                // imageInfos 里 url 字段名可能是 url / picUrl / path
+                String url = firstNonBlank(
+                        img.path("url").asText(""), img.path("picUrl").asText(""), img.path("path").asText(""));
+                if (url.isEmpty()) continue;
                 Map<String, Object> item = new LinkedHashMap<>();
-                item.put("url", img.path("url").asText(img.path("path").asText("")));
-                item.put("height", img.path("height").asInt(800));
-                item.put("width", img.path("width").asInt(800));
-                if (!item.get("url").toString().isEmpty()) {
+                item.put("url", url);
+                item.put("height", img.path("height").asInt(img.path("heightSize").asInt(800)));
+                item.put("width", img.path("width").asInt(img.path("widthSize").asInt(800)));
+                images.add(item);
+            }
+        }
+
+        // 2. 兜底旧字段名（极个别账号响应结构差异）：picInfo / picPath / picDetailDO / imageList
+        if (images.isEmpty()) {
+            JsonNode picInfo = itemDO.path("picInfo");
+            if (picInfo.isArray() && !picInfo.isEmpty()) {
+                for (JsonNode pic : picInfo) addImageFromPicNode(images, pic);
+            } else if (!itemDO.path("picPath").asText("").isEmpty()) {
+                Map<String, Object> img = new LinkedHashMap<>();
+                img.put("url", itemDO.path("picPath").asText(""));
+                img.put("height", itemDO.path("picHeight").asInt(800));
+                img.put("width", itemDO.path("picWidth").asInt(800));
+                images.add(img);
+            }
+            JsonNode picDetailDO = itemDO.path("picDetailDO");
+            if (picDetailDO.isArray() && !picDetailDO.isEmpty()) {
+                for (JsonNode pic : picDetailDO) addImageFromPicNode(images, pic);
+            }
+            JsonNode imageList = itemDO.path("imageList");
+            if (imageList.isArray() && !imageList.isEmpty()) {
+                for (JsonNode img : imageList) {
+                    String url = img.path("url").asText(img.path("path").asText(""));
+                    if (url.isEmpty()) continue;
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("url", url);
+                    item.put("height", img.path("height").asInt(800));
+                    item.put("width", img.path("width").asInt(800));
                     images.add(item);
                 }
             }
         }
+
+        // 3. 最终兜底：trackParams.mainPic（真抓验证，在 detail 根不在 itemDO）
+        if (images.isEmpty() && detail != null) {
+            String mainPic = detail.path("trackParams").path("mainPic").asText("");
+            if (!mainPic.isEmpty()) {
+                Map<String, Object> img = new LinkedHashMap<>();
+                img.put("url", mainPic);
+                img.put("height", 800);
+                img.put("width", 800);
+                images.add(img);
+            }
+        }
         return images;
+    }
+
+    private String firstNonBlank(String... vals) {
+        for (String v : vals) if (v != null && !v.isEmpty()) return v;
+        return "";
     }
 
     private void addImageFromPicNode(List<Map<String, Object>> images, JsonNode pic) {
@@ -363,24 +404,61 @@ public class XianyuProductEditApiService {
         images.add(img);
     }
 
-    /** 提取分类信息 → catDTO {catId, catName, channelCatId, tbCatId} */
+    /**
+     * 提取分类信息 → catDTO {catId, catName, channelCatId, leafId, tbCatId}
+     * <p>真抓验证（2026-08-04 调 mtop.taobao.idle.pc.detail）：类目在嵌套对象 {@code itemDO.itemCatDTO}，
+     * 含 catId/channelCatId/leafId/tbCatId/rootChannelCatId/level2ChannelCatId/level3ChannelCatId。
+     * 兜底在 {@code detail.data.trackParams}（categoryId/channelCatId/rootChannelCatId）。
+     * 旧版 itemDO.categoryId / itemDO.channelCatId 扁平字段在真实响应里不存在。</p>
+     */
     private Map<String, String> extractCatDTO(JsonNode itemDO, JsonNode detail) {
         Map<String, String> catDTO = new LinkedHashMap<>();
-        // 优先从 itemDO 提取
-        String catId = itemDO.path("categoryId").asText("");
-        if (!catId.isEmpty()) catDTO.put("catId", catId);
-        String channelCatId = itemDO.path("channelCatId").asText("");
-        if (!channelCatId.isEmpty()) catDTO.put("channelCatId", channelCatId);
-        String catName = itemDO.path("categoryName").asText("");
-        if (!catName.isEmpty()) catDTO.put("catName", catName);
-        // 兜底从 detail.data.trackParams 拿
-        if (catDTO.isEmpty()) {
+
+        // 1. 真抓主路径：itemDO.itemCatDTO（嵌套对象，含完整 5 字段）
+        JsonNode itemCatDTO = itemDO.path("itemCatDTO");
+        if (!itemCatDTO.isMissingNode() && !itemCatDTO.isNull()) {
+            putIfNonBlank(catDTO, "catId", itemCatDTO.path("catId").asText(""));
+            putIfNonBlank(catDTO, "catName", itemCatDTO.path("catName").asText(itemCatDTO.path("categoryName").asText("")));
+            putIfNonBlank(catDTO, "channelCatId", itemCatDTO.path("channelCatId").asText(""));
+            putIfNonBlank(catDTO, "leafId", itemCatDTO.path("leafId").asText(""));
+            putIfNonBlank(catDTO, "tbCatId", itemCatDTO.path("tbCatId").asText(""));
+        }
+
+        // 2. 兜底：itemDO 扁平字段（categoryId 兜底 catId；channelCatId/leafId/tbCatId 旧路径兼容）
+        if (catDTO.get("catId") == null) {
+            putIfNonBlank(catDTO, "catId", itemDO.path("categoryId").asText(""));
+        }
+        if (catDTO.get("channelCatId") == null) {
+            putIfNonBlank(catDTO, "channelCatId", itemDO.path("channelCatId").asText(""));
+        }
+        if (catDTO.get("leafId") == null) {
+            putIfNonBlank(catDTO, "leafId", itemDO.path("leafId").asText(""));
+        }
+        if (catDTO.get("tbCatId") == null) {
+            putIfNonBlank(catDTO, "tbCatId", itemDO.path("tbCatId").asText(""));
+        }
+        if (catDTO.get("catName") == null) {
+            putIfNonBlank(catDTO, "catName", itemDO.path("categoryName").asText(""));
+        }
+
+        // 3. 最终兜底：detail.data.trackParams（categoryId/channelCatId/rootChannelCatId 都有）
+        if (detail != null) {
             JsonNode trackParams = detail.path("data").path("trackParams");
-            if (trackParams.path("categoryId").isValueNode()) {
-                catDTO.put("catId", trackParams.path("categoryId").asText(""));
+            if (catDTO.get("catId") == null) {
+                putIfNonBlank(catDTO, "catId", trackParams.path("categoryId").asText(""));
+            }
+            if (catDTO.get("channelCatId") == null) {
+                // trackParams.channelCatId 是真值；rootChannelCatId 是兜底
+                String cc = trackParams.path("channelCatId").asText("");
+                if (cc.isEmpty()) cc = trackParams.path("rootChannelCatId").asText("");
+                putIfNonBlank(catDTO, "channelCatId", cc);
             }
         }
         return catDTO;
+    }
+
+    private void putIfNonBlank(Map<String, String> map, String key, String value) {
+        if (value != null && !value.isEmpty()) map.put(key, value);
     }
 
     /** 提取属性标签列表 */
