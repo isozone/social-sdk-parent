@@ -139,7 +139,7 @@ public class XianyuProductEditApiService {
         String title = extractTitle(itemDO);
         String description = extractDescription(itemDO);
         String origPriceCent = extractOriginalPrice(itemDO);   // 原价保留
-        String stock = extractStock(itemDO);                    // 库存不变
+        String stock = extractStock(itemDO, detail);            // 库存不变（透传 detail 兜底）
         List<Map<String, Object>> images = extractImages(itemDO, detail);
         Map<String, String> catDTO = extractCatDTO(itemDO, detail);
         List<Map<String, Object>> labelExtList = extractLabelExtList(itemDO);
@@ -149,19 +149,22 @@ public class XianyuProductEditApiService {
         // 3. 价格：元 → 分
         String newPriceCent = priceToCent(price);
 
-        // 4. 编辑重发改价：传 itemId 调 publishItem 重载版，闲鱼按「编辑已有商品」处理，
-        //    itemId 保留，浏览量/收藏不清零，scene=pcEdit。比"发新商品+下架原商品"更稳，
-        //    避免新发商品类目/图片/标签任一字段提取错就抛错。
+        // 4. 发新商品版（itemId=null → pcMainPublish 场景）
+        //    真抓验证（2026-08-04 调闲鱼 PC 发布页 bundle p_publish-index.js，139 万字）：
+        //    闲鱼 PC 端 publishScene 只有 "mainPublish"/"pcMainPublish"，**无编辑重发场景**。
+        //    传 itemId + scene=pcEdit 是瞎猜的，闲鱼端不认 pcEdit，按发新商品处理 → 改价后多出一个商品。
+        //    所以闲鱼 PC 端改价只能走"发新商品 + 下架旧商品"路径，没有编辑重发这条路。
         JsonNode publishResult = publishApiService.publishItem(
-            itemId, title, description, newPriceCent, origPriceCent, stock,
+            null, title, description, newPriceCent, origPriceCent, stock,
             images, catDTO, labelExtList, addrDTO, deliverySettings
         );
 
-        // 5. 编辑重发失败抛异常（保留原商品在售，不会下架）
+        // 5. 发布成功才下架原商品；失败抛异常保留原商品，避免丢失在售
         if (!isPublishSuccess(publishResult)) {
-            throw new IllegalStateException("改价：编辑重发失败，原商品保留在售，resp=" + publishResult);
+            throw new IllegalStateException("改价：发布新商品失败，已保留原商品，resp=" + publishResult);
         }
-        // 编辑重发不需要下架原商品（itemId 保留，闲鱼已就地改价）
+        shelfOff(itemId);
+
         return publishResult;
     }
 
@@ -306,13 +309,40 @@ public class XianyuProductEditApiService {
         return extractPrice(itemDO);
     }
 
-    /** 提取库存 */
+    /**
+     * 提取库存 — 真抓验证闲鱼 bundle 里字段名是 quantity，但详情响应里位置可能在
+     * itemDO / b2cItemDO / data 根，且 spuQuantity（SPU 总库存）兜底。
+     * 旧版只走 itemDO.quantity，取不到直接返回 "1" → 改价后库存变 1 的 bug。
+     */
     private String extractStock(JsonNode itemDO) {
-        JsonNode quantity = itemDO.path("quantity");
-        if (!quantity.isMissingNode() && quantity.asInt() > 0) {
-            return String.valueOf(quantity.asInt());
+        return extractStock(itemDO, null);
+    }
+
+    /** 重载版：detail 传入以兜底 b2cItemDO.quantity / data.quantity / spuQuantity */
+    private String extractStock(JsonNode itemDO, JsonNode detail) {
+        // 1. itemDO.quantity（主路径）
+        JsonNode q = itemDO.path("quantity");
+        if (!q.isMissingNode() && !q.isNull() && q.asInt() > 0) {
+            return String.valueOf(q.asInt());
         }
-        return "1"; // 默认 1
+        // 2. itemDO.spuQuantity（SPU 总库存兜底）
+        q = itemDO.path("spuQuantity");
+        if (!q.isMissingNode() && !q.isNull() && q.asInt() > 0) {
+            return String.valueOf(q.asInt());
+        }
+        // 3. detail.data.b2cItemDO.quantity（b2c 模式）
+        if (detail != null) {
+            JsonNode b2c = detail.path("data").path("b2cItemDO").path("quantity");
+            if (!b2c.isMissingNode() && !b2c.isNull() && b2c.asInt() > 0) {
+                return String.valueOf(b2c.asInt());
+            }
+            // 4. detail.data.quantity（根兜底）
+            JsonNode dq = detail.path("data").path("quantity");
+            if (!dq.isMissingNode() && !dq.isNull() && dq.asInt() > 0) {
+                return String.valueOf(dq.asInt());
+            }
+        }
+        return "1"; // 全兜底也取不到，保留默认 1（极少数情况）
     }
 
     /**

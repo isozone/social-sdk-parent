@@ -353,19 +353,30 @@ public class ProductService {
             JsonNode picDetail = detailData.path("picDetailDO");
             JsonNode itemDO = detailData.path("itemDO");
 
-            String title = pickText(b2cItem, "title");
+            // 真抓验证（2026-08-04 调 mtop.taobao.idle.pc.detail）：标题/价格/库存/描述真值在 data.itemDO，
+            // b2cItemDO 仅 b2c 模式存在。旧版主走 b2cItemDO 导致非 b2c 账号全取空 → syncSingleItem 标题/价格为空。
+            String title = pickText(itemDO, "title");
+            if (title.isEmpty()) title = pickText(b2cItem, "title");
             if (title.isEmpty()) title = pickText(detailData, "title");
-            BigDecimal price = pickBigDecimal(b2cItem, "priceInCent", "soldPrice");
+            BigDecimal price = pickBigDecimal(itemDO, "priceInCent", "soldPrice", "price");
+            if (price == null) price = pickBigDecimal(b2cItem, "priceInCent", "soldPrice");
             if (price == null) price = pickBigDecimal(detailData, "priceInfo.price", "soldPrice", "price");
-            BigDecimal orig = pickBigDecimal(b2cItem, "oriPriceInCent", "originalPrice");
+            BigDecimal orig = pickBigDecimal(itemDO, "oriPriceInCent", "originalPrice");
+            if (orig == null) orig = pickBigDecimal(b2cItem, "oriPriceInCent", "originalPrice");
             Integer stock = pickInt(itemDO, "quantity");
             if (stock == null) stock = pickInt(b2cItem, "quantity");
-            String description = pickText(b2cItem, "desc");
+            String description = pickText(itemDO, "desc");
+            if (description.isEmpty()) description = pickText(b2cItem, "desc");
             if (description.isEmpty()) description = pickText(detailData, "desc");
-            String images = extractImagesJson(picDetail.path("picUrlList"));
+            // 图片真抓在 data.itemDO.imageInfos[]（前面真抓验证过），picDetailDO.picUrlList 是兜底
+            String images = extractImagesJson(itemDO.path("imageInfos"));
+            if (images == null) images = extractImagesJson(picDetail.path("picUrlList"));
             if (images == null) images = extractImagesJson(b2cItem.path("picUrlList"));
-            String mainImageUrl = firstPicUrl(picDetail.path("picUrlList"));
+            String mainImageUrl = firstPicUrl(itemDO.path("imageInfos"));
+            if (mainImageUrl == null) mainImageUrl = firstPicUrl(picDetail.path("picUrlList"));
             if (mainImageUrl == null) mainImageUrl = firstPicUrl(b2cItem.path("picUrlList"));
+            // 兜底 trackParams.mainPic（真抓验证过）
+            if (mainImageUrl == null) mainImageUrl = pickText(detailData.path("trackParams"), "mainPic");
             String rawStatus = pickString(itemDO, "itemStatus");
             if (rawStatus == null || rawStatus.isEmpty()) rawStatus = pickString(detailData, "itemStatus");
             String status = mapStatus(rawStatus);
@@ -841,17 +852,28 @@ public class ProductService {
         XianyuPublishApiService publishApi = new XianyuPublishApiService(mtopClient);
         XianyuProductEditApiService editApi = new XianyuProductEditApiService(mtopClient, productApi, publishApi);
 
-        // 3. 调 SDK updatePrice：编辑重发改价（传 itemId，scene=pcEdit，itemId 保留，浏览量/收藏不清零）
+        // 3. 调 SDK updatePrice：发新商品 + 下架原商品（真抓验证闲鱼 PC 端无编辑重发场景，必走此路径）
         JsonNode pubResp = editApi.updatePrice(itemId, price.toPlainString());
         if (!isMtopSuccess(pubResp)) {
-            throw new IllegalStateException("Xianyu updatePrice (edit republish) failed: " + safeMtopMsg(pubResp));
+            throw new IllegalStateException("Xianyu updatePrice (republish new + shelf off old) failed: " + safeMtopMsg(pubResp));
         }
 
-        // 4. 编辑重发 itemId 不变，不需要解析新 itemId / 下架原商品 / 同步新记录
-        //    只更新本地 DB 价格字段
+        // 4. 解析新商品 itemId
+        String newItemId = parseItemIdFromPublishResp(pubResp);
+
+        // 5. 更新本地 DB：原商品标记下架（闲鱼已自动下架，本地同步状态）
+        product.setStatus("OFF_SALE");
         product.setPrice(price);
         product.setUpdatedAt(LocalDateTime.now());
         productMapper.updateById(product);
+
+        // 6. 同步新商品信息到本地（如果有新 itemId 则 upsert 新记录，否则通过 syncFromXianyu 拉回）
+        if (newItemId != null && !newItemId.isEmpty()) {
+            syncSingleItem(account.getId(), newItemId);
+        } else {
+            // 发布接口未返回新 itemId，通过列表同步拉回
+            try { syncFromXianyu(account.getId()); } catch (Exception e) { /* 不影响主流程 */ }
+        }
 
         return product;
     }

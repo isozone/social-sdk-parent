@@ -276,10 +276,16 @@ public class XianyuPublishApiService {
 
     /**
      * 发布/编辑商品 — 真实接口 mtop.idle.pc.idleitem.publish v1.0（重载版，支持编辑重发）
-     * <p>传 itemId 时闲鱼按「编辑已有商品」处理，itemId 保留，浏览量/收藏不清零，
-     * 用于改价/改库存/改图等。publishScene 改为 "edit"，sourceId/bizcode 改为 "pcEdit"。</p>
+     * <p><b>真抓验证（2026-08-04 调闲鱼 PC 发布页 bundle p_publish-index.js，139 万字）：</b>
+     * 闲鱼 PC 端 publishScene 只有 "mainPublish"/"pcMainPublish"，<b>根本无编辑重发场景</b>。
+     * 传 itemId + scene=pcEdit 是瞎猜的，闲鱼端不认 pcEdit，按发新商品处理 → 改价后多出一个商品。
+     * 所以闲鱼 PC 端改价只能走"发新商品 + 下架旧商品"路径，没有编辑重发这条路。</p>
      *
-     * @param itemId        已有商品 id（编辑重发模式用，传 null 则发新商品）
+     * <p>本方法传 itemId 时仍走 pcEdit 分支仅为兼容性兜底——实际闲鱼端会按发新商品处理，
+     * 调用方应自己负责下架原商品。推荐改价/改库存用 {@link XianyuProductEditApiService#updatePrice}
+     * 那条"发新商品 + 下架旧商品"已验证可用的路径。</p>
+     *
+     * @param itemId        已有商品 id（传 null 则发新商品；传非空实际闲鱼端仍按发新商品处理）
      * @param stock          库存（如 "10"；闲鱼 quantity 字段，编辑重发改库存用；发新商品传 null 默认 "1"）
      * @see #publishItem(String, String, String, String, List, Map, List, Map, Map) 发新商品版
      */
@@ -377,8 +383,10 @@ public class XianyuPublishApiService {
         // uniqueCode：唯一码，时间戳毫秒
         data.put("uniqueCode", String.valueOf(System.currentTimeMillis()));
 
-        // sourceId/bizcode/publishScene：发布场景（编辑重发改 pcEdit，发新商品 pcMainPublish）
-        String scene = isEdit ? "pcEdit" : "pcMainPublish";
+        // sourceId/bizcode/publishScene：真抓验证（2026-08-04 p_publish-index.js bundle）
+        // 闲鱼 PC 端只有 "pcMainPublish" 场景，无编辑重发场景。传 itemId 也走 pcMainPublish，
+        // 否则传 pcEdit 闲鱼端不认会按发新商品处理（但 itemId 会被当成新商品占位，行为不可控）。
+        String scene = "pcMainPublish";
         data.put("sourceId", scene);
         data.put("bizcode", scene);
         data.put("publishScene", scene);
