@@ -40,61 +40,77 @@ class ProductServiceBuildItemCatDTOTest {
     @Test
     void buildItemCatDTO_normalResponse_fillsAll5Fields() throws Exception {
         ProductService svc = newProductService();
-        String resp = "{\"data\":{\"categoryPredictResult\":{" +
-                "\"catId\":\"50023914\"," +
-                "\"catName\":\"手机\"," +
-                "\"channelCatId\":\"4d8b31d719602249ac899d2620c5df2b\"," +
-                "\"leafId\":\"leaf123\"," +
-                "\"tbCatId\":\"50023914\"" +
-                "}}}";
+        // 真抓响应结构（2026-08-04 验证）：data.cardList[].cardData.valuesList[]，取 isClicked=1
+        String resp = "{\"data\":{\"cardList\":[{\"cardData\":{\"valuesList\":[" +
+                "{\"catId\":\"50025386\",\"catName\":\"手机\"," +
+                "\"channelCatId\":\"126862528\",\"leafId\":\"1377\",\"tbCatId\":\"1512\"," +
+                "\"isClicked\":\"1\",\"score\":\"0.998\"}," +
+                "{\"catId\":\"50025399\",\"catName\":\"手机回收\"," +
+                "\"channelCatId\":\"201450518\",\"leafId\":\"\",\"tbCatId\":\"50600011\"," +
+                "\"isClicked\":\"0\",\"score\":\"0.0004\"}" +
+                "]}}]}}";
         Map<String, String> catDTO = svc.buildItemCatDTO(json(resp), null);
-        assertEquals("50023914", catDTO.get("catId"));
+        assertEquals("50025386", catDTO.get("catId"));
         assertEquals("手机", catDTO.get("catName"));
-        assertEquals("4d8b31d719602249ac899d2620c5df2b", catDTO.get("channelCatId"));
-        assertEquals("leaf123", catDTO.get("leafId"));
-        assertEquals("50023914", catDTO.get("tbCatId"));
+        assertEquals("126862528", catDTO.get("channelCatId"));
+        assertEquals("1377", catDTO.get("leafId"));
+        assertEquals("1512", catDTO.get("tbCatId"));
     }
 
     @Test
-    void buildItemCatDTO_fallbackResultPath_fillsFields() throws Exception {
+    void buildItemCatDTO_noClicked_picksHighestScore() throws Exception {
         ProductService svc = newProductService();
-        // data.categoryPredictResult 缺失 → 兜底 data.result.categoryPredictResult
-        String resp = "{\"data\":{\"result\":{\"categoryPredictResult\":{" +
-                "\"catId\":\"c1\",\"channelCatId\":\"cc1\"" +
-                "}}}}";
+        // 没有 isClicked=1 时，取 score 最高的兜底
+        String resp = "{\"data\":{\"cardList\":[{\"cardData\":{\"valuesList\":[" +
+                "{\"catId\":\"low\",\"channelCatId\":\"low_cc\",\"score\":\"0.1\"}," +
+                "{\"catId\":\"high\",\"channelCatId\":\"high_cc\",\"score\":\"0.9\"}" +
+                "]}}]}}";
         Map<String, String> catDTO = svc.buildItemCatDTO(json(resp), null);
-        assertEquals("c1", catDTO.get("catId"));
-        assertEquals("cc1", catDTO.get("channelCatId"));
+        assertEquals("high", catDTO.get("catId"));
+        assertEquals("high_cc", catDTO.get("channelCatId"));
     }
 
     @Test
     void buildItemCatDTO_userCategoryIdOverridesCatId() throws Exception {
         ProductService svc = newProductService();
-        String resp = "{\"data\":{\"categoryPredictResult\":{" +
-                "\"catId\":\"AI_CAT\",\"channelCatId\":\"CC\"" +
-                "}}}";
+        String resp = "{\"data\":{\"cardList\":[{\"cardData\":{\"valuesList\":[" +
+                "{\"catId\":\"AI_CAT\",\"channelCatId\":\"CC\",\"isClicked\":\"1\"}" +
+                "]}}]}}";
         Map<String, String> catDTO = svc.buildItemCatDTO(json(resp), "USER_CAT");
         assertEquals("USER_CAT", catDTO.get("catId"));
         assertEquals("CC", catDTO.get("channelCatId"), "channelCatId 仍取 AI 推荐结果");
     }
 
     @Test
-    void buildItemCatDTO_emptyResponse_returnsEmptyMap() throws Exception {
+    void buildItemCatDTO_emptyResponse_fallsBackToDefault() throws Exception {
         ProductService svc = newProductService();
+        // 空响应不再抛错，用 DEFAULT_FALLBACK_CAT_ID 兜底让发布先通
         Map<String, String> catDTO = svc.buildItemCatDTO(null, null);
         assertNotNull(catDTO);
-        assertTrue(catDTO.isEmpty(), "空响应应返回空 map，由调用方校验拦截");
+        assertEquals("50023914", catDTO.get("catId"));
+        assertEquals("50023914", catDTO.get("channelCatId"));
     }
 
     @Test
-    void buildItemCatDTO_missingChannelCatId_returnsEmptyChannelCatId() throws Exception {
+    void buildItemCatDTO_missingChannelCatId_fallsBackToDefault() throws Exception {
         ProductService svc = newProductService();
-        // AI 推荐返回但缺 channelCatId（模拟接口名对但响应字段不全）
-        String resp = "{\"data\":{\"categoryPredictResult\":{" +
-                "\"catId\":\"c1\",\"catName\":\"手机\"" +
-                "}}}";
+        // AI 推荐返回但缺 channelCatId（模拟接口名对但响应字段不全）→ 兜底默认类目
+        String resp = "{\"data\":{\"cardList\":[{\"cardData\":{\"valuesList\":[" +
+                "{\"catId\":\"c1\",\"catName\":\"手机\",\"isClicked\":\"1\"}" +  // 缺 channelCatId
+                "]}}]}}";
         Map<String, String> catDTO = svc.buildItemCatDTO(json(resp), null);
         assertEquals("c1", catDTO.get("catId"));
-        assertEquals("", catDTO.get("channelCatId"), "channelCatId 缺失，调用方校验应拦截");
+        assertEquals("50023914", catDTO.get("channelCatId"), "channelCatId 缺失时用默认值兜底");
+    }
+
+    @Test
+    void buildItemCatDTO_legacyCategoryPredictResultPath_stillWorks() throws Exception {
+        // 兜底：极个别账号响应不带 cardList，走旧字段名 categoryPredictResult 也能取到
+        ProductService svc = newProductService();
+        String resp = "{\"data\":{\"categoryPredictResult\":{" +
+                "\"catId\":\"c1\",\"channelCatId\":\"cc1\"}}}";
+        Map<String, String> catDTO = svc.buildItemCatDTO(json(resp), null);
+        assertEquals("c1", catDTO.get("catId"));
+        assertEquals("cc1", catDTO.get("channelCatId"));
     }
 }

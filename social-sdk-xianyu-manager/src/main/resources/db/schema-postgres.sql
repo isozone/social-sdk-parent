@@ -278,6 +278,7 @@ CREATE TABLE IF NOT EXISTS xianyu_collect (
 -- 创建索引
 CREATE INDEX idx_xianyu_product_account ON xianyu_product(account_id);
 CREATE INDEX idx_xianyu_product_status ON xianyu_product(status);
+CREATE INDEX idx_xianyu_product_item_id ON xianyu_product(item_id);
 CREATE INDEX idx_xianyu_message_session ON xianyu_message(account_id, session_id);
 CREATE INDEX idx_xianyu_order_account ON xianyu_order(account_id);
 CREATE INDEX idx_xianyu_keyword_rule_account ON xianyu_keyword_rule(account_id);

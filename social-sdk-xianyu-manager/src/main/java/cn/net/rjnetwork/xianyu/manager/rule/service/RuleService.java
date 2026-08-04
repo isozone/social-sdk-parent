@@ -1,6 +1,8 @@
 package cn.net.rjnetwork.xianyu.manager.rule.service;
 
 import cn.net.rjnetwork.xianyu.manager.ai.service.AiChatService;
+import cn.net.rjnetwork.xianyu.manager.product.mapper.ProductMapper;
+import cn.net.rjnetwork.xianyu.manager.product.model.XianyuProduct;
 import cn.net.rjnetwork.xianyu.manager.product.service.PolishService;
 import cn.net.rjnetwork.xianyu.manager.reply.service.AutoReplyLogService;
 import cn.net.rjnetwork.xianyu.manager.rule.dto.RuleCreateRequest;
@@ -31,16 +33,18 @@ public class RuleService {
     private final AiChatService aiChatService;
     private final AutoReplyLogService logService;
     private final PolishService polishService;
+    private final ProductMapper productMapper;
     // 内存缓存：accountId -> list of rules
     private final Map<Long, List<XianyuKeywordRule>> ruleCache = new ConcurrentHashMap<>();
     private static final Logger log = LoggerFactory.getLogger(RuleService.class);
 
-    public RuleService(RuleMapper ruleMapper, AutoReplyConfigMapper autoReplyConfigMapper, AiChatService aiChatService, AutoReplyLogService logService, PolishService polishService) {
+    public RuleService(RuleMapper ruleMapper, AutoReplyConfigMapper autoReplyConfigMapper, AiChatService aiChatService, AutoReplyLogService logService, PolishService polishService, ProductMapper productMapper) {
         this.ruleMapper = ruleMapper;
         this.autoReplyConfigMapper = autoReplyConfigMapper;
         this.aiChatService = aiChatService;
         this.logService = logService;
         this.polishService = polishService;
+        this.productMapper = productMapper;
     }
 
     public List<XianyuKeywordRule> listRules(Long accountId) {
@@ -124,6 +128,17 @@ public class RuleService {
      * 优先级：关键字匹配 > AI 接管 > 兜底自动回复
      */
     public String autoReply(Long accountId, String message) {
+        return autoReply(accountId, message, null);
+    }
+
+    /**
+     * 自动回复：三层匹配逻辑 — keyword → AI → auto
+     * 优先级：关键字匹配 > AI 接管 > 兜底自动回复
+     *
+     * @param sessionId 闲鱼会话 ID（格式 {item_id}@goofish），用于反查当前商品上下文喂给 AI；
+     *                  为 null/null/blank 时降级为不带商品上下文。
+     */
+    public String autoReply(Long accountId, String message, String sessionId) {
         // 1. 关键字词匹配（最高优先级）
         List<XianyuKeywordRule> rules = ruleCache.computeIfAbsent(accountId, k -> listRules(k));
         if (rules == null || rules.isEmpty()) {
@@ -145,7 +160,8 @@ public class RuleService {
         // 2. AI 接管（次优先级）
         XianyuAutoReplyConfig config = getAutoReplyConfig(accountId);
         if (config != null && Boolean.TRUE.equals(config.getAiEnabled())) {
-            String aiReply = callAiReply(config, message);
+            XianyuProduct productContext = findProductBySessionId(sessionId);
+            String aiReply = callAiReply(config, message, productContext);
             if (aiReply != null && !aiReply.isEmpty()) {
                 logService.log(accountId, null, "AI_REPLY", "AI", null, message, aiReply, true);
                 return aiReply;
@@ -165,6 +181,25 @@ public class RuleService {
         // 记录未匹配
         logService.log(accountId, null, null, null, null, message, null, false);
         return null;
+    }
+
+    /**
+     * 从闲鱼 sessionId（格式 {item_id}@goofish）解析 item_id，反查本地商品表拿上下文。
+     * 本地查不到返回 null（降级为不带商品上下文）。
+     */
+    private XianyuProduct findProductBySessionId(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) return null;
+        // 去掉 @goofish / @goofish.com 后缀，剩下的就是 item_id
+        String itemId = sessionId.split("@")[0].trim();
+        if (itemId.isEmpty()) return null;
+        try {
+            LambdaQueryWrapper<XianyuProduct> wrapper = new LambdaQueryWrapper<>();
+            wrapper.eq(XianyuProduct::getItemId, itemId).last("LIMIT 1");
+            return productMapper.selectOne(wrapper);
+        } catch (Exception e) {
+            log.warn("[RuleService] findProductBySessionId failed sessionId={}: {}", sessionId, e.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -204,20 +239,78 @@ public class RuleService {
      * 通过 config.aiModelId 找到模型和厂商，构造 systemPrompt 后发起调用
      */
     private String callAiReply(XianyuAutoReplyConfig config, String message) {
+        return callAiReply(config, message, null);
+    }
+
+    /**
+     * AI 接管回复：把当前商品上下文喂给 AI，让回复针对性议价/答疑。
+     * 商品上下文为 null 时降级为不带商品的通用回复。
+     */
+    private String callAiReply(XianyuAutoReplyConfig config, String message, XianyuProduct product) {
         if (config == null || config.getAiModelId() == null) {
             log.warn("[RuleService] callAiReply skipped: aiModelId is null (account config not set?)");
             return null;
         }
         try {
-            String systemPrompt = (config.getAiSystemPrompt() != null && !config.getAiSystemPrompt().isBlank())
+            String basePrompt = (config.getAiSystemPrompt() != null && !config.getAiSystemPrompt().isBlank())
                     ? config.getAiSystemPrompt()
                     : "你是一个友好、专业的闲鱼卖家客服，请用简洁亲切的语气回复买家。";
-            String reply = aiChatService.chat(config.getAiModelId(), systemPrompt, message);
+            String fullPrompt = basePrompt + "\n\n" + buildProductContext(product);
+            String reply = aiChatService.chat(config.getAiModelId(), fullPrompt, message);
             return (reply != null && !reply.isBlank()) ? reply.trim() : null;
         } catch (Exception e) {
             // 打全异常堆栈，便于排查 AI 调用失败的真实原因（API Key 错、网络超时、模型名错等）
             log.error("[RuleService] AI reply failed: modelId={}, error={}", config.getAiModelId(), e.getMessage(), e);
             return null;
+        }
+    }
+
+    /**
+     * 构造商品上下文 prompt 片段：标题/价格/描述/发货方式/商品类型。
+     * 本地查不到商品（product=null）时返回降级提示，让 AI 知道没商品上下文、按通用话术回复。
+     */
+    private String buildProductContext(XianyuProduct product) {
+        if (product == null) {
+            return "【当前商品信息】未提供（买家咨询通用问题，按闲鱼卖家通用话术回复即可）。";
+        }
+        StringBuilder sb = new StringBuilder("【当前商品信息】\n");
+        if (product.getTitle() != null && !product.getTitle().isBlank()) {
+            sb.append("- 标题：").append(product.getTitle()).append('\n');
+        }
+        if (product.getPrice() != null) {
+            sb.append("- 价格：").append(product.getPrice()).append(" 元\n");
+        }
+        if (product.getOriginalPrice() != null) {
+            sb.append("- 原价：").append(product.getOriginalPrice()).append(" 元\n");
+        }
+        if (product.getDescription() != null && !product.getDescription().isBlank()) {
+            // 描述可能很长，截前 500 字喂给 AI 避免超 token
+            String desc = product.getDescription();
+            if (desc.length() > 500) desc = desc.substring(0, 500) + "...";
+            sb.append("- 描述：").append(desc).append('\n');
+        }
+        if (product.getGoodsType() != null && !product.getGoodsType().isBlank()) {
+            sb.append("- 商品类型：").append("VIRTUAL".equalsIgnoreCase(product.getGoodsType()) ? "虚拟商品" : "实物商品").append('\n');
+        }
+        if (product.getDeliverType() != null && !product.getDeliverType().isBlank()) {
+            sb.append("- 发货方式：").append(deliverTypeLabel(product.getDeliverType())).append('\n');
+        }
+        if (product.getDeliverContentTemplate() != null && !product.getDeliverContentTemplate().isBlank()) {
+            String tpl = product.getDeliverContentTemplate();
+            if (tpl.length() > 200) tpl = tpl.substring(0, 200) + "...";
+            sb.append("- 发货内容模板：").append(tpl).append('\n');
+        }
+        sb.append("\n请基于以上商品信息针对性回复买家的问题（如议价、成色、瑕疵、发货、参数等）。");
+        return sb.toString();
+    }
+
+    private String deliverTypeLabel(String deliverType) {
+        switch (deliverType) {
+            case "CARD": return "卡密";
+            case "ACCOUNT": return "账号";
+            case "LINK": return "链接";
+            case "FILE": return "文件";
+            default: return deliverType;
         }
     }
 

@@ -62,6 +62,11 @@ public class MessageService {
     @org.springframework.beans.factory.annotation.Autowired
     private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
 
+    /** AI 自动回复专用线程池（与消息同步池隔离，AI 调用慢不挤占同步线程） */
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.beans.factory.annotation.Qualifier(cn.net.rjnetwork.xianyu.manager.config.AsyncConfig.AUTO_REPLY_EXECUTOR)
+    private java.util.concurrent.Executor autoReplyExecutor;
+
     public MessageService(MessageMapper messageMapper, RuleService ruleService,
                           ApplicationEventPublisher eventPublisher, AccountMapper accountMapper,
                           XianyuCaptchaSolver captchaSolver, AuditService auditService) {
@@ -1503,13 +1508,51 @@ public class MessageService {
     }
 
     /**
-     * 自动回复：检查消息是否命中规则，命中后真实调用闲鱼 IM 发送并发布站内/站外通知。
+     * 自动回复（异步）：把 AI 调用 + 发送回复提交到独立线程池，立即返回不阻塞消息同步链路。
+     * AI 调用慢（数秒级），若与消息同步共线程会占住同步线程导致链路阻塞。
+     * 异步跑完后会自动调 sendMessage 把回复发给买家，并发 AUTO_REPLY_SENT/FAILED 通知事件。
+     * @return null（异步任务已提交，同步链路不需要返回值）
      */
     public String autoReplyIfNeeded(Long accountId, XianyuMessage incomingMessage) {
         if (incomingMessage == null || !"INCOMING".equals(incomingMessage.getDirection())) {
             return null;
         }
-        String reply = ruleService.autoReply(accountId, incomingMessage.getContent());
+        // 复制一份消息快照，避免异步任务里读到被改的 entity
+        XianyuMessage snapshot = new XianyuMessage();
+        snapshot.setAccountId(accountId);
+        snapshot.setSessionId(incomingMessage.getSessionId());
+        snapshot.setSenderId(incomingMessage.getSenderId());
+        snapshot.setContent(incomingMessage.getContent());
+        snapshot.setDirection(incomingMessage.getDirection());
+        snapshot.setMessageTime(incomingMessage.getMessageTime());
+
+        autoReplyExecutor.execute(() -> {
+            try {
+                String reply = autoReplyNow(accountId, snapshot);
+                if (reply != null && !reply.isBlank()) {
+                    log.info("[MESSAGE] auto reply sent async: account={} session={} replyLen={}",
+                            accountId, snapshot.getSessionId(), reply.length());
+                } else {
+                    log.info("[MESSAGE] auto reply async no match: account={} session={}",
+                            accountId, snapshot.getSessionId());
+                }
+            } catch (Exception e) {
+                log.warn("[MESSAGE] auto reply async failed account={} session={}: {}",
+                        accountId, snapshot.getSessionId(), e.getMessage());
+            }
+        });
+        return null;
+    }
+
+    /**
+     * 自动回复（同步执行）：检查消息是否命中规则，命中后真实调用闲鱼 IM 发送并发布站内/站外通知。
+     * 仅供异步包装、测试接口、手动触发使用，不要直接在消息同步链路里调（会阻塞）。
+     */
+    public String autoReplyNow(Long accountId, XianyuMessage incomingMessage) {
+        if (incomingMessage == null || !"INCOMING".equals(incomingMessage.getDirection())) {
+            return null;
+        }
+        String reply = ruleService.autoReply(accountId, incomingMessage.getContent(), incomingMessage.getSessionId());
         if (reply == null || reply.isBlank()) {
             return reply;
         }

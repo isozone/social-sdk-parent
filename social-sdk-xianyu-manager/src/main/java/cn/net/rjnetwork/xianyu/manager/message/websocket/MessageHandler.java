@@ -54,11 +54,8 @@ public class MessageHandler {
                 logger.warn("更新买家画像失败: {}", e.getMessage());
             }
 
-            // 3. 自动回复
-            String reply = messageService.autoReplyIfNeeded(accountId, message);
-            if (reply != null) {
-                broadcaster.broadcast(accountId, message);
-            }
+            // 3. 自动回复（异步提交到独立线程池，不阻塞 WSS 推送链路；AI 跑完自动调 sendMessage 发回复）
+            messageService.autoReplyIfNeeded(accountId, message);
 
             // 4. 广播新消息
             broadcaster.broadcast(accountId, message);

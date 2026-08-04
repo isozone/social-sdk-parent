@@ -79,6 +79,6 @@ public class SecurityConfig {
     }
 
     /** CORS 允许来源白名单（逗号分隔），可通过 application.yml 的 cors.allowed-origins 覆盖。 */
-    @Value("${cors.allowed-origins:http://localhost:5173,http://127.0.0.1:5173}")
+    @Value("${cors.allowed-origins:http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000}")
     private String corsAllowedOrigins;
 }

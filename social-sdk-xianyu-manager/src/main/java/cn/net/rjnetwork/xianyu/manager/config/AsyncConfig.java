@@ -19,6 +19,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 public class AsyncConfig implements AsyncConfigurer {
 
     public static final String SYNC_EXECUTOR = "syncTaskExecutor";
+    /** AI 自动回复专用线程池 bean 名（与同步池隔离，避免 AI 雌塞挤占消息同步线程） */
+    public static final String AUTO_REPLY_EXECUTOR = "autoReplyExecutor";
 
     @Bean(name = {SYNC_EXECUTOR, "taskExecutor"})
     public ThreadPoolTaskExecutor syncTaskExecutor() {
@@ -48,5 +50,26 @@ public class AsyncConfig implements AsyncConfigurer {
     @Override
     public Executor getAsyncExecutor() {
         return syncTaskExecutor();
+    }
+
+    /**
+     * AI 自动回复专用线程池：与消息同步池隔离。
+     * AI 调用慢（数秒级），若与 syncTaskExecutor 共池会占住消息同步线程导致链路阻塞。
+     * 本池独立队列 + 独立拒绝策略（CallerRuns），不挤占消息同步。
+     */
+    @Bean(name = AUTO_REPLY_EXECUTOR)
+    public ThreadPoolTaskExecutor autoReplyExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("auto-reply-");
+        executor.setKeepAliveSeconds(120);
+        // 拒绝策略由调用方线程跑（降级同步），保证回复一定被处理
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(60);
+        executor.initialize();
+        return executor;
     }
 }

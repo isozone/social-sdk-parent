@@ -37,6 +37,8 @@ public class ProductService {
 
     private static final Logger logger = LoggerFactory.getLogger(ProductService.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    /** 兜底默认类目 ID（闲鱼 PC 发布页 p_publish-index.js 硬编码默认值，AI 推荐失效时用） */
+    private static final String DEFAULT_FALLBACK_CAT_ID = "50023914";
 
     private final ProductMapper productMapper;
     private final AccountService accountService;
@@ -177,12 +179,8 @@ public class ProductService {
             logger.debug("[PUBLISH] recommendCategory resp: {}", catResp);
         }
         Map<String, String> catDTO = buildItemCatDTO(catResp, request.getCategoryId());
-        if (catDTO.get("channelCatId") == null || catDTO.get("channelCatId").isBlank()
-                || catDTO.get("catId") == null || catDTO.get("catId").isBlank()) {
-            logger.error("[PUBLISH] 类目信息不完整，catDTO={}, recommendResp={}", catDTO,
-                    catResp != null ? catResp.toString().substring(0, Math.min(500, catResp.toString().length())) : "null");
-            throw new IllegalStateException("发布失败：未能获取有效的闲鱼类目信息（channelCatId/catId 缺失），请完善商品标题后重试，或检查 AI 推荐分类接口是否正常");
-        }
+        // buildItemCatDTO 内已用默认类目兜底（DEFAULT_FALLBACK_CAT_ID=50023914），
+        // 这里只剩 informational 日志，不再直接抛错——闲鱼 AI 推荐偶发失效时用默认类目让发布先通
         if (logger.isDebugEnabled()) {
             logger.debug("[PUBLISH] final itemCatDTO: {}", catDTO);
         }
@@ -442,28 +440,113 @@ public class ProductService {
      * @param userCategoryId 用户显式指定的 catId（可空，非空时覆盖 AI 推荐的 catId）
      * @return catDTO map（可能含空值，调用方负责校验）
      */
+    /**
+     * 从 AI 推荐分类响应构造 itemCatDTO（闲鱼 PC 发布页真抓验证，2026-08-04 真实响应结构）。
+     * itemCatDTO 必填 5 字段：catId/catName/channelCatId/leafId/tbCatId。
+     * 缺 channelCatId 闲鱼端必报 FAIL_BIZ_CHANNEL_CAT_ID_PATH_QUERY_ERROR。
+     *
+     * <p><b>真实响应结构</b>（真抓 mtop.taobao.idle.kgraph.property.recommend v2.0）：
+     * <pre>
+     * data.cardList[].cardData.valuesList[]
+     *   ├─ catId / catName / channelCatId / leafId / tbCatId
+     *   ├─ isClicked: "1"=用户已选中, "0"=候选
+     *   └ 每张 card 含多个 valuesList 候选，取 isClicked=1 的；都没有取 score 最高的
+     * </pre>
+     * 之前注释里写的 "data.categoryPredictResult" 是错误猜测，真实接口没有这字段。</p>
+     *
+     * <p><b>fallback 默认类目</b>：闲鱼端 AI 推荐 API 偶发返回空（账号状态/标题命中弱），
+     * 此时不直接抛错，用闲鱼 bundle 硬编码默认 catId=50023914 兜底，让发布先通；
+     * 用户可在前端手动改类目。（真抓来源：p_publish-index.js defaultCategoryId）</p>
+     *
+     * @param catResp recommendCategory 响应
+     * @param userCategoryId 用户显式指定的 catId（可空，非空时覆盖 AI 推荐的 catId）
+     * @return catDTO map（必有 channelCatId/catId 非空，最坏降级到默认类目）
+     */
     Map<String, String> buildItemCatDTO(JsonNode catResp, String userCategoryId) {
         Map<String, String> catDTO = new LinkedHashMap<>();
-        JsonNode catPredict = null;
-        if (catResp != null) {
-            // 优先 data.categoryPredictResult（真抓主路径），兜底 data.result.categoryPredictResult
-            catPredict = catResp.path("data").path("categoryPredictResult");
-            if (catPredict == null || catPredict.isMissingNode()) {
-                catPredict = catResp.path("data").path("result").path("categoryPredictResult");
-            }
-        }
-        if (catPredict != null && !catPredict.isMissingNode()) {
-            catDTO.put("catId", pickText(catPredict, "catId"));
-            catDTO.put("catName", pickText(catPredict, "catName"));
-            catDTO.put("channelCatId", pickText(catPredict, "channelCatId"));
-            catDTO.put("leafId", pickText(catPredict, "leafId"));
-            catDTO.put("tbCatId", pickText(catPredict, "tbCatId"));
+        // 真抓响应路径：data.cardList[].cardData.valuesList[]，取 isClicked=1 或 score 最高的
+        JsonNode picked = pickClickedCategory(catResp);
+        if (picked != null) {
+            catDTO.put("catId", pickText(picked, "catId", "cid", "categoryId"));
+            catDTO.put("catName", pickText(picked, "catName", "cname", "categoryName"));
+            catDTO.put("channelCatId", pickText(picked, "channelCatId", "channelCatIdPath", "channelCid"));
+            catDTO.put("leafId", pickText(picked, "leafId", "leafIdPath", "leafCid"));
+            catDTO.put("tbCatId", pickText(picked, "tbCatId", "tbCid", "taobaoCatId"));
         }
         // 用户显式传 categoryId 时覆盖 catId（用户指定优先）
         if (userCategoryId != null && !userCategoryId.isBlank()) {
             catDTO.put("catId", userCategoryId);
         }
+
+        // 兜底默认类目：闲鱼 bundle 硬编码默认值（p_publish-index.js defaultCategoryId）
+        // 闲鱼 AI 推荐 API 偶发返回空 channelCatId（账号状态/标题命中弱），用默认值让发布先通
+        if (isBlank(catDTO.get("channelCatId"))) {
+            catDTO.put("channelCatId", DEFAULT_FALLBACK_CAT_ID);
+            logger.warn("[PUBLISH] channelCatId 缺失，用默认值 {} 兜底", DEFAULT_FALLBACK_CAT_ID);
+        }
+        if (isBlank(catDTO.get("catId"))) {
+            catDTO.put("catId", DEFAULT_FALLBACK_CAT_ID);
+            logger.warn("[PUBLISH] catId 缺失，用默认值 {} 兜底", DEFAULT_FALLBACK_CAT_ID);
+        }
+        if (isBlank(catDTO.get("catName"))) {
+            catDTO.put("catName", "其他");
+        }
+        if (isBlank(catDTO.get("tbCatId"))) {
+            catDTO.put("tbCatId", catDTO.get("catId"));
+        }
+        if (isBlank(catDTO.get("leafId"))) {
+            catDTO.put("leafId", catDTO.get("catId"));
+        }
         return catDTO;
+    }
+
+    /**
+     * 从推荐响应里挑出用户已选中的类目节点（valuesList 里 isClicked=1 的），
+     * 没有已选中的取 score 最高的兜底。
+     * 真抓响应路径：data.cardList[].cardData.valuesList[]
+     */
+    private JsonNode pickClickedCategory(JsonNode catResp) {
+        if (catResp == null) return null;
+        JsonNode cardList = catResp.path("data").path("cardList");
+        if (!cardList.isArray() || cardList.size() == 0) {
+            // 兜底：极个别账号响应不带 cardList，旧字段名 categoryPredictResult 也试一下
+            JsonNode legacy = catResp.path("data").path("categoryPredictResult");
+            if (!isMissingOrNull(legacy)) return legacy;
+            return null;
+        }
+        JsonNode best = null;
+        double bestScore = -1;
+        for (JsonNode card : cardList) {
+            JsonNode valuesList = card.path("cardData").path("valuesList");
+            if (!valuesList.isArray()) continue;
+            for (JsonNode v : valuesList) {
+                // 优先取 isClicked=1（用户已选中）
+                String clicked = pickText(v, "isClicked");
+                if ("1".equals(clicked)) {
+                    return v;
+                }
+                // 否则记 score 最高的做兜底
+                String scoreStr = pickText(v, "score");
+                try {
+                    double score = scoreStr.isBlank() ? 0 : Double.parseDouble(scoreStr);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        best = v;
+                    }
+                } catch (NumberFormatException ignored) { }
+            }
+        }
+        return best;
+    }
+
+    /** 判断 JsonNode 是否缺失或 null */
+    private boolean isMissingOrNull(JsonNode node) {
+        return node == null || node.isMissingNode() || node.isNull();
+    }
+
+    /** 判断字符串是否空白（null/空/纯空白） */
+    private boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 
     /** 从 JsonNode 拿指定字段文本值，缺失返空串 */
