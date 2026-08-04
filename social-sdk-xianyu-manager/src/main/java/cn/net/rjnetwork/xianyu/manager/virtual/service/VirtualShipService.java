@@ -13,8 +13,12 @@ import cn.net.rjnetwork.xianyu.manager.order.model.XianyuOrder;
 import cn.net.rjnetwork.xianyu.manager.product.mapper.ProductMapper;
 import cn.net.rjnetwork.xianyu.manager.product.model.XianyuProduct;
 import cn.net.rjnetwork.xianyu.manager.virtual.mapper.VirtualCardPoolMapper;
+import cn.net.rjnetwork.xianyu.manager.virtual.mapper.CardItemRelationMapper;
+import cn.net.rjnetwork.xianyu.manager.virtual.mapper.ShipCardMapper;
 import cn.net.rjnetwork.xianyu.manager.virtual.mapper.VirtualShipConfigMapper;
 import cn.net.rjnetwork.xianyu.manager.virtual.mapper.VirtualShipTaskMapper;
+import cn.net.rjnetwork.xianyu.manager.virtual.model.CardItemRelation;
+import cn.net.rjnetwork.xianyu.manager.virtual.model.ShipCard;
 import cn.net.rjnetwork.xianyu.manager.virtual.model.VirtualCardPool;
 import cn.net.rjnetwork.xianyu.manager.virtual.model.VirtualShipConfig;
 import cn.net.rjnetwork.xianyu.manager.virtual.model.VirtualShipTask;
@@ -59,6 +63,9 @@ public class VirtualShipService {
     private final ProductMapper productMapper;
     private final OrderMapper orderMapper;
     private final AccountMapper accountMapper;
+    /** A6 新卡券模型：ship_card + card_item_relation（AutoShipService 发货读取，与旧 virtual_card_pool 并存兼容） */
+    private ShipCardMapper shipCardMapper;
+    private CardItemRelationMapper cardItemRelationMapper;
     /** 真实消息发送器（DefaultVirtualMessageSender → MessageService.sendMessage） */
     private final VirtualMessageSender messageSender;
     /** 网盘存储服务（FILE 类型发货） */
@@ -94,6 +101,16 @@ public class VirtualShipService {
     @Autowired
     public void setAutoShipService(@Lazy AutoShipService autoShipService) {
         this.autoShipService = autoShipService;
+    }
+
+    @Autowired
+    public void setShipCardMapper(ShipCardMapper shipCardMapper) {
+        this.shipCardMapper = shipCardMapper;
+    }
+
+    @Autowired
+    public void setCardItemRelationMapper(CardItemRelationMapper cardItemRelationMapper) {
+        this.cardItemRelationMapper = cardItemRelationMapper;
     }
 
     @Autowired
@@ -609,6 +626,45 @@ public class VirtualShipService {
                 count++;
             } catch (Exception e) {
                 System.err.println("[VirtualShip] import card failed: " + e.getMessage());
+            }
+        }
+        return count;
+    }
+
+    /**
+     * 导入卡密/账号到 A6 新卡券模型（ship_card + card_item_relation）——本地商品发布建池用。
+     * <p>与 AutoShipService 发货读取的表一致（旧 importCards 写 virtual_card_pool，仅历史兼容）。
+     * 每行格式：CARD→卡号|密码，ACCOUNT→账号|密码|服务器。</p>
+     */
+    @Transactional
+    public int importShipCards(Long productId, String deliverType, List<String> cards) {
+        if (shipCardMapper == null || cardItemRelationMapper == null) {
+            throw new IllegalStateException("ship_card 模型未初始化（ShipCardMapper 未注入）");
+        }
+        int count = 0;
+        String cardType = "ACCOUNT".equals(deliverType) ? "ACCOUNT" : "CARD";
+        for (String line : cards) {
+            if (line == null || line.isBlank()) continue;
+            String[] parts = line.trim().split("\\|");
+            if (parts.length == 0 || parts[0].trim().isEmpty()) continue;
+            ShipCard shipCard = new ShipCard();
+            shipCard.setCardType(cardType);
+            shipCard.setCardCode(parts[0].trim());
+            shipCard.setCardPassword(parts.length > 1 ? parts[1].trim() : null);
+            if (parts.length > 2) shipCard.setExtra(parts[2].trim());
+            shipCard.setStatus("AVAILABLE");
+            shipCard.setCreatedAt(LocalDateTime.now());
+            try {
+                shipCardMapper.insert(shipCard);
+                CardItemRelation rel = new CardItemRelation();
+                rel.setProductId(productId);
+                rel.setCardId(shipCard.getId());
+                rel.setPriority(0);
+                rel.setEnabled(1);
+                cardItemRelationMapper.insert(rel);
+                count++;
+            } catch (Exception e) {
+                System.err.println("[VirtualShip] import ship card failed: " + e.getMessage());
             }
         }
         return count;

@@ -250,7 +250,7 @@ public class LocalProductService {
         // 虚拟商品：发货前校验库存充足（CARD / ACCOUNT 统一校验）
         if ("VIRTUAL".equals(item.getGoodsType())
                 && ("CARD".equals(item.getDeliverType()) || "ACCOUNT".equals(item.getDeliverType()))) {
-            List<String> items = parseJsonArray(item.getDeliverContentTemplate());
+            List<String> items = extractDeliverItems(item.getDeliverContentTemplate());
             if (items.size() < item.getStock()) {
                 throw new IllegalStateException(
                     String.format("发货内容数量不足：库存 %d，实际 %d", item.getStock(), items.size()));
@@ -279,8 +279,8 @@ public class LocalProductService {
         // 建池失败直接抛异常，不删除本地记录，用户可修正后重试
         if ("VIRTUAL".equals(item.getGoodsType())
                 && ("CARD".equals(item.getDeliverType()) || "ACCOUNT".equals(item.getDeliverType()))) {
-            List<String> rawItems = parseJsonArray(item.getDeliverContentTemplate());
-            int imported = virtualShipService.importCards(published.getId(), rawItems);
+            List<String> rawItems = extractDeliverItems(item.getDeliverContentTemplate());
+            int imported = virtualShipService.importShipCards(published.getId(), item.getDeliverType(), rawItems);
             log.info("[LOCAL-PUBLISH] 虚拟商品建池: productId={}, type={}, count={}",
                     published.getId(), item.getDeliverType(), imported);
         }
@@ -327,6 +327,34 @@ public class LocalProductService {
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * 从动态表单组合的 JSON 中提取发货条目数组（CARD→cards、ACCOUNT→accounts），
+     * 兼容旧格式（纯 JSON 数组 / 纯文本多行）。
+     */
+    private List<String> extractDeliverItems(String deliverContentTemplate) {
+        if (deliverContentTemplate == null || deliverContentTemplate.isBlank()) return new ArrayList<>();
+        String trimmed = deliverContentTemplate.trim();
+        if (trimmed.startsWith("{")) {
+            try {
+                JsonNode node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(trimmed);
+                if (node != null && node.isObject()) {
+                    JsonNode arr = node.has("cards") ? node.get("cards")
+                            : (node.has("accounts") ? node.get("accounts") : null);
+                    if (arr != null && arr.isArray()) {
+                        List<String> out = new ArrayList<>();
+                        arr.forEach(n -> {
+                            String s = n.asText("");
+                            if (!s.isBlank()) out.add(s.trim());
+                        });
+                        return out;
+                    }
+                }
+            } catch (Exception ignored) { /* fallthrough */ }
+        }
+        // 旧格式：JSON 数组或纯文本
+        return parseJsonArray(deliverContentTemplate);
     }
 
     // ==================== 批量导入 ====================

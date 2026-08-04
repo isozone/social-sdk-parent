@@ -424,17 +424,33 @@
           </el-col>
         </el-row>
         <el-form-item label="发货类型" v-if="localForm.goodsType === 'VIRTUAL'">
-          <el-select v-model="localForm.deliverType" style="width: 100%;">
+          <el-select v-model="localForm.deliverType" style="width: 100%;" @change="onDeliverTypeChange">
             <el-option label="卡密" value="CARD" />
             <el-option label="账号" value="ACCOUNT" />
             <el-option label="链接" value="LINK" />
             <el-option label="网盘文件" value="FILE" />
           </el-select>
         </el-form-item>
-        <el-form-item label="发货内容模板" v-if="localForm.goodsType === 'VIRTUAL'">
-          <el-input v-model="localForm.deliverContentTemplate" type="textarea" :rows="3" placeholder="每行一条：卡密 / 账号 / 链接，发布后按顺序交付" />
-          <div style="font-size: 12px; color: var(--text-3); margin-top: 4px;">支持变量 {orderNo} / {buyer}，运行时自动替换</div>
-        </el-form-item>
+
+        <!-- 动态发货内容表单：按发货类型切换，保存时组合成 JSON -->
+        <template v-if="localForm.goodsType === 'VIRTUAL' && localForm.deliverType">
+          <el-form-item v-if="localForm.deliverType === 'LINK'" label="发货链接">
+            <el-input v-model="deliverForm.link" placeholder="https://pan.quark.cn/s/xxx（买家直接点击的下载链接）" />
+          </el-form-item>
+          <el-form-item v-if="localForm.deliverType === 'CARD'" label="卡密列表">
+            <el-input v-model="deliverForm.cardsText" type="textarea" :rows="5" placeholder="每行一条：卡号|密码（密码可省略）&#10;ABC123|pwd1&#10;DEF456" />
+          </el-form-item>
+          <el-form-item v-if="localForm.deliverType === 'ACCOUNT'" label="账号列表">
+            <el-input v-model="deliverForm.accountsText" type="textarea" :rows="5" placeholder="每行一条：账号|密码|服务器（服务器可省略）&#10;user1|pwd1|srv1" />
+          </el-form-item>
+          <el-form-item v-if="localForm.deliverType === 'FILE'" label="文件路径">
+            <el-input v-model="deliverForm.filePath" placeholder="/data/files/xxx.zip（本地文件路径，发布后自动上传网盘）" />
+          </el-form-item>
+          <el-form-item label="发货消息模板">
+            <el-input v-model="deliverForm.message" type="textarea" :rows="3" :placeholder="deliverMessagePlaceholder" />
+            <div style="font-size: 12px; color: var(--text-3); margin-top: 4px;">{{ deliverMessageHint }}</div>
+          </el-form-item>
+        </template>
         <el-form-item label="商品描述">
           <el-input v-model="localForm.description" type="textarea" :rows="4" placeholder="商品详细描述（可选）" />
         </el-form-item>
@@ -560,7 +576,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, MagicStick, VideoPlay, Link, Plus, UploadFilled, Download, DocumentCopy } from '@element-plus/icons-vue'
 import api from '@/api/request'
@@ -605,6 +621,77 @@ const localForm = reactive({
   images: [],
   action: 'DRAFT'
 })
+
+// 动态发货内容表单：按发货类型切换，保存时组合成 JSON 存入 deliverContentTemplate
+const deliverForm = reactive({
+  link: '',
+  cardsText: '',
+  accountsText: '',
+  filePath: '',
+  message: ''
+})
+
+const onDeliverTypeChange = () => {
+  // 切换发货类型时清空上次的字段，避免类型间串数据
+  deliverForm.link = ''
+  deliverForm.cardsText = ''
+  deliverForm.accountsText = ''
+  deliverForm.filePath = ''
+  deliverForm.message = ''
+}
+
+const deliverMessagePlaceholder = computed(() => {
+  const t = localForm.deliverType
+  if (t === 'CARD') return '卡号：${cardCode}\n密码：${cardPassword}（留空走默认格式）'
+  if (t === 'ACCOUNT') return '账号：${account}\n密码：${password}\n服务器：${server}（留空走默认格式）'
+  if (t === 'LINK') return '感谢购买【${itemTitle}】，下载链接：${link}\n订单号：${orderId}'
+  if (t === 'FILE') return '下载链接：${link}\n提取码：${extractCode}\n有效期：7天'
+  return ''
+})
+
+const deliverMessageHint = computed(() => {
+  const t = localForm.deliverType
+  if (t === 'CARD') return '可用占位符：${cardCode} ${cardPassword}；每行一张卡密，格式 卡号|密码'
+  if (t === 'ACCOUNT') return '可用占位符：${account} ${password} ${server}；每行一个账号，格式 账号|密码|服务器'
+  if (t === 'LINK') return '可用占位符：${link} ${itemTitle} ${orderId}'
+  if (t === 'FILE') return '可用占位符：${link} ${extractCode} ${fileName}；文件路径为服务器本地路径'
+  return ''
+})
+
+// 把动态表单组合成 JSON 字符串（保存到 deliverContentTemplate）
+function buildDeliverJson() {
+  const t = localForm.deliverType
+  if (!t) return ''
+  const obj = { type: t, message: deliverForm.message || '' }
+  if (t === 'LINK') {
+    obj.link = deliverForm.link || ''
+  } else if (t === 'CARD') {
+    obj.cards = deliverForm.cardsText.split('\n').map(s => s.trim()).filter(Boolean)
+  } else if (t === 'ACCOUNT') {
+    obj.accounts = deliverForm.accountsText.split('\n').map(s => s.trim()).filter(Boolean)
+  } else if (t === 'FILE') {
+    obj.filePath = deliverForm.filePath || ''
+  }
+  return JSON.stringify(obj)
+}
+
+// 编辑时把 JSON 解析回动态表单（兼容旧格式：纯文本/数组 → 当作 message）
+function parseDeliverJson(str) {
+  if (!str) return
+  try {
+    const obj = JSON.parse(str)
+    if (obj && typeof obj === 'object' && !Array.isArray(obj) && obj.type) {
+      deliverForm.link = obj.link || ''
+      deliverForm.cardsText = Array.isArray(obj.cards) ? obj.cards.join('\n') : ''
+      deliverForm.accountsText = Array.isArray(obj.accounts) ? obj.accounts.join('\n') : ''
+      deliverForm.filePath = obj.filePath || ''
+      deliverForm.message = obj.message || ''
+      return
+    }
+  } catch { /* fallthrough */ }
+  // 旧格式：整体当消息模板
+  deliverForm.message = str
+}
 
 const batchForm = reactive({
   partialSuccess: true,
@@ -722,8 +809,13 @@ const accountName = (id) => accounts.value.find(a => a.id === id)?.accountName |
 const poolCount = (row) => {
   if (!row.deliverContentTemplate) return 0
   try {
-    const arr = JSON.parse(row.deliverContentTemplate)
-    return Array.isArray(arr) ? arr.length : 0
+    const obj = JSON.parse(row.deliverContentTemplate)
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+      if (obj.type === 'CARD' && Array.isArray(obj.cards)) return obj.cards.length
+      if (obj.type === 'ACCOUNT' && Array.isArray(obj.accounts)) return obj.accounts.length
+      return 0 // LINK / FILE 不走卡券池
+    }
+    return Array.isArray(obj) ? obj.length : 0
   } catch {
     return row.deliverContentTemplate.split('|||').filter(s => s.trim()).length
   }
@@ -757,6 +849,7 @@ function resetLocalForm() {
     id: null, accountId: null, title: '', price: 0, originalPrice: 0, stock: 1,
     description: '', goodsType: 'PHYSICAL', deliverType: '', deliverContentTemplate: '', images: [], action: 'DRAFT'
   })
+  Object.assign(deliverForm, { link: '', cardsText: '', accountsText: '', filePath: '', message: '' })
   localImageFileList.value = []
 }
 
@@ -764,10 +857,18 @@ async function handleLocalSave() {
   if (!localForm.accountId) return ElMessage.warning('请选择发布账号')
   if (!localForm.title) return ElMessage.warning('请输入标题')
   if (localForm.price == null || localForm.price <= 0) return ElMessage.warning('请输入有效售价')
+  if (localForm.goodsType === 'VIRTUAL') {
+    if (!localForm.deliverType) return ElMessage.warning('虚拟商品请选择发货类型')
+    if (localForm.deliverType === 'CARD' && !deliverForm.cardsText.trim()) return ElMessage.warning('请填写卡密列表（每行一条）')
+    if (localForm.deliverType === 'ACCOUNT' && !deliverForm.accountsText.trim()) return ElMessage.warning('请填写账号列表（每行一个）')
+    if (localForm.deliverType === 'LINK' && !deliverForm.link.trim()) return ElMessage.warning('请填写发货链接')
+    if (localForm.deliverType === 'FILE' && !deliverForm.filePath.trim()) return ElMessage.warning('请填写文件路径')
+  }
   localSubmitting.value = true
   try {
     const images = localImageFileList.value.filter(f => f.status === 'success' && f.url).map(f => denormalizeUploadUrl(f.url))
-    const payload = { ...localForm, images }
+    // 动态表单 → JSON 存入 deliverContentTemplate，整个发货链路统一走该 JSON
+    const payload = { ...localForm, images, deliverContentTemplate: buildDeliverJson() }
     let res
     if (localForm.id) {
       res = await localProductApi.updateLocalProduct(localForm.id, payload)
@@ -804,6 +905,7 @@ function editLocalProduct(row) {
     deliverContentTemplate: row.deliverContentTemplate || '',
     action: 'DRAFT'
   })
+  parseDeliverJson(row.deliverContentTemplate || '')
   const imgs = parseJsonArray(row.images) || (row.imageUrl ? [row.imageUrl] : [])
   localForm.images = imgs
   localImageFileList.value = imgs.map((url, idx) => ({ uid: `img-${idx}`, url: normalizeImageUrl(url), name: `图片${idx + 1}`, status: 'success' }))

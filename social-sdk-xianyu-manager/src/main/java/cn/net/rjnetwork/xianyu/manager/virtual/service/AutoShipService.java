@@ -5,12 +5,17 @@ import cn.net.rjnetwork.xianyu.api.XianyuTradeAuxApiService;
 import cn.net.rjnetwork.xianyu.manager.account.mapper.AccountMapper;
 import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
 import cn.net.rjnetwork.xianyu.manager.batch.service.BatchJobService;
+import cn.net.rjnetwork.xianyu.manager.clouddisk.model.CloudStorageAccount;
+import cn.net.rjnetwork.xianyu.manager.clouddisk.model.CloudStorageFile;
+import cn.net.rjnetwork.xianyu.manager.clouddisk.service.CloudStorageService;
 import cn.net.rjnetwork.xianyu.manager.message.dto.MessageSendRequest;
 import cn.net.rjnetwork.xianyu.manager.message.service.MessageService;
 import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
 import cn.net.rjnetwork.xianyu.manager.order.mapper.OrderMapper;
 import cn.net.rjnetwork.xianyu.manager.order.model.XianyuOrder;
 import cn.net.rjnetwork.xianyu.manager.order.ship.service.DeliveryRuleEngine;
+import cn.net.rjnetwork.xianyu.manager.product.mapper.ProductMapper;
+import cn.net.rjnetwork.xianyu.manager.product.model.XianyuProduct;
 import cn.net.rjnetwork.xianyu.manager.virtual.mapper.CardItemRelationMapper;
 import cn.net.rjnetwork.xianyu.manager.virtual.mapper.DeliveryLogMapper;
 import cn.net.rjnetwork.xianyu.manager.virtual.mapper.ShipCardMapper;
@@ -30,11 +35,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 自动发货主链路 —— A8。
@@ -70,6 +79,8 @@ public class AutoShipService {
     private final DeliveryLogMapper deliveryLogMapper;
     private final VirtualShipTaskMapper taskMapper;
     private final AccountMapper accountMapper;
+    private final ProductMapper productMapper;
+    private final CloudStorageService cloudStorageService;
     private final DeliveryRuleEngine ruleEngine;
     private final MessageService messageService;
     private final BatchJobService batchJobService;
@@ -85,6 +96,8 @@ public class AutoShipService {
                            DeliveryLogMapper deliveryLogMapper,
                            VirtualShipTaskMapper taskMapper,
                            AccountMapper accountMapper,
+                           ProductMapper productMapper,
+                           CloudStorageService cloudStorageService,
                            DeliveryRuleEngine ruleEngine,
                            MessageService messageService,
                            BatchJobService batchJobService,
@@ -95,6 +108,8 @@ public class AutoShipService {
         this.deliveryLogMapper = deliveryLogMapper;
         this.taskMapper = taskMapper;
         this.accountMapper = accountMapper;
+        this.productMapper = productMapper;
+        this.cloudStorageService = cloudStorageService;
         this.ruleEngine = ruleEngine;
         this.messageService = messageService;
         this.batchJobService = batchJobService;
@@ -166,39 +181,63 @@ public class AutoShipService {
             ShipCard matched = null;
             String deliverText = order.getDeliverContent();
             if (!messageAlreadySent) {
-                // 2. A6 多卡券匹配：按 priority 升序原子抢占 AVAILABLE→USED
-                List<CardItemRelation> rels = relationMapper.selectEnabledByProductId(task.getProductId());
-                for (CardItemRelation rel : rels) {
-                    ShipCard card = shipCardMapper.selectById(rel.getCardId());
-                    if (card == null || !"AVAILABLE".equals(card.getStatus())) {
-                        continue;
+                // 2.0 模板直发：LINK/FILE 类型不依赖卡券池，直接用商品模板渲染发货内容。
+                //     CARD/ACCOUNT 才走下方 A6 多卡券匹配（每单消耗一张卡券）。
+                XianyuProduct product = productMapper.selectById(task.getProductId());
+                String deliverType = product != null ? product.getDeliverType() : null;
+                String template = product != null ? product.getDeliverContentTemplate() : null;
+                boolean templateDirect = "LINK".equals(deliverType) || "FILE".equals(deliverType);
+                if (templateDirect) {
+                    DeliverPayload payload = parseDeliverPayload(template);
+                    if ("LINK".equals(deliverType)) {
+                        String link = payload != null && !isBlank(payload.link) ? payload.link : template;
+                        if (isBlank(link)) {
+                            finalizeSkip(task, audit, "链接发货但商品未配置链接（deliverContentTemplate 为空）");
+                            return;
+                        }
+                        String message = payload != null && !isBlank(payload.message) ? payload.message : link;
+                        deliverText = renderTemplate(message, order, link);
+                        audit.setDeliverContent(deliverText);
+                    } else {
+                        String filePath = payload != null && !isBlank(payload.filePath) ? payload.filePath : template;
+                        deliverText = uploadFileDeliver(filePath, payload != null ? payload.message : null, product);
+                        audit.setDeliverContent(deliverText);
                     }
-                    // 先 CAS 预占，成功后再发送，避免并发双发同一卡
-                    card.setStatus("USED");
-                    card.setUsedOrderId(task.getOrderId());
-                    card.setUsedAt(LocalDateTime.now());
-                    int claimed = shipCardMapper.update(card, new LambdaQueryWrapper<ShipCard>()
-                            .eq(ShipCard::getId, card.getId())
-                            .eq(ShipCard::getStatus, "AVAILABLE"));
-                    if (claimed > 0) {
-                        matched = card;
-                        break;
+                } else {
+                    // 2. A6 多卡券匹配：按 priority 升序原子抢占 AVAILABLE→USED
+                    List<CardItemRelation> rels = relationMapper.selectEnabledByProductId(task.getProductId());
+                    for (CardItemRelation rel : rels) {
+                        ShipCard card = shipCardMapper.selectById(rel.getCardId());
+                        if (card == null || !"AVAILABLE".equals(card.getStatus())) {
+                            continue;
+                        }
+                        // 先 CAS 预占，成功后再发送，避免并发双发同一卡
+                        card.setStatus("USED");
+                        card.setUsedOrderId(task.getOrderId());
+                        card.setUsedAt(LocalDateTime.now());
+                        int claimed = shipCardMapper.update(card, new LambdaQueryWrapper<ShipCard>()
+                                .eq(ShipCard::getId, card.getId())
+                                .eq(ShipCard::getStatus, "AVAILABLE"));
+                        if (claimed > 0) {
+                            matched = card;
+                            break;
+                        }
                     }
+                    if (matched == null) {
+                        finalizeSkip(task, audit, "无可用卡券，触发 A9 补发");
+                        // 推通知让运营补卡券池；A9 补发任务也会扫到本 task 重试
+                        publishNotify(task, order, "AUTO_SHIP_NO_CARD", "productId=" + task.getProductId() + " 无可用卡券");
+                        return;
+                    }
+                    deliverText = buildDeliverContent(matched);
+                    audit.setShipCardId(matched.getId());
+                    audit.setDeliverContent(deliverText);
                 }
-                if (matched == null) {
-                    finalizeSkip(task, audit, "无可用卡券，触发 A9 补发");
-                    // 推通知让运营补卡券池；A9 补发任务也会扫到本 task 重试
-                    publishNotify(task, order, "AUTO_SHIP_NO_CARD", "productId=" + task.getProductId() + " 无可用卡券");
-                    return;
-                }
-                deliverText = buildDeliverContent(matched);
-                audit.setShipCardId(matched.getId());
-                audit.setDeliverContent(deliverText);
 
                 // 3. 延迟窗口（executeAt 未到则延后执行，防被风控盯上）
                 if (task.getExecuteAt() != null && task.getExecuteAt().isAfter(LocalDateTime.now())) {
                     // 延迟执行：释放刚抢占的卡券，避免被长时间占用
-                    releaseShipCard(matched.getId());
+                    if (matched != null) releaseShipCard(matched.getId());
                     task.setStatus("PENDING");
                     taskMapper.updateById(task);
                     audit.setStatus("DELAYED");
@@ -210,14 +249,14 @@ public class AutoShipService {
                 // 4. 真实发消息：buyerId 兜底生成会话，禁止 sessionId=null 假发送
                 XianyuAccount account = accountMapper.selectById(task.getAccountId());
                 if (account == null) {
-                    releaseShipCard(matched.getId());
+                    if (matched != null) releaseShipCard(matched.getId());
                     finalizeFail(task, audit, "FAILED", "账号不存在");
                     publishShipFailed(task, order, "账号不存在");
                     return;
                 }
                 String buyerId = stripGoofishSuffix(order.getBuyerId());
                 if (buyerId.isBlank()) {
-                    releaseShipCard(matched.getId());
+                    if (matched != null) releaseShipCard(matched.getId());
                     finalizeFail(task, audit, "FAILED", "订单缺少 buyerId，无法发送发货消息");
                     publishShipFailed(task, order, "订单缺少 buyerId，无法发送发货消息");
                     return;
@@ -231,7 +270,7 @@ public class AutoShipService {
                     req.setAutoReply(false);
                     messageService.sendMessage(req);
                 } catch (Exception e) {
-                    releaseShipCard(matched.getId());
+                    if (matched != null) releaseShipCard(matched.getId());
                     finalizeFail(task, audit, "FAILED", "发送失败：" + e.getMessage());
                     publishShipFailed(task, order, "发送失败：" + e.getMessage());
                     return;
@@ -422,6 +461,122 @@ public class AutoShipService {
     }
 
     private String nullSafe(String s) { return s == null ? "" : s; }
+
+    private boolean isBlank(String s) { return s == null || s.isBlank(); }
+
+    /** 动态表单 JSON 解析结果：{type, link, filePath, message, cards[], accounts[]} */
+    private static class DeliverPayload {
+        String link;
+        String filePath;
+        String message;
+        List<String> cards;
+        List<String> accounts;
+    }
+
+    /**
+     * 解析动态表单组合的 JSON（前端 products/Index.vue 与 product/Index.vue 同构产出）。
+     * 兼容旧格式：不是 JSON 对象或解析失败时返回 null，调用方按纯文本模板兜底。
+     */
+    private DeliverPayload parseDeliverPayload(String template) {
+        if (template == null || template.isBlank()) return null;
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper om =
+                    new com.fasterxml.jackson.databind.ObjectMapper();
+            JsonNode node = om.readTree(template);
+            if (node == null || !node.isObject()) return null;
+            DeliverPayload p = new DeliverPayload();
+            p.link = node.path("link").asText("");
+            p.filePath = node.path("filePath").asText("");
+            p.message = node.path("message").asText("");
+            if (node.has("cards") && node.get("cards").isArray()) {
+                p.cards = new java.util.ArrayList<>();
+                node.get("cards").forEach(c -> p.cards.add(c.asText("")));
+            }
+            if (node.has("accounts") && node.get("accounts").isArray()) {
+                p.accounts = new java.util.ArrayList<>();
+                node.get("accounts").forEach(c -> p.accounts.add(c.asText("")));
+            }
+            return p;
+        } catch (Exception e) {
+            return null; // 非 JSON（旧格式纯文本/数组）→ 兜底
+        }
+    }
+
+    /** 模板渲染：${itemTitle}/${orderId}/${link} 等占位符替换，未命中变量保留原占位符。 */
+    private String renderTemplate(String template, XianyuOrder order, String link) {
+        if (template == null) return null;
+        Map<String, String> vars = new LinkedHashMap<>();
+        vars.put("itemTitle", order != null && order.getItemTitle() != null ? order.getItemTitle() : "");
+        vars.put("orderId", order != null && order.getOrderId() != null ? order.getOrderId() : "");
+        vars.put("link", link != null ? link : "");
+        Pattern p = Pattern.compile("\\$\\{(\\w+)\\}");
+        Matcher m = p.matcher(template);
+        StringBuilder sb = new StringBuilder();
+        while (m.find()) {
+            String key = m.group(1);
+            String val = vars.getOrDefault(key, m.group(0));
+            m.appendReplacement(sb, Matcher.quoteReplacement(val));
+        }
+        m.appendTail(sb);
+        return sb.toString();
+    }
+
+    /** FILE 类型发货：deliverContentTemplate 是本地文件路径，上传网盘后返回 下载链接+提取码。 */
+    private String uploadFileDeliver(String filePath, String messageTemplate, XianyuProduct product) {
+        if (filePath == null || filePath.isBlank()) {
+            return "【系统错误】商品文件路径为空";
+        }
+        try {
+            List<CloudStorageAccount> accounts = cloudStorageService.listAccounts(product.getAccountId());
+            if (accounts.isEmpty()) {
+                return "【系统忙碌】网盘账号未配置，请稍后重试";
+            }
+            CloudStorageAccount account = accounts.get(0);
+            File file = new File(filePath);
+            if (!file.exists()) {
+                return "【系统错误】商品文件不存在: " + filePath;
+            }
+            cn.net.rjnetwork.xianyu.manager.clouddisk.dto.FileUploadRequest uploadReq =
+                    new cn.net.rjnetwork.xianyu.manager.clouddisk.dto.FileUploadRequest();
+            uploadReq.setFileName(file.getName());
+            uploadReq.setFileSize(file.length());
+            try {
+                uploadReq.setMimeType(java.nio.file.Files.probeContentType(file.toPath()));
+            } catch (Exception ignored) { }
+            uploadReq.setTargetPath("/xianyu-virtual-ship/" + product.getId());
+            uploadReq.setExpireDays(30);
+            try (FileInputStream fis = new FileInputStream(file)) {
+                uploadReq.setContent(fis);
+                CloudStorageFile uploaded = cloudStorageService.uploadFile(account.getId(), uploadReq);
+                if (uploaded != null && "COMPLETED".equals(uploaded.getUploadStatus())) {
+                    String link = cloudStorageService.shareFile(uploaded.getId());
+                    Map<String, String> vars = new LinkedHashMap<>();
+                    vars.put("link", link != null ? link : "");
+                    vars.put("extractCode", uploaded.getExtractCode() != null ? uploaded.getExtractCode() : "");
+                    vars.put("fileName", uploaded.getFileName() != null ? uploaded.getFileName() : "");
+                    // 用动态表单的 message（messageTemplate），不再直接渲染整个 JSON
+                    String template = messageTemplate;
+                    if (template == null || template.isBlank()) {
+                        return String.format("下载链接：%s\n提取码：%s\n有效期：7天", link, uploaded.getExtractCode());
+                    }
+                    Pattern p = Pattern.compile("\\$\\{(\\w+)\\}");
+                    Matcher m = p.matcher(template);
+                    StringBuilder sb = new StringBuilder();
+                    while (m.find()) {
+                        String key = m.group(1);
+                        String val = vars.getOrDefault(key, m.group(0));
+                        m.appendReplacement(sb, Matcher.quoteReplacement(val));
+                    }
+                    m.appendTail(sb);
+                    return sb.toString();
+                }
+            }
+            return "【系统错误】文件上传失败，请稍后重试";
+        } catch (Exception e) {
+            log.warn("[A8] FILE deliver failed: {}", e.getMessage());
+            return "【系统错误】文件发货失败，请联系客服";
+        }
+    }
 
     private Long parseLong(String s) {
         if (s == null || s.isBlank()) return null;

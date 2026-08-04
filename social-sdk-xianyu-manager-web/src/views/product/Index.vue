@@ -96,28 +96,33 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item label="发货类型" v-if="vsConfigForm.goodsType === 'VIRTUAL'">
-          <el-radio-group v-model="vsConfigForm.deliverType">
+          <el-radio-group v-model="vsConfigForm.deliverType" @change="onVsDeliverTypeChange">
             <el-radio-button value="CARD">卡密</el-radio-button>
             <el-radio-button value="ACCOUNT">账号</el-radio-button>
             <el-radio-button value="LINK">链接文本</el-radio-button>
             <el-radio-button value="FILE">网盘文件</el-radio-button>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="发货内容模板" v-if="vsConfigForm.goodsType === 'VIRTUAL'">
-          <el-input v-model="vsConfigForm.deliverContentTemplate" type="textarea" :rows="6" :placeholder="vsTemplatePlaceholder" />
-          <div style="color: var(--text-3); font-size: 12px; margin-top: 6px; line-height: 1.6;">
-            <div v-if="vsConfigForm.deliverType === 'CARD' || vsConfigForm.deliverType === 'ACCOUNT'">
-              卡密发货。可用占位符：<b>${cardCode}</b> <b>${cardPassword}</b>。留空走默认格式。
-            </div>
-            <div v-else-if="vsConfigForm.deliverType === 'LINK'">
-              链接发货。模板即发给买家的文本，支持 <b>${itemTitle}</b> <b>${orderId}</b>。
-            </div>
-            <div v-else-if="vsConfigForm.deliverType === 'FILE'">
-              网盘发货。模板填本地文件路径，系统自动上传网盘生成分享链接。可用：<b>${link}</b> <b>${extractCode}</b> <b>${fileName}</b>。
-            </div>
-            <div v-else>请选择发货类型。</div>
-          </div>
-        </el-form-item>
+
+        <!-- 动态发货内容表单：与本地商品新建弹窗同构，保存时组合成 JSON -->
+        <template v-if="vsConfigForm.goodsType === 'VIRTUAL' && vsConfigForm.deliverType">
+          <el-form-item v-if="vsConfigForm.deliverType === 'LINK'" label="发货链接">
+            <el-input v-model="vsDeliverForm.link" placeholder="https://pan.quark.cn/s/xxx（买家直接点击的下载链接）" />
+          </el-form-item>
+          <el-form-item v-if="vsConfigForm.deliverType === 'CARD'" label="卡密列表">
+            <el-input v-model="vsDeliverForm.cardsText" type="textarea" :rows="5" placeholder="每行一条：卡号|密码（密码可省略）&#10;ABC123|pwd1&#10;DEF456" />
+          </el-form-item>
+          <el-form-item v-if="vsConfigForm.deliverType === 'ACCOUNT'" label="账号列表">
+            <el-input v-model="vsDeliverForm.accountsText" type="textarea" :rows="5" placeholder="每行一条：账号|密码|服务器（服务器可省略）&#10;user1|pwd1|srv1" />
+          </el-form-item>
+          <el-form-item v-if="vsConfigForm.deliverType === 'FILE'" label="文件路径">
+            <el-input v-model="vsDeliverForm.filePath" placeholder="/data/files/xxx.zip（本地文件路径，发布后自动上传网盘）" />
+          </el-form-item>
+          <el-form-item label="发货消息模板">
+            <el-input v-model="vsDeliverForm.message" type="textarea" :rows="3" :placeholder="vsDeliverMessagePlaceholder" />
+            <div style="color: var(--text-3); font-size: 12px; margin-top: 6px; line-height: 1.6;">{{ vsDeliverMessageHint }}</div>
+          </el-form-item>
+        </template>
       </el-form>
       <template #footer>
         <el-button @click="vsConfigVisible = false">取消</el-button>
@@ -242,13 +247,74 @@ const vsConfigForm = ref({
   deliverContentTemplate: ''
 })
 
-const vsTemplatePlaceholder = computed(() => {
+// 动态发货内容表单：与本地商品新建弹窗同构，保存时组合成 JSON 存入 deliverContentTemplate
+const vsDeliverForm = ref({
+  link: '',
+  cardsText: '',
+  accountsText: '',
+  filePath: '',
+  message: ''
+})
+
+const onVsDeliverTypeChange = () => {
+  // 切换发货类型时清空上次的字段，避免类型间串数据
+  Object.assign(vsDeliverForm.value, { link: '', cardsText: '', accountsText: '', filePath: '', message: '' })
+}
+
+const vsDeliverMessagePlaceholder = computed(() => {
   const t = vsConfigForm.value.deliverType
-  if (t === 'CARD' || t === 'ACCOUNT') return '卡号：${cardCode}\n密码：${cardPassword}\n（留空走默认格式）'
-  if (t === 'LINK') return '感谢购买【${itemTitle}】，下载链接：xxx\n订单号：${orderId}'
-  if (t === 'FILE') return '/data/files/my-product.zip\n（填本地文件路径，上传网盘后用 ${link} ${extractCode} 渲染）'
+  if (t === 'CARD') return '卡号：${cardCode}\n密码：${cardPassword}（留空走默认格式）'
+  if (t === 'ACCOUNT') return '账号：${account}\n密码：${password}\n服务器：${server}（留空走默认格式）'
+  if (t === 'LINK') return '感谢购买【${itemTitle}】，下载链接：${link}\n订单号：${orderId}'
+  if (t === 'FILE') return '下载链接：${link}\n提取码：${extractCode}\n有效期：7天'
   return ''
 })
+
+const vsDeliverMessageHint = computed(() => {
+  const t = vsConfigForm.value.deliverType
+  if (t === 'CARD') return '可用占位符：${cardCode} ${cardPassword}；每行一张卡密，格式 卡号|密码'
+  if (t === 'ACCOUNT') return '可用占位符：${account} ${password} ${server}；每行一个账号，格式 账号|密码|服务器'
+  if (t === 'LINK') return '可用占位符：${link} ${itemTitle} ${orderId}'
+  if (t === 'FILE') return '可用占位符：${link} ${extractCode} ${fileName}；文件路径为服务器本地路径'
+  return ''
+})
+
+// 把动态表单组合成 JSON 字符串（保存到 deliverContentTemplate）
+function buildVsDeliverJson() {
+  const t = vsConfigForm.value.deliverType
+  if (!t) return ''
+  const f = vsDeliverForm.value
+  const obj = { type: t, message: f.message || '' }
+  if (t === 'LINK') {
+    obj.link = f.link || ''
+  } else if (t === 'CARD') {
+    obj.cards = f.cardsText.split('\n').map(s => s.trim()).filter(Boolean)
+  } else if (t === 'ACCOUNT') {
+    obj.accounts = f.accountsText.split('\n').map(s => s.trim()).filter(Boolean)
+  } else if (t === 'FILE') {
+    obj.filePath = f.filePath || ''
+  }
+  return JSON.stringify(obj)
+}
+
+// 打开配置时把 JSON 解析回动态表单（兼容旧格式：纯文本/数组 → 当作 message）
+function parseVsDeliverJson(str) {
+  Object.assign(vsDeliverForm.value, { link: '', cardsText: '', accountsText: '', filePath: '', message: '' })
+  if (!str) return
+  try {
+    const obj = JSON.parse(str)
+    if (obj && typeof obj === 'object' && !Array.isArray(obj) && obj.type) {
+      vsDeliverForm.value.link = obj.link || ''
+      vsDeliverForm.value.cardsText = Array.isArray(obj.cards) ? obj.cards.join('\n') : ''
+      vsDeliverForm.value.accountsText = Array.isArray(obj.accounts) ? obj.accounts.join('\n') : ''
+      vsDeliverForm.value.filePath = obj.filePath || ''
+      vsDeliverForm.value.message = obj.message || ''
+      return
+    }
+  } catch { /* fallthrough */ }
+  // 旧格式：整体当消息模板
+  vsDeliverForm.value.message = str
+}
 
 const openVirtualShipConfig = (row) => {
   vsConfigForm.value = {
@@ -258,6 +324,7 @@ const openVirtualShipConfig = (row) => {
     deliverType: row.deliverType || 'CARD',
     deliverContentTemplate: row.deliverContentTemplate || ''
   }
+  parseVsDeliverJson(row.deliverContentTemplate || '')
   vsConfigVisible.value = true
 }
 
@@ -265,10 +332,15 @@ const saveVirtualShipConfig = async () => {
   vsConfigSaving.value = true
   try {
     const isVirtual = vsConfigForm.value.goodsType === 'VIRTUAL'
+    const t = vsConfigForm.value.deliverType
+    if (isVirtual && t === 'CARD' && !vsDeliverForm.value.cardsText.trim()) return ElMessage.warning('请填写卡密列表（每行一条）')
+    if (isVirtual && t === 'ACCOUNT' && !vsDeliverForm.value.accountsText.trim()) return ElMessage.warning('请填写账号列表（每行一个）')
+    if (isVirtual && t === 'LINK' && !vsDeliverForm.value.link.trim()) return ElMessage.warning('请填写发货链接')
+    if (isVirtual && t === 'FILE' && !vsDeliverForm.value.filePath.trim()) return ElMessage.warning('请填写文件路径')
     await saveProductVirtualShipConfig(vsConfigForm.value.id, {
       goodsType: vsConfigForm.value.goodsType,
       deliverType: isVirtual ? vsConfigForm.value.deliverType : null,
-      deliverContentTemplate: isVirtual ? vsConfigForm.value.deliverContentTemplate : null
+      deliverContentTemplate: isVirtual ? buildVsDeliverJson() : null
     })
     ElMessage.success('配置已保存')
     vsConfigVisible.value = false

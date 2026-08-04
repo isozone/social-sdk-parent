@@ -52,6 +52,8 @@ public class MessageService {
     private final Map<Long, String> accountCookieFingerprints = new ConcurrentHashMap<>();
     /** 账号 selfUserId 内存缓存：避免每次 normalizeDirections 都 selectById + 远程拉 userId */
     private final Map<Long, String> selfUserIdCache = new ConcurrentHashMap<>();
+    /** 已自动回复过的 msgId 集合（幂等去重，避免 WSS 推送 + 轮询同步两条路径重复触发同一消息的自动回复） */
+    private final java.util.Set<String> autoRepliedMsgIds = java.util.Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     /** 账号服务 — 用于风控触发时按账号启动独占 Chrome 容器（per-account CDP 端点）。 */
     private AccountService accountService;
@@ -1516,6 +1518,18 @@ public class MessageService {
     public String autoReplyIfNeeded(Long accountId, XianyuMessage incomingMessage) {
         if (incomingMessage == null || !"INCOMING".equals(incomingMessage.getDirection())) {
             return null;
+        }
+        // 消息级去重：同一 msgId 只触发一次自动回复（WSS 推送 + 轮询同步两条路径都会调本方法）
+        String msgKey = incomingMessage.getMsgId();
+        if (msgKey != null && !msgKey.isBlank()) {
+            if (!autoRepliedMsgIds.add(msgKey)) {
+                log.info("[MESSAGE] auto reply skipped (already replied): msgId={} session={}", msgKey, incomingMessage.getSessionId());
+                return null;
+            }
+            // 集合会无限增长，定期清理超 1000 条时清最早的（内存兜底，DB 已有 msgId 唯一约束做持久化兜底）
+            if (autoRepliedMsgIds.size() > 1000) {
+                autoRepliedMsgIds.clear();
+            }
         }
         // 复制一份消息快照，避免异步任务里读到被改的 entity
         XianyuMessage snapshot = new XianyuMessage();

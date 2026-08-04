@@ -16,6 +16,8 @@ import cn.net.rjnetwork.xianyu.manager.virtual.mapper.VirtualShipTaskMapper;
 import cn.net.rjnetwork.xianyu.manager.virtual.model.CardItemRelation;
 import cn.net.rjnetwork.xianyu.manager.virtual.model.ShipCard;
 import cn.net.rjnetwork.xianyu.manager.virtual.model.VirtualShipTask;
+import cn.net.rjnetwork.xianyu.manager.product.mapper.ProductMapper;
+import cn.net.rjnetwork.xianyu.manager.clouddisk.service.CloudStorageService;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +47,8 @@ class AutoShipNotifyLoopTest {
     @Mock private DeliveryLogMapper deliveryLogMapper;
     @Mock private VirtualShipTaskMapper taskMapper;
     @Mock private AccountMapper accountMapper;
+    @Mock private ProductMapper productMapper;
+    @Mock private CloudStorageService cloudStorageService;
     @Mock private DeliveryRuleEngine ruleEngine;
     @Mock private MessageService messageService;
     @Mock private BatchJobService batchJobService;
@@ -56,8 +60,8 @@ class AutoShipNotifyLoopTest {
     void setUp() {
         service = new AutoShipService(
                 orderMapper, shipCardMapper, relationMapper, deliveryLogMapper,
-                taskMapper, accountMapper, ruleEngine, messageService,
-                batchJobService, eventPublisher);
+                taskMapper, accountMapper, productMapper, cloudStorageService,
+                ruleEngine, messageService, batchJobService, eventPublisher);
         service.setSelf(service);
     }
 
