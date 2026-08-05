@@ -20,14 +20,11 @@ public class RiskbirdLoginResult {
     /** 账号 ID（容器隔离的键）。 */
     private Long accountId;
 
-    /** 账号标识（用户名/手机号）。 */
+    /** 账号标识（用户名/手机号，扫码登录无原始用户名时为 null）。 */
     private String username;
 
-    /** 登录后提取的 Cookie（cookie header 形式，可持久化复用）。 */
+    /** 登录成功后提取的 Cookie（cookie header 形式，可持久化复用）；失败或未提取时为 null。 */
     private String cookieHeader;
-
-    /** 容器 CDP 端点（每账号独立容器时有效）。 */
-    private String cdpEndpoint;
 
     /** 消息（成功提示 / 失败原因）。 */
     private String message;

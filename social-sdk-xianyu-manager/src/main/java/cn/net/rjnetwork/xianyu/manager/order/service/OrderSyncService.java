@@ -18,7 +18,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -73,9 +72,17 @@ public class OrderSyncService {
     }
 
     /**
-     * 同步指定账号的订单（bought + sold），自动翻页直到没有更多数据
+     * 同步指定账号的订单（bought + sold），自动翻页直到没有更多数据。
+     *
+     * <p><b>不要</b>在此方法上加 @Transactional：同步是「拉远端 + 逐条写入」的长链路，
+     * 内部会调用带 @Transactional 的 {@code OrderStateMachineService#transition} 和
+     * {@code VirtualShipService#createShipTaskIfVirtual}（默认 REQUIRED 传播会加入外层事务）。
+     * 一旦它们抛运行时异常，Spring 会先把共享事务标记为 rollback-only，本方法 try-catch
+     * 即使吞掉异常，提交时仍会抛 UnexpectedRollbackException（"Transaction rolled back
+     * because it has been marked as rollback-only"），且整批已同步订单全部回滚。
+     * 去掉外层事务后：每条写入各自独立提交，单条失败只回滚自身，与下方
+     * 「容错不阻断主链路」的设计意图一致。</p>
      */
-    @Transactional
     public SyncResult syncOrders(Long accountId) {
         XianyuAccount account = accountMapper.selectById(accountId);
         if (account == null) {
@@ -425,10 +432,14 @@ public class OrderSyncService {
     }
 
     /**
-     * 将 API 状态消息映射到标准状态码（兜底方案）
+     * 将 API 状态消息映射到标准状态码（兜底方案）。
+     *
+     * <p>未命中任何中文关键词时返回 {@code null}（而非硬塞 {@code PENDING}），
+     * 让上层据「本次同步未能解析状态」决定保留 DB 旧值，避免反复 {@code PENDING ↔ SHIPPED} 抖动刷屏。
+     * 仅 {@code statusMsg == null} 的首插入场景由调用方单独处理为 {@code CREATED/PENDING}。
      */
     private String mapStatusFromMsg(String statusMsg) {
-        if (statusMsg == null) return "PENDING";
+        if (statusMsg == null || statusMsg.isEmpty()) return null;
         if (statusMsg.contains("待付款")) return "PENDING";
         if (statusMsg.contains("待发货") || statusMsg.contains("已付款")) return "PAID";
         if (statusMsg.contains("已发货") || statusMsg.contains("等待见面交易")) return "SHIPPED";
@@ -436,7 +447,7 @@ public class OrderSyncService {
         if (statusMsg.contains("退款中") || statusMsg.contains("协商退款")) return "REFUNDING";
         if (statusMsg.contains("退款成功") || statusMsg.contains("有退款") || statusMsg.contains("已退款")) return "REFUNDED";
         if (statusMsg.contains("已关闭") || statusMsg.contains("交易关闭")) return "CLOSED";
-        return "PENDING";
+        return null;
     }
 
     /**
@@ -462,7 +473,11 @@ public class OrderSyncService {
 
             XianyuOrder existing = findByAccountIdAndOrderId(accountId, order.getOrderId());
             if (existing != null) {
-                boolean statusChanged = !str(existing.getStatus()).equals(str(order.getStatus()));
+                // 比较统一按大小写归一（避免 SHIPPED vs shipped 抖动判变）
+                String oldStatus = norm(existing.getStatus());
+                String newStatus = norm(order.getStatus());
+                // 本次同步未能解析出状态（newStatus 为空）时：保留 DB 旧值，不判变更、不刷通知
+                boolean statusChanged = !newStatus.isEmpty() && !newStatus.equals(oldStatus);
                 boolean titleChanged = !str(existing.getItemTitle()).equals(str(order.getItemTitle()));
 
                 existing.setItemId(order.getItemId());
@@ -473,7 +488,9 @@ public class OrderSyncService {
                 existing.setOrderDetailUrl(order.getOrderDetailUrl());
                 existing.setRawData(order.getRawData());
                 existing.setAmount(order.getAmount());
-                existing.setStatus(order.getStatus());
+                if (!newStatus.isEmpty()) {
+                    existing.setStatus(order.getStatus()); // 真实变更才覆盖；未解析时保留旧值
+                }
                 existing.setOrderTime(order.getOrderTime());
                 existing.setTradeStatusEnum(order.getTradeStatusEnum());
                 existing.setIsSeller(order.getIsSeller());
@@ -491,7 +508,7 @@ public class OrderSyncService {
                             statusChanged ? "ORDER_STATUS_CHANGED" : "ORDER_UPDATED",
                             accountId, accountName,
                             Map.of("accountName", accountName, "orderId", order.getOrderId(),
-                                    "itemTitle", str(order.getItemTitle()), "status", str(order.getStatus()))));
+                                    "itemTitle", str(order.getItemTitle()), "status", str(existing.getStatus()))));
                 }
             } else {
                 // 新订单：按 itemTitle + accountId 反查本地商品，回填 product_id + goodsType
@@ -552,6 +569,11 @@ public class OrderSyncService {
     }
 
     private String str(Object o) { return o != null ? o.toString() : ""; }
+
+    /** 状态码归一：去空格 + 转大写，空/null 返回空串（用于大小写不敏感比较）。 */
+    private String norm(Object o) {
+        return o == null ? "" : o.toString().trim().toUpperCase();
+    }
 
     /**
      * 按 accountId + orderId 查询

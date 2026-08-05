@@ -13,7 +13,6 @@ import cn.net.rjnetwork.xianyu.chrome.core.ChromeBrowser;
 import cn.net.rjnetwork.xianyu.chrome.human.HumanDelay;
 import cn.net.rjnetwork.xianyu.chrome.network.ChromeNetwork;
 import cn.net.rjnetwork.xianyu.chrome.page.ChromePage;
-import cn.net.rjnetwork.xianyu.chrome.session.ChromeSnapshotService;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,7 +61,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
     @Override
     public RiskbirdLoginResult loginWithPassword(String username, String password)
             throws IOException, TimeoutException, InterruptedException {
-        return loginResult(false, "riskbird 站点以扫码登录为主（微信/风鸟App），请使用 prepareQrLogin() + waitQrLogin()");
+        return loginResult(false, username, null, "riskbird 站点以扫码登录为主（微信/风鸟App），请使用 prepareQrLogin() + waitQrLogin()");
     }
 
     /**
@@ -79,7 +78,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
      */
     @Override
     public String prepareQrLogin() throws IOException, TimeoutException, InterruptedException {
-        ChromeProfileRef profile = ensureContainer();
+        ensureContainer();
         try (ChromePage page = chromeBrowser.openPage(accountId)) {
             page.navigate(config.getLoginSuccessUrl());
             // 等 SPA 渲染稳定（登录入口 / 事件绑定就绪），避免过早交互无效
@@ -112,28 +111,27 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
             String qrUrl = page.attr(config.getQrImageSelector(), "src");
             log.info("[RISKBIRD] 扫码二维码已就绪, accountId={}, qrUrl={}", accountId, qrUrl);
             return qrUrl;
-        } finally {
-            profile.release();
-        }
+        } finally {}
     }
 
     @Override
     public RiskbirdLoginResult waitQrLogin(String qrSession)
             throws IOException, TimeoutException, InterruptedException {
-        ChromeProfileRef profile = ensureContainer();
+        ensureContainer();
         long deadline = System.currentTimeMillis() + config.getLoginTimeoutMs();
         while (System.currentTimeMillis() < deadline) {
             if (isLoggedIn()) {
-                return loginResult(true, "扫码登录成功");
+                String cookie = extractCookieHeaderQuietly();
+                return loginResult(true, null, cookie, "扫码登录成功");
             }
             Thread.sleep(config.getQrPollIntervalMs());
         }
-        return loginResult(false, "扫码登录超时");
+        return loginResult(false, null, null, "扫码登录超时");
     }
 
     @Override
     public RiskbirdLoginResult loginWithCookie(String cookieHeader) throws IOException, TimeoutException {
-        ChromeProfileRef profile = ensureContainer();
+        ensureContainer();
         try (CdpSession cdp = chromeBrowser.connectToAccount(accountId)) {
             // 直接把 cookie header 解析并注入（复用 CdpCookieStore）
             CdpCookieStore store = new CdpCookieStore(cdp);
@@ -148,15 +146,25 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
                 }
             }
             boolean loggedIn = isLoggedIn();
-            return loginResult(loggedIn, loggedIn ? "Cookie 登录成功" : "Cookie 已注入，但未检测到有效登录态");
-        } finally {
-            profile.release();
+            String extracted = loggedIn ? extractCookieHeaderQuietly() : null;
+            return loginResult(loggedIn, null, extracted,
+                    loggedIn ? "Cookie 登录成功" : "Cookie 已注入，但未检测到有效登录态");
+        }
+    }
+
+    /** 登录态提取为 cookie header（best-effort，失败返回 null 不中断登录流程）。 */
+    private String extractCookieHeaderQuietly() {
+        try (CdpSession cdp = chromeBrowser.connectToAccount(accountId)) {
+            return new CdpCookieStore(cdp).toHeaderValue(config.getBaseUrl());
+        } catch (Exception e) {
+            log.debug("[RISKBIRD] 登录后提取 Cookie 失败(忽略): {}", e.getMessage());
+            return null;
         }
     }
 
     @Override
     public boolean isLoggedIn() throws IOException, TimeoutException {
-        ChromeProfileRef profile = ensureContainer();
+        ensureContainer();
         try (CdpSession cdp = chromeBrowser.connectToAccount(accountId)) {
             CdpCookieStore store = new CdpCookieStore(cdp);
             List<CdpCookieStore.Cookie> cookies = store.getCookies(config.getBaseUrl());
@@ -182,19 +190,15 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
                 }
             }
             return false;
-        } finally {
-            profile.release();
-        }
+        } finally {}
     }
 
     @Override
     public String extractCookieHeader() throws IOException, TimeoutException {
-        ChromeProfileRef profile = ensureContainer();
+        ensureContainer();
         try (CdpSession cdp = chromeBrowser.connectToAccount(accountId)) {
             return new CdpCookieStore(cdp).toHeaderValue(config.getBaseUrl());
-        } finally {
-            profile.release();
-        }
+        } finally {}
     }
 
     // ==================== 查询 / 检索 / 搜索 ====================
@@ -211,7 +215,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
      */
     public RiskbirdSearchResult search(RiskbirdConfig.QueryType type, String keyword, int page)
             throws IOException, TimeoutException, InterruptedException {
-        ChromeProfileRef profile = ensureContainer();
+        ensureContainer();
         String channel = config.getQueryChannel();
         try {
             if ("api".equals(channel) || "hybrid".equals(channel)) {
@@ -225,9 +229,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
                         .error("API 通道未命中搜索结果").channel("api").build();
             }
             return searchViaDom(type, keyword, page);
-        } finally {
-            profile.release();
-        }
+        } finally {}
     }
 
     /**
@@ -239,7 +241,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
      */
     public List<RiskbirdPerson> searchPersons(String personName, int maxResults)
             throws IOException, TimeoutException, InterruptedException {
-        ChromeProfileRef profile = ensureContainer();
+        ensureContainer();
         try (ChromePage page = chromeBrowser.openPage(accountId)) {
             page.navigate(searchUrl(RiskbirdConfig.QueryType.PERSON, personName, 1));
             page.waitForLoadState(20);
@@ -257,9 +259,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
             // 从页面文本解析人员块（每人：姓名 + 共关联 N 家 + 地区分布 + 合作伙伴）
             String bodyText = page.evalString("(document.body.innerText || '').slice(0, 15000)");
             return parsePersons(personName, bodyText, maxResults);
-        } finally {
-            profile.release();
-        }
+        } finally {}
     }
 
     /**
@@ -275,7 +275,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
         if (filter == null || !filter.hasAny()) {
             return search(type, keyword, page);
         }
-        ChromeProfileRef profile = ensureContainer();
+        ensureContainer();
         try (ChromePage pg = chromeBrowser.openPage(accountId)) {
             pg.navigate(searchUrl(type, keyword, page));
             pg.waitForLoadState(20);
@@ -330,9 +330,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
             result.setSuccess(!companies.isEmpty());
             result.setChannel("dom");
             return result;
-        } finally {
-            profile.release();
-        }
+        } finally {}
     }
 
     /** 在搜索页点击筛选项（省份 → 地市 → 行业 → 状态），每项点击后等待查询刷新。 */
@@ -379,7 +377,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
      */
     public RiskbirdIntellectualProperty queryIntellectualProperty(String companyName, String entId)
             throws IOException, TimeoutException, InterruptedException {
-        ChromeProfileRef profile = ensureContainer();
+        ensureContainer();
         try (ChromePage page = chromeBrowser.openPage(accountId)) {
             page.navigate(config.getEntUrlTemplate()
                     .replace("{company}", java.net.URLEncoder.encode(companyName, StandardCharsets.UTF_8))
@@ -401,9 +399,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
                     + "if (i < 0) { i = t.indexOf('知识产权'); } "
                     + "return i >= 0 ? t.substring(i, Math.min(t.length, i + 6000)) : ''; })()");
             return parseIntellectualProperty(rawText);
-        } finally {
-            profile.release();
-        }
+        } finally {}
     }
 
     /**
@@ -560,7 +556,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
      */
     public RiskbirdCompany queryCompany(String companyName, String entId)
             throws IOException, TimeoutException, InterruptedException {
-        ChromeProfileRef profile = ensureContainer();
+        ensureContainer();
         try {
             try (ChromePage page = chromeBrowser.openPage(accountId)) {
                 page.navigate(config.getEntUrlTemplate()
@@ -576,9 +572,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
         } catch (Exception e) {
             log.warn("[RISKBIRD] DOM 查询企业详情失败, company={}, err={}", companyName, e.getMessage());
             return RiskbirdCompany.builder().name(companyName).entId(entId).build();
-        } finally {
-            profile.release();
-        }
+        } finally {}
     }
 
     @Override
@@ -606,7 +600,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
 
     private RiskbirdSearchResult searchViaApi(RiskbirdConfig.QueryType type, String keyword, int page)
             throws IOException, TimeoutException, InterruptedException {
-        ChromeProfileRef profile = ensureContainer();
+        ensureContainer();
         try (CdpSession cdp = chromeBrowser.connectToAccount(accountId)) {
             ChromeNetwork net = new ChromeNetwork(cdp);
             net.enable(true); // 开启响应体捕获
@@ -637,9 +631,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
             }
             return RiskbirdSearchResult.builder().keyword(keyword).success(false)
                     .error("API 通道未命中接口响应").channel("api").build();
-        } finally {
-            profile.release();
-        }
+        } finally {}
     }
 
     /** 安全读取响应体（资源可能已被回收/不可读，失败返回 null 不中断）。 */
@@ -654,7 +646,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
 
     private RiskbirdSearchResult searchViaDom(RiskbirdConfig.QueryType type, String keyword, int page)
             throws IOException, TimeoutException, InterruptedException {
-        ChromeProfileRef profile = ensureContainer();
+        ensureContainer();
         try (ChromePage pg = chromeBrowser.openPage(accountId)) {
             pg.navigate(searchUrl(type, keyword, page));
             pg.waitForLoadState(20);
@@ -707,9 +699,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
             }
             result.setChannel("dom");
             return result;
-        } finally {
-            profile.release();
-        }
+        } finally {}
     }
 
     /** 从页面文本解析总数（「为您找到 N 条相关结果」/「共 N 条」）。 */
@@ -842,27 +832,18 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
 
     // ==================== 内部：容器与登录态 ====================
 
-    /** 轻量容器引用（释放时仅降低访问时间，不停止容器——容器生命周期由上层管理）。 */
-    private static final class ChromeProfileRef implements AutoCloseable {
-        @Override
-        public void close() {
-            // 空实现：容器由 ChromeBrowser/ChromeProfileManager 管理
-        }
-
-        void release() {
-            // 保持容器常驻（由上层空闲回收策略处理）
-        }
-    }
-
-    private ChromeProfileRef ensureContainer() {
+    /** 确保账号对应的 Chrome 容器就绪（容器生命周期由上层 ChromeBrowser/ChromeProfileManager 管理）。 */
+    private void ensureContainer() {
         chromeBrowser.requireProfile(accountId);
-        return new ChromeProfileRef();
     }
 
-    private RiskbirdLoginResult loginResult(boolean success, String message) {
+    /** 构造登录结果（统一填 accountId；username/cookieHeader 按场景传入，不适用的传 null）。 */
+    private RiskbirdLoginResult loginResult(boolean success, String username, String cookieHeader, String message) {
         return RiskbirdLoginResult.builder()
                 .success(success)
                 .accountId(accountId)
+                .username(username)
+                .cookieHeader(cookieHeader)
                 .message(message)
                 .build();
     }
