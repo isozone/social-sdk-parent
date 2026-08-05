@@ -270,20 +270,13 @@ public class ProductService {
         }
 
         // 7. 步骤 D：运费设置
-        // 虚拟商品（goodsType=VIRTUAL）不收运费：supportFreight=false、免邮
-        // 实物商品默认按距离计费，templateId=-100
+        // 全品类统一「无需邮寄」：平台不收运费、不走物流（supportFreight=false + canFreeShipping=true），
+        // 不再区分实物/虚拟——实物也按无需邮寄上架，避免买家端被「按距离计费」劝退。
+        // templateId 仅在 supportFreight=true 时有意义，无需邮寄时不传。
         Map<String, Object> deliverySettings = new LinkedHashMap<>();
-        boolean isVirtual = "VIRTUAL".equalsIgnoreCase(request.getGoodsType());
-        if (isVirtual) {
-            deliverySettings.put("supportFreight", false);
-            deliverySettings.put("canFreeShipping", true);
-            deliverySettings.put("onlyTakeSelf", false);
-        } else {
-            deliverySettings.put("supportFreight", true);
-            deliverySettings.put("canFreeShipping", false);
-            deliverySettings.put("onlyTakeSelf", false);
-            deliverySettings.put("templateId", "-100");  // 按距离计费
-        }
+        deliverySettings.put("supportFreight", false);
+        deliverySettings.put("canFreeShipping", true);
+        deliverySettings.put("onlyTakeSelf", false);
 
         // 8. 步骤 E：价格转分（元 → 分）
         String priceInCent = null;
