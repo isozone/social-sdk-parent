@@ -21,6 +21,7 @@ COPY social-sdk-proxys ./social-sdk-proxys
 COPY social-sdk-cdp-auth ./social-sdk-cdp-auth
 COPY social-sdk-xianyu-manager ./social-sdk-xianyu-manager
 COPY social-sdk-spring-boot-starter ./social-sdk-spring-boot-starter
+COPY social-sdk-riskbird ./social-sdk-riskbird
 RUN mvn clean package -DskipTests -pl social-sdk-xianyu-manager -am \
     && for jar in social-sdk-xianyu-manager/target/*.jar; do \
         case "$jar" in \
