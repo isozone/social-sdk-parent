@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS local_product (
     goods_type    VARCHAR(16)  NULL COMMENT 'PHYSICAL/VIRTUAL',
     deliver_type  VARCHAR(16)  NULL COMMENT 'CARD/ACCOUNT/LINK/FILE',
     deliver_content_template TEXT NULL COMMENT '虚拟发货模板',
+    shipping_mode VARCHAR(16)  NULL DEFAULT 'NONE' COMMENT '运费偏好：NONE=无需邮寄/FREE=包邮/DISTANCE=按距离计费',
     status        VARCHAR(16)  NOT NULL DEFAULT 'DRAFT' COMMENT 'DRAFT/PENDING/PUBLISHING/FAILED',
     publish_error TEXT         NULL COMMENT '最近一次发布失败原因',
     created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,

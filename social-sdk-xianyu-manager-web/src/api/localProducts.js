@@ -28,6 +28,16 @@ export function batchPublishLocalProducts(data) {
   return api.post('/local-products/batch-publish', data)
 }
 
+/** 批量删除本地商品：POST /api/local-products/batch-delete { ids:[] } */
+export function batchDeleteLocalProducts(ids) {
+  return api.post('/local-products/batch-delete', { ids })
+}
+
+/** 批量改运费偏好：POST /api/local-products/batch-shipping-mode { ids:[], shippingMode } */
+export function batchUpdateShippingMode(ids, shippingMode) {
+  return api.post('/local-products/batch-shipping-mode', { ids, shippingMode })
+}
+
 export function previewLocalProductImport(params) {
   const fd = new FormData()
   fd.append('file', params.file)

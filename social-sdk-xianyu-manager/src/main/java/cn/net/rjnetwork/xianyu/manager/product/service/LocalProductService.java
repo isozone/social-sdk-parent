@@ -198,11 +198,54 @@ public class LocalProductService {
     }
 
     /**
+     * 批量删除本地商品（草稿池清理，物理删除）。
+     * 不删正在发布中（PUBLISHING）的，避免误删刚出库的；其余按 ids 物理删。
+     * @return 实际删除条数
+     */
+    @Transactional
+    public int batchDelete(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return 0;
+        int deleted = 0;
+        for (Long id : ids) {
+            LocalProduct p = localProductMapper.selectById(id);
+            if (p == null) continue;
+            if (STATUS_PUBLISHING.equals(p.getStatus())) continue;  // 发布中跳过，防误删
+            localProductMapper.deleteById(id);
+            deleted++;
+        }
+        log.info("[LOCAL-BATCH] batchDelete: requested={} deleted={} skipped={}", ids.size(), deleted, ids.size() - deleted);
+        return deleted;
+    }
+
+    /**
+     * 批量改运费偏好（ids + shippingMode）。
+     * 发布中（PUBLISHING）的跳过，其余按 ids 更新 shippingMode 字段。
+     * @return 实际更新条数
+     */
+    @Transactional
+    public int batchUpdateShippingMode(List<Long> ids, String shippingMode) {
+        if (ids == null || ids.isEmpty()) return 0;
+        String mode = shippingMode != null ? shippingMode.toUpperCase() : "NONE";
+        int updated = 0;
+        for (Long id : ids) {
+            LocalProduct p = localProductMapper.selectById(id);
+            if (p == null) continue;
+            if (STATUS_PUBLISHING.equals(p.getStatus())) continue;
+            p.setShippingMode(mode);
+            p.setUpdatedAt(LocalDateTime.now());
+            localProductMapper.updateById(p);
+            updated++;
+        }
+        log.info("[LOCAL-BATCH] batchUpdateShippingMode: requested={} updated={} mode={}", ids.size(), updated, mode);
+        return updated;
+    }
+
+    /**
      * 发布（带重试）
      * 每次重试走指数退避：第 n 次重试等待 retryBackoffBaseMs * 2^(n-1)
      */
     private void publishWithRetry(LocalProduct item, LocalProductBatchPublishRequest req,
-                                  AtomicInteger retriedCounter) {
+                                 AtomicInteger retriedCounter) {
         int maxAttempts = 1 + Math.max(0, Math.min(req.getRetryTimes(), 3));
         Exception lastEx = null;
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -275,6 +318,8 @@ public class LocalProductService {
         createReq.setGoodsType(item.getGoodsType());
         createReq.setDeliverType(item.getDeliverType());
         createReq.setDeliverContentTemplate(item.getDeliverContentTemplate());
+        // 运费偏好透传，否则 ProductService.create 落库时 shippingMode=null 兜底 NONE，用户选的 FREE/DISTANCE 会丢
+        createReq.setShippingMode(item.getShippingMode());
         XianyuProduct published = productService.create(createReq);
 
         // 虚拟商品：发布成功后自动建卡密池/账号池（库存联动）
@@ -306,6 +351,8 @@ public class LocalProductService {
         p.setGoodsType(r.getGoodsType());
         p.setDeliverType(r.getDeliverType());
         p.setDeliverContentTemplate(r.getDeliverContentTemplate());
+        // 运费偏好透传，否则前端表单保存草稿/编辑时 shippingMode 永远落 DB 默认 NONE，用户选的 FREE/DISTANCE 会丢
+        p.setShippingMode(r.getShippingMode());
         if (r.getImages() != null && !r.getImages().isEmpty()) {
             p.setImageUrl(r.getImages().get(0));
         }
@@ -559,12 +606,18 @@ public class LocalProductService {
         return parseCsv(file);
     }
 
-    /** Excel 解析：用 Apache POI 读首个 sheet，每行转 String[]，空单元格落 ""。 */
+    /** Excel 解析：用 Apache POI 读首个 sheet，每行转 String[]，空单元格落 ""。
+     *  超过 MAX_IMPORT_ROWS 行的文件显式拒绝（POI 全量加载，万行级 xlsx 会 OOM），抛友好错而非挂服务。 */
+    private static final int MAX_IMPORT_ROWS = 10000;
     private List<String[]> parseExcel(org.springframework.web.multipart.MultipartFile file) throws IOException {
         List<String[]> rows = new ArrayList<>();
         try (Workbook wb = new XSSFWorkbook(file.getInputStream())) {
             Sheet sheet = wb.getSheetAt(0);
             int lastRow = sheet.getLastRowNum();
+            if (lastRow > MAX_IMPORT_ROWS) {
+                throw new IllegalArgumentException("Excel 行数过多（" + lastRow + " 行），上限 " + MAX_IMPORT_ROWS
+                        + " 行；请拆分后导入，避免内存溢出");
+            }
             int maxCol = 0;
             // 先扫一遍确定最大列数（空单元格 POI 返回 null，需对齐成统一宽度的 String[]）
             for (int r = 0; r <= lastRow; r++) {

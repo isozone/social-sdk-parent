@@ -179,6 +179,8 @@ public class DatabaseInitializer {
             // 必须在主 schema 执行成功后跑；主 schema 失败时空库对着不存在的表 ALTER 会炸，
             // ensureColumn 已加 tableExists 兜底，但放里层 try 更稳。
             ensureChromeColumns();
+            // 本地商品运费偏好列（shipping_mode）旧库升级兜底
+            ensureLocalProductShippingModeColumn();
         } catch (Exception e) {
             logger.warn("Database initialization skipped (may already exist): {}", e.getMessage());
         }
@@ -202,6 +204,9 @@ public class DatabaseInitializer {
 
     private void ensureNotifyRetryColumns() {
         ensureColumn("notify_retry", "vars_json", "TEXT");
+        // notify_log 投递日志表早期 schema 缺 sent_at 列（schema-*.sql 新建库已含，此处兜底老库升级），
+        // 缺则 NotifyLogService 落库时报 "column 'sent_at' not found"，需用户手工 ALTER 很不友好。
+        ensureColumn("notify_log", "sent_at", "TIMESTAMP");
     }
 
     private void ensureNotifyDigestConfigTable() {
@@ -561,6 +566,15 @@ public class DatabaseInitializer {
         ensureColumn("xianyu_account", "chrome_crash_count", "INTEGER DEFAULT 0");
         ensureColumn("xianyu_account", "chrome_seed", "BIGINT");
         ensureColumn("xianyu_account", "chrome_launched_at", "DATETIME");
+    }
+
+    /**
+     * 补齐 local_product 的 shipping_mode 列（旧库升级场景）。
+     * schema-*.sql 新建库已含此列；此处用 ALTER 兜底已有库，
+     * 与 LocalProduct.shippingMode 字段 + 导入链路 COL_SHIPPING_MODE 对齐。
+     */
+    private void ensureLocalProductShippingModeColumn() {
+        ensureColumn("local_product", "shipping_mode", "VARCHAR(16) DEFAULT 'NONE'");
     }
 
     /**

@@ -46,6 +46,9 @@
               <el-option label="失败" value="FAILED" />
             </template>
           </el-select>
+          <el-button @click="handleResetFilters">
+            <el-icon><Refresh /></el-icon> 重置
+          </el-button>
         </div>
         <div class="toolbar-right">
           <el-button v-if="activeTab === 'xianyu'" type="primary" :disabled="!filters.accountId" :loading="syncing" @click="handleSyncFromXianyu">
@@ -56,6 +59,12 @@
           </el-button>
           <el-button v-if="activeTab === 'local'" type="success" :loading="batchPublishing" @click="handleBatchPublish">
             <el-icon><UploadFilled /></el-icon> 批量发布
+          </el-button>
+          <el-button v-if="activeTab === 'local'" type="danger" :disabled="!selectedLocalProducts.length" @click="handleBatchDelete">
+            <el-icon><Delete /></el-icon> 批量删除
+          </el-button>
+          <el-button v-if="activeTab === 'local'" type="warning" :disabled="!selectedLocalProducts.length" @click="showBatchShippingDialog = true">
+            <el-icon><EditPen /></el-icon> 批量改运费
           </el-button>
           <el-button v-if="activeTab === 'local'" type="warning" @click="showImportDialog = true">
             <el-icon><Download /></el-icon> 批量导入
@@ -150,6 +159,24 @@
         @current-change="activeTab === 'xianyu' ? loadProducts() : loadLocalProducts()"
       />
     </el-card>
+
+    <!-- 本地商品 批量改运费对话框 -->
+    <el-dialog v-model="showBatchShippingDialog" title="批量改运费偏好" width="460px" :close-on-click-modal="false">
+      <div style="margin-bottom: 12px;">将对勾选的 <b>{{ selectedLocalProducts.length }}</b> 个商品统一设置运费偏好：</div>
+      <el-form label-width="90px">
+        <el-form-item label="运费偏好">
+          <el-select v-model="batchShippingMode" style="width: 100%;">
+            <el-option label="无需邮寄" value="NONE" />
+            <el-option label="包邮" value="FREE" />
+            <el-option label="按距离计费" value="DISTANCE" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showBatchShippingDialog = false">取消</el-button>
+        <el-button type="primary" :loading="batchShippingLoading" @click="handleBatchUpdateShippingMode">确认修改</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 本地商品 批量导入对话框 -->
     <el-dialog v-model="showImportDialog" title="批量导入本地商品" width="780px" :close-on-click-modal="false" @close="resetImportDialog">
@@ -589,7 +616,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh, MagicStick, VideoPlay, Link, Plus, UploadFilled, Download, DocumentCopy } from '@element-plus/icons-vue'
+import { Refresh, MagicStick, VideoPlay, Link, Plus, UploadFilled, Download, DocumentCopy, Delete, EditPen } from '@element-plus/icons-vue'
 import api from '@/api/request'
 import { optimizeTitle as optimizeTitleApi, optimizeDescription as optimizeDescriptionApi, extractKeywords as extractKeywordsApi } from '@/api/ai'
 
@@ -606,6 +633,9 @@ const batchPublishing = ref(false)
 const showCreateDialog = ref(false)
 const showLocalCreateDialog = ref(false)
 const showImportDialog = ref(false)
+const showBatchShippingDialog = ref(false)
+const batchShippingMode = ref('NONE')
+const batchShippingLoading = ref(false)
 const showAiOptimizeDialog = ref(false)
 const showDetailDrawer = ref(false)
 const detail = ref(null)
@@ -850,6 +880,19 @@ watch(activeTab, (tab) => {
   else loadLocalProducts()
 })
 
+// 筛选条件变更时自动回第 1 页（避免在第 5 页改关键词后新结果不足 5 页显示空）
+watch(() => filters.value.accountId, () => { pagination.value.page = 1 })
+watch(() => filters.value.keyword, () => { pagination.value.page = 1 })
+watch(() => filters.value.status, () => { pagination.value.page = 1 })
+
+// 重置筛选条件并刷新（一键清账号/关键词/状态，回第 1 页）
+function handleResetFilters() {
+  filters.value = { accountId: null, keyword: '', status: '' }
+  pagination.value.page = 1
+  if (activeTab.value === 'xianyu') loadProducts()
+  else loadLocalProducts()
+}
+
 async function loadLocalProducts() {
   loading.value = true
   try {
@@ -1027,6 +1070,49 @@ async function handleBatchPublish() {
     }
   } catch (e) { ElMessage.error('批量发布失败：' + (e?.message || '')) }
   finally { batchPublishing.value = false }
+}
+
+async function handleBatchDelete() {
+  const selected = selectedLocalProducts.value
+  if (!selected.length) return ElMessage.warning('请先勾选要删除的本地商品')
+  try {
+    await ElMessageBox.confirm(
+      `确认批量删除选中的 ${selected.length} 个商品？此操作不可恢复（发布中的会自动跳过）。`,
+      '批量删除', { type: 'warning' }
+    )
+  } catch { return }
+  try {
+    const ids = selected.map(s => s.id)
+    const res = await localProductApi.batchDeleteLocalProducts(ids)
+    if (res.success) {
+      const d = res.data || {}
+      ElMessage.success(`批量删除完成：实际删除 ${d.deleted || 0} 条，跳过 ${(d.requested || 0) - (d.deleted || 0)} 条`)
+      selectedLocalProducts.value = []
+      await loadLocalProducts()
+    } else {
+      ElMessage.error(res.message || '批量删除失败')
+    }
+  } catch (e) { ElMessage.error('批量删除失败：' + (e?.message || '')) }
+}
+
+async function handleBatchUpdateShippingMode() {
+  const selected = selectedLocalProducts.value
+  if (!selected.length) return ElMessage.warning('请先勾选要改运费的本地商品')
+  batchShippingLoading.value = true
+  try {
+    const ids = selected.map(s => s.id)
+    const res = await localProductApi.batchUpdateShippingMode(ids, batchShippingMode.value)
+    if (res.success) {
+      const d = res.data || {}
+      ElMessage.success(`批量改运费完成：实际更新 ${d.updated || 0} 条（${d.shippingMode}）`)
+      showBatchShippingDialog.value = false
+      selectedLocalProducts.value = []
+      await loadLocalProducts()
+    } else {
+      ElMessage.error(res.message || '批量改运费失败')
+    }
+  } catch (e) { ElMessage.error('批量改运费失败：' + (e?.message || '')) }
+  finally { batchShippingLoading.value = false }
 }
 
 function onLocalSelectionChange(selection) {

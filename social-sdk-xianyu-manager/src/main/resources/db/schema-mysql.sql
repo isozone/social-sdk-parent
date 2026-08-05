@@ -978,6 +978,7 @@ CREATE TABLE IF NOT EXISTS local_product (
     goods_type  VARCHAR(16) DEFAULT 'PHYSICAL',
     deliver_type VARCHAR(16),
     deliver_content_template TEXT,
+    shipping_mode VARCHAR(16) DEFAULT 'NONE',  -- NONE=无需邮寄/FREE=包邮/DISTANCE=按距离计费
     status      VARCHAR(16) NOT NULL DEFAULT 'DRAFT',
     publish_error TEXT,
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,

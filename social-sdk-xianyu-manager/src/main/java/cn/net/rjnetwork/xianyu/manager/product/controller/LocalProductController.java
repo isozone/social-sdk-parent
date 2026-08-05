@@ -95,4 +95,43 @@ public class LocalProductController {
             return ApiResponse.fail("BATCH_PUBLISH_FAILED", e.getMessage());
         }
     }
+
+    /** 批量删除本地商品（草稿池清理，物理删除） */
+    @PostMapping("/batch-delete")
+    public ApiResponse<Map<String, Object>> batchDelete(@RequestBody Map<String, Object> body) {
+        try {
+            @SuppressWarnings("unchecked")
+            List<Long> ids = ((List<Object>) body.get("ids")).stream()
+                    .map(o -> Long.valueOf(String.valueOf(o))).collect(java.util.stream.Collectors.toList());
+            if (ids.isEmpty()) return ApiResponse.fail("BAD_REQUEST", "ids 不能为空");
+            int deleted = localProductService.batchDelete(ids);
+            Map<String, Object> data = new HashMap<>();
+            data.put("deleted", deleted);
+            data.put("requested", ids.size());
+            return ApiResponse.ok(data);
+        } catch (Exception e) {
+            return ApiResponse.fail("BATCH_DELETE_FAILED", e.getMessage());
+        }
+    }
+
+    /** 批量改运费偏好（ids + shippingMode） */
+    @PostMapping("/batch-shipping-mode")
+    public ApiResponse<Map<String, Object>> batchUpdateShippingMode(@RequestBody Map<String, Object> body) {
+        try {
+            @SuppressWarnings("unchecked")
+            List<Long> ids = ((List<Object>) body.get("ids")).stream()
+                    .map(o -> Long.valueOf(String.valueOf(o))).collect(java.util.stream.Collectors.toList());
+            String shippingMode = String.valueOf(body.get("shippingMode"));
+            if (ids.isEmpty()) return ApiResponse.fail("BAD_REQUEST", "ids 不能为空");
+            if (shippingMode == null || shippingMode.isBlank())
+                return ApiResponse.fail("BAD_REQUEST", "shippingMode 不能为空");
+            int updated = localProductService.batchUpdateShippingMode(ids, shippingMode);
+            Map<String, Object> data = new HashMap<>();
+            data.put("updated", updated);
+            data.put("shippingMode", shippingMode);
+            return ApiResponse.ok(data);
+        } catch (Exception e) {
+            return ApiResponse.fail("BATCH_UPDATE_FAILED", e.getMessage());
+        }
+    }
 }

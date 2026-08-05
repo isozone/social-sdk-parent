@@ -1015,6 +1015,7 @@ CREATE TABLE IF NOT EXISTS local_product (
     goods_type VARCHAR(16) DEFAULT 'PHYSICAL',  -- PHYSICAL/VIRTUAL
     deliver_type VARCHAR(16),                    -- CARD/ACCOUNT/LINK/FILE
     deliver_content_template TEXT,
+    shipping_mode VARCHAR(16) DEFAULT 'NONE',   -- NONE=无需邮寄/FREE=包邮/DISTANCE=按距离计费
     status VARCHAR(16) NOT NULL DEFAULT 'DRAFT', -- DRAFT/PENDING/PUBLISHING/FAILED
     publish_error TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
