@@ -60,8 +60,11 @@
           <el-button v-if="activeTab === 'local'" type="warning" @click="showImportDialog = true">
             <el-icon><Download /></el-icon> 批量导入
           </el-button>
-          <el-button v-if="activeTab === 'local'" type="info" @click="handleDownloadTemplate">
+          <el-button v-if="activeTab === 'local'" type="info" @click="handleDownloadTemplate('csv')">
             <el-icon><DocumentCopy /></el-icon> CSV 模板
+          </el-button>
+          <el-button v-if="activeTab === 'local'" type="info" @click="handleDownloadTemplate('xlsx')">
+            <el-icon><DocumentCopy /></el-icon> Excel 模板
           </el-button>
         </div>
       </div>
@@ -151,19 +154,19 @@
     <!-- 本地商品 批量导入对话框 -->
     <el-dialog v-model="showImportDialog" title="批量导入本地商品" width="780px" :close-on-click-modal="false" @close="resetImportDialog">
       <el-steps :active="importStep" finish-status="success" style="margin-bottom: 20px;">
-        <el-step title="上传 CSV" />
+        <el-step title="上传文件" />
         <el-step title="预览校验" />
         <el-step title="确认导入" />
       </el-steps>
 
       <!-- Step 1: 上传 -->
       <div v-if="importStep === 0">
-        <el-upload drag :auto-upload="false" :on-change="handleImportFileChange" :show-file-list="false" accept=".csv">
+        <el-upload drag :auto-upload="false" :on-change="handleImportFileChange" :show-file-list="false" accept=".csv,.xlsx,.xls">
           <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
-          <div class="el-upload__text">拖拽 CSV 文件到此处，或 <em>点击上传</em></div>
+          <div class="el-upload__text">拖拽 CSV / Excel 文件到此处，或 <em>点击上传</em></div>
           <template #tip>
             <div style="font-size: 12px; color: var(--text-3); margin-top: 8px;">
-              列：account_name, title, price, stock, images, goods_type, deliver_type, deliver_content_template
+              列：account_name, title, price, stock, images, goods_type, deliver_type, deliver_content_template, description, shipping_mode
             </div>
           </template>
         </el-upload>
@@ -796,19 +799,20 @@ function resetImportDialog() {
   importFile.value = null
 }
 
-function handleDownloadTemplate() {
-  const header = 'account_name,title,price,stock,images,goods_type,deliver_type,deliver_content_template\n'
-  const example1 = '示例账号,iPhone 15 Pro 256G 原色钛金属,6999.00,3,https://cdn.com/1.jpg,PHYSICAL,,\n'
-  const example2 = '示例账号,Steam 充值卡 100元,100.00,50,,VIRTUAL,CARD,卡密AAA-111|||卡密BBB-222|||卡密CCC-333\n'
-  const example3 = '示例账号,考研资料完整版,9.90,999,,VIRTUAL,FILE,链接: https://pan.baidu.com/xxx 提取码: abcd\n'
-  const csv = '﻿' + header + example1 + example2 + example3
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = 'local_product_import_template.csv'
-  link.click()
-  URL.revokeObjectURL(url)
+// 模板下载：走后端接口动态生成，与 LocalProductService 列名常量严格对齐（避免前端硬编码过时）
+async function handleDownloadTemplate(type = 'csv') {
+  try {
+    const blob = await localProductApi.downloadImportTemplate(type)
+    const filename = type === 'xlsx' ? 'local-product-import.xlsx' : 'local-product-import.csv'
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error('模板下载失败: ' + (e.message || e))
+  }
 }
 
 // ===== 状态 =====

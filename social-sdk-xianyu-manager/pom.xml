@@ -167,6 +167,18 @@
             <version>3.5.3</version>
         </dependency>
 
+        <!-- Apache POI：本地商品批量导入支持 Excel（.xlsx/.xls）解析，CSV 仍保留 -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi</artifactId>
+            <version>5.2.5</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.5</version>
+        </dependency>
+
         <!-- Lombok -->
         <dependency>
             <groupId>org.projectlombok</groupId>

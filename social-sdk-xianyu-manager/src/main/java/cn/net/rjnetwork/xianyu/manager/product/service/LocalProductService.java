@@ -15,6 +15,8 @@ import cn.net.rjnetwork.xianyu.manager.virtual.service.VirtualShipService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -371,13 +373,14 @@ public class LocalProductService {
     private static final String COL_DELIVER_TYPE = "deliver_type";
     private static final String COL_DELIVER_CONTENT = "deliver_content_template";
     private static final String COL_DESCRIPTION = "description";
+    private static final String COL_SHIPPING_MODE = "shipping_mode";
 
     /**
      * 预览导入（解析 CSV，返回前 10 条预览 + 错误明细，不写入 DB）
      */
     public LocalProductImportPreview previewImport(LocalProductImportRequest request) throws IOException {
-        List<String[]> rows = parseCsv(request.getFile());
-        if (rows.isEmpty()) throw new IllegalArgumentException("CSV 文件为空");
+        List<String[]> rows = parseFile(request.getFile());
+        if (rows.isEmpty()) throw new IllegalArgumentException("导入文件为空");
 
         String[] header = rows.get(0);
         Map<String, Integer> colIdx = mapColumns(header);
@@ -425,6 +428,9 @@ public class LocalProductService {
                     ? request.getDefaultGoodsType() : getCol(cols, colIdx, COL_GOODS_TYPE));
             row.put("deliverType", getCol(cols, colIdx, COL_DELIVER_TYPE));
             row.put("deliverContentTemplate", getCol(cols, colIdx, COL_DELIVER_CONTENT));
+            // 运费偏好：空则兜底 NONE（无需邮寄），与前端表单默认一致
+            String shippingMode = getCol(cols, colIdx, COL_SHIPPING_MODE);
+            row.put("shippingMode", shippingMode.isEmpty() ? "NONE" : shippingMode.toUpperCase());
 
             // 实物/虚拟字段校验
             String goodsType = (String) row.get("goodsType");
@@ -507,8 +513,8 @@ public class LocalProductService {
             return new LocalProductImportResult(preview.getTotalRows(), 0, 0, preview.getTotalRows(), List.of("无有效行可导入"));
         }
 
-        // 重新解析完整 CSV 并写入
-        List<String[]> rows = parseCsv(request.getFile());
+        // 重新解析完整文件并写入（CSV/Excel 均可）
+        List<String[]> rows = parseFile(request.getFile());
         String[] header = rows.get(0);
         Map<String, Integer> colIdx = mapColumns(header);
 
@@ -539,6 +545,106 @@ public class LocalProductService {
     }
 
     // ==================== 导入工具方法 ====================
+
+    /**
+     * 解析导入文件为行数组（CSV 和 Excel 均可）。
+     * 按文件名扩展名分流：.csv 走 BufferedReader 逗号分割；.xlsx/.xls 走 Apache POI。
+     * 返回结构与原 parseCsv 一致：每行一个 String[]，首行为表头。
+     */
+    private List<String[]> parseFile(org.springframework.web.multipart.MultipartFile file) throws IOException {
+        String name = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
+        if (name.endsWith(".xlsx") || name.endsWith(".xls")) {
+            return parseExcel(file);
+        }
+        return parseCsv(file);
+    }
+
+    /** Excel 解析：用 Apache POI 读首个 sheet，每行转 String[]，空单元格落 ""。 */
+    private List<String[]> parseExcel(org.springframework.web.multipart.MultipartFile file) throws IOException {
+        List<String[]> rows = new ArrayList<>();
+        try (Workbook wb = new XSSFWorkbook(file.getInputStream())) {
+            Sheet sheet = wb.getSheetAt(0);
+            int lastRow = sheet.getLastRowNum();
+            int maxCol = 0;
+            // 先扫一遍确定最大列数（空单元格 POI 返回 null，需对齐成统一宽度的 String[]）
+            for (int r = 0; r <= lastRow; r++) {
+                Row row = sheet.getRow(r);
+                if (row == null) continue;
+                if (row.getLastCellNum() > maxCol) maxCol = row.getLastCellNum();
+            }
+            if (maxCol == 0) maxCol = 1;
+            for (int r = 0; r <= lastRow; r++) {
+                Row row = sheet.getRow(r);
+                if (row == null) { rows.add(new String[maxCol]); continue; }
+                String[] cols = new String[maxCol];
+                for (int c = 0; c < maxCol; c++) {
+                    Cell cell = row.getCell(c);
+                    cols[c] = cell == null ? "" : cellValueAsString(cell);
+                }
+                rows.add(cols);
+            }
+        }
+        return rows;
+    }
+
+    /** POI Cell 转字符串：文本/数字/布尔/公式结果统一为 String。 */
+    private String cellValueAsString(Cell cell) {
+        switch (cell.getCellType()) {
+            case STRING: return cell.getStringCellValue().trim();
+            case NUMERIC:
+                // 整数避免 .0 后缀，价格等浮点保留原样
+                double d = cell.getNumericCellValue();
+                return d == Math.floor(d) ? String.valueOf((long) d) : String.valueOf(d);
+            case BOOLEAN: return String.valueOf(cell.getBooleanCellValue());
+            case FORMULA: return cell.getCellFormula();  // 公式不计算，保留原表达式（导入场景罕见）
+            default: return "";
+        }
+    }
+
+    /**
+     * 写 Excel 模板到输出流：sheet1=导入模板（表头+示例行），sheet2=列说明。
+     * 由 LocalProductImportController.downloadExcelTemplate 调用。
+     */
+    public void writeExcelTemplate(OutputStream os, String[] headers, String[][] sampleRows, String helpText) throws IOException {
+        try (Workbook wb = new XSSFWorkbook()) {
+            // sheet1：导入模板
+            Sheet sheet = wb.createSheet("导入模板");
+            Row headerRow = sheet.createRow(0);
+            CellStyle headerStyle = wb.createCellStyle();
+            Font font = wb.createFont();
+            font.setBold(true);
+            headerStyle.setFont(font);
+            for (int c = 0; c < headers.length; c++) {
+                Cell cell = headerRow.createCell(c, CellType.STRING);
+                cell.setCellValue(headers[c]);
+                cell.setCellStyle(headerStyle);
+            }
+            for (int r = 0; r < sampleRows.length; r++) {
+                Row row = sheet.createRow(r + 1);
+                for (int c = 0; c < sampleRows[r].length; c++) {
+                    row.createCell(c, CellType.STRING).setCellValue(sampleRows[r][c]);
+                }
+            }
+            // 自适应列宽（含中文，setWidth 按 chars × 256 估）
+            for (int c = 0; c < headers.length; c++) {
+                int maxLen = headers[c].getBytes(StandardCharsets.UTF_8).length;
+                for (String[] row : sampleRows) {
+                    if (c < row.length && row[c] != null) {
+                        maxLen = Math.max(maxLen, row[c].getBytes(StandardCharsets.UTF_8).length);
+                    }
+                }
+                sheet.setColumnWidth(c, Math.min(60 * 256, (maxLen + 2) * 256));
+            }
+
+            // sheet2：列说明
+            Sheet helpSheet = wb.createSheet("列说明");
+            Row helpRow = helpSheet.createRow(0);
+            helpRow.createCell(0, CellType.STRING).setCellValue(helpText);
+            helpSheet.setColumnWidth(0, 200 * 256);
+
+            wb.write(os);
+        }
+    }
 
     private List<String[]> parseCsv(org.springframework.web.multipart.MultipartFile file) throws IOException {
         List<String[]> rows = new ArrayList<>();
@@ -582,9 +688,14 @@ public class LocalProductService {
         }
     }
 
+    /**
+     * 解析图片 URL 列：兼容逗号/分号/换行三种分隔符。
+     * CSV 场景常用逗号；Excel 单元格内换行或分号更自然（逗号在 Excel 里易与文本混淆）。
+     */
     private List<String> parseImagesFromRaw(String raw) {
         if (raw == null || raw.isBlank()) return new ArrayList<>();
-        return Arrays.stream(raw.split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
+        return Arrays.stream(raw.split("[,;\\r?\\n]"))
+                .map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
     }
 
     private Map<String, Object> parseSingleRow(String[] cols, Map<String, Integer> colIdx,
@@ -604,6 +715,9 @@ public class LocalProductService {
         row.put("goodsType", getCol(cols, colIdx, COL_GOODS_TYPE).isEmpty()
                 ? request.getDefaultGoodsType() : getCol(cols, colIdx, COL_GOODS_TYPE));
         row.put("deliverType", getCol(cols, colIdx, COL_DELIVER_TYPE));
+        // 运费偏好：空则兜底 NONE（无需邮寄）
+        String shippingMode = getCol(cols, colIdx, COL_SHIPPING_MODE);
+        row.put("shippingMode", shippingMode.isEmpty() ? "NONE" : shippingMode.toUpperCase());
 
         // 图片处理
         List<String> images = parseImagesFromRaw(getCol(cols, colIdx, COL_IMAGES));
@@ -655,6 +769,7 @@ public class LocalProductService {
         p.setGoodsType((String) row.get("goodsType"));
         p.setDeliverType((String) row.get("deliverType"));
         p.setDeliverContentTemplate((String) row.get("deliverContentTemplate"));
+        p.setShippingMode((String) row.get("shippingMode"));
         List<String> images = (List<String>) row.get("images");
         p.setImages(toJsonArray(images));
         if (!images.isEmpty()) p.setImageUrl(images.get(0));

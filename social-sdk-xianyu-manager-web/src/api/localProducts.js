@@ -49,3 +49,12 @@ export function confirmLocalProductImport(params) {
   if (params.deliverContentSeparator) fd.append('deliverContentSeparator', params.deliverContentSeparator)
   return api.post('/local-products/import/confirm', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
 }
+
+/**
+ * 下载导入模板（CSV 或 Excel）。走后端接口动态生成，与列名常量严格对齐。
+ * @param {'csv'|'xlsx'} type
+ * @returns Blob 二进制（前端用 URL.createObjectURL + a.click 触发下载）
+ */
+export function downloadImportTemplate(type = 'csv') {
+  return api.get(`/local-products/import/template.${type}`, { responseType: 'blob' })
+}

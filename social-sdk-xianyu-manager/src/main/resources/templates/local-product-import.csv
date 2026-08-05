@@ -1,0 +1,4 @@
+account_name,title,price,stock,images,goods_type,deliver_type,deliver_content_template,description,shipping_mode
+示例闲鱼账号,001.聪明人的个人成长,9.9,100,https://cdn.example.com/img1.jpg;https://cdn.example.com/img2.jpg,PHYSICAL,,,成体系的心智成长工具包，包邮同步发货,NONE
+测试账号A,002.如何阅读一本书,19.9,50,https://cdn.example.com/a.jpg,PHYSICAL,,,经典阅读方法指南,FREE
+测试账号B,003.某虚拟卡密商品,5.0,999,https://cdn.example.com/v.jpg,VIRTUAL,CARD,card001|pwd001||card002|pwd002||card003|pwd003,虚拟卡密自动发货,DISTANCE
