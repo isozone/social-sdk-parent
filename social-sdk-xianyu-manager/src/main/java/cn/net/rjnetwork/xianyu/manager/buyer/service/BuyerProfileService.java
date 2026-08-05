@@ -61,6 +61,8 @@ public class BuyerProfileService {
         BuyerProfile p = findOrCreate(buyerId, nickname);
         p.setNickname(nickname);
         p.setTotalMessages(p.getTotalMessages() + 1);
+        // 最近联系时间刷新（DB 已建列+索引，原 model 漏映射导致画像查不到，现补）
+        p.setLastContactAt(LocalDateTime.now());
         p.setUpdatedAt(LocalDateTime.now());
         profileMapper.updateById(p);
     }

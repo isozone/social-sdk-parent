@@ -5,6 +5,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import cn.net.rjnetwork.xianyu.manager.common.BaseEntity;
 
+import java.time.LocalDateTime;
+
 /**
  * 买家画像 — 跨会话聚合
  */
@@ -26,4 +28,6 @@ public class BuyerProfile extends BaseEntity {
     private Double credibilityScore; // 可信度 0-100
     private String tags;             // JSON 标签
     private String notes;            // 运营备注
+    /** 最近联系时间（DB schema 已建列+索引，原 model 漏映射；onIncomingMessage 聚合时刷新） */
+    private LocalDateTime lastContactAt;
 }
