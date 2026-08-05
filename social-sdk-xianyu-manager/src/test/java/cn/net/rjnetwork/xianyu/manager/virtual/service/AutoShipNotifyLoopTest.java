@@ -110,29 +110,31 @@ class AutoShipNotifyLoopTest {
         when(accountMapper.selectById(7L)).thenReturn(account);
         when(messageService.sendMessage(any(MessageSendRequest.class))).thenReturn(null);
 
-        // dummyDelivery 依赖真实 MTOP，会在无 cookie/网络环境下失败；此处验证失败通知与 MESSAGE_SENT 标记。
+        // dummyDelivery 依赖真实 MTOP，会在无 cookie/网络环境下失败；此处验证降级通知与 MESSAGE_SENT 标记。
+        // 语义变更 2026-08-04：dummyDelivery 失败不再 finalizeFail+VIRTUAL_SHIP_FAILED（会把已真发的帧回滚），
+        // 改为降级推 AUTO_SHIP_DUMMY_FAILED 通知让运营后台补，task 继续标 SENT_PENDING_ACK（真发消息才是发货本质）。
         service.processShipTask(task);
 
         ArgumentCaptor<NotifyEvent> cap = ArgumentCaptor.forClass(NotifyEvent.class);
         verify(eventPublisher, atLeastOnce()).publishEvent(cap.capture());
-        NotifyEvent failed = cap.getAllValues().stream()
-                .filter(e -> "VIRTUAL_SHIP_FAILED".equals(e.getScenario()))
+        // dummyDelivery 失败应推降级通知（AUTO_SHIP_DUMMY_FAILED），不再推 VIRTUAL_SHIP_FAILED
+        NotifyEvent dummyFailed = cap.getAllValues().stream()
+                .filter(e -> "AUTO_SHIP_DUMMY_FAILED".equals(e.getScenario()))
                 .findFirst()
-                .orElseThrow();
-        assertEquals(7L, failed.getAccountId());
-        assertEquals("ORD-56", failed.getVars().get("orderId"));
-        assertTrue(String.valueOf(failed.getVars().get("reason")).contains("dummyDelivery")
-                || String.valueOf(failed.getVars().get("reason")).contains("MESSAGE_SENT")
-                || String.valueOf(failed.getVars().get("reason")).contains("cookie")
-                || String.valueOf(failed.getVars().get("reason")).length() > 0);
+                .orElseThrow(() -> new AssertionError("dummyDelivery 失败应推 AUTO_SHIP_DUMMY_FAILED 降级通知"));
+        assertEquals(7L, dummyFailed.getAccountId());
+        assertEquals("ORD-56", dummyFailed.getVars().get("orderId"));
+        assertTrue(String.valueOf(dummyFailed.getVars().get("reason")).length() > 0,
+                "降级通知应带失败原因");
 
         ArgumentCaptor<VirtualShipTask> taskCap = ArgumentCaptor.forClass(VirtualShipTask.class);
         verify(taskMapper, atLeastOnce()).updateById(taskCap.capture());
+        // 真发消息后 task 应固化 MESSAGE_SENT 标记（markMessageSent 独立小事务），dummy 失败不抹掉它
         boolean hasMessageSentMarker = taskCap.getAllValues().stream()
                 .map(VirtualShipTask::getErrorMessage)
                 .filter(m -> m != null)
                 .anyMatch(m -> m.startsWith("MESSAGE_SENT:"));
-        assertTrue(hasMessageSentMarker, "消息已发后应固化 MESSAGE_SENT 标记，避免重试重复发卡");
+        assertTrue(hasMessageSentMarker, "消息已发后应固化 MESSAGE_SENT 标记，dummyDelivery 失败不抹掉它");
 
         ArgumentCaptor<MessageSendRequest> sendCap = ArgumentCaptor.forClass(MessageSendRequest.class);
         verify(messageService).sendMessage(sendCap.capture());
