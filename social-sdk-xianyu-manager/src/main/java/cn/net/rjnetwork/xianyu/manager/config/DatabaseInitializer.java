@@ -477,6 +477,11 @@ public class DatabaseInitializer {
         ensureColumn("xianyu_message", "msg_type", "VARCHAR(16)");
         ensureColumn("xianyu_message", "direction", "VARCHAR(8)");
         ensureColumn("xianyu_message", "auto_reply", "BOOLEAN");
+        // 旁路业务字段（cid + biz_order/item/buyer_id）老库升级兜底
+        ensureColumn("xianyu_message", "cid", "VARCHAR(64)");
+        ensureColumn("xianyu_message", "biz_order_id", "VARCHAR(64)");
+        ensureColumn("xianyu_message", "biz_item_id", "VARCHAR(64)");
+        ensureColumn("xianyu_message", "biz_buyer_id", "VARCHAR(64)");
     }
 
     private void ensureImColumns() {

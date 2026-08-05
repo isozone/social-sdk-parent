@@ -1144,6 +1144,26 @@ public class MessageService {
      * @return 解析后的展示内容；图片/视频返回 CDN URL，便于前端直接渲染
      */
     private String parseLwpContent(JsonNode messageNode, JsonNode extension, XianyuMessage entity) {
+        // 旁路业务字段透传：闲鱼消息体里的 cid/commonData/biz 等关联键，原链路只取显消息字段全丢了。
+        // 此处一并提取保留，方便后续业务按 cid 定位卡片动作、按 orderId/itemId 关联订单/商品、按 buyerId 关联买家档案。
+        String cid = firstText(messageNode, "cid", "conversationId", "convId");
+        if (!cid.isEmpty()) entity.setCid(cid);
+        JsonNode commonData = messageNode.path("commonData");
+        if (commonData.isObject()) {
+            String orderId = commonData.has("orderIdStr")
+                    ? commonData.path("orderIdStr").asText("")
+                    : firstText(commonData, "orderId");
+            if (!orderId.isEmpty()) entity.setBizOrderId(orderId);
+            String itemId = firstText(commonData, "itemId");
+            if (!itemId.isEmpty()) entity.setBizItemId(itemId);
+        }
+        // biz/peerUserId/buyerId：买家用户 ID（消息↔买家档案关联键）
+        String buyerId = firstText(messageNode, "buyerId", "peerUserId", "biz.buyerId");
+        if (buyerId.isEmpty() && messageNode.has("biz")) {
+            buyerId = firstText(messageNode.path("biz"), "buyerId", "peerUserId");
+        }
+        if (!buyerId.isEmpty()) entity.setBizBuyerId(buyerId);
+
         JsonNode content = messageNode.path("content");
         int contentType = content.path("contentType").asInt(0);
 

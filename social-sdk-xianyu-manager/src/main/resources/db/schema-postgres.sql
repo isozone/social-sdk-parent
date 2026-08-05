@@ -113,6 +113,10 @@ CREATE TABLE IF NOT EXISTS xianyu_message (
     direction VARCHAR(8) DEFAULT 'INCOMING',
     auto_reply BOOLEAN DEFAULT FALSE,
     message_time TIMESTAMP,
+    cid VARCHAR(64),
+    biz_order_id VARCHAR(64),
+    biz_item_id VARCHAR(64),
+    biz_buyer_id VARCHAR(64),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted INTEGER DEFAULT 0
