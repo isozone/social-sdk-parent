@@ -35,6 +35,19 @@
           >
             <el-icon><Refresh /></el-icon> 同步订单
           </el-button>
+          <el-input
+            v-model="keyword"
+            placeholder="搜订单号/商品标题/买家"
+            style="width: 240px"
+            clearable
+            @change="loadOrders"
+            @clear="loadOrders"
+          >
+            <template #prefix><el-icon><Search /></el-icon></template>
+          </el-input>
+          <el-button @click="handleResetFilters">
+            <el-icon><Refresh /></el-icon> 重置
+          </el-button>
         </div>
       </div>
 
@@ -47,7 +60,19 @@
 
       <el-table :data="orders" stripe v-loading="loading" class="orders-table">
         <el-table-column prop="id" label="ID" width="60" />
-        <el-table-column prop="orderId" label="订单号" width="180" />
+        <el-table-column prop="orderId" label="订单号" width="200">
+          <template #default="{ row }">
+            <span class="order-id-text">{{ row.orderId }}</span>
+            <el-button
+              v-if="row.orderId"
+              size="small" text type="primary"
+              @click="copyOrderId(row.orderId)"
+              title="复制订单号"
+            >
+              <el-icon><CopyDocument /></el-icon>
+            </el-button>
+          </template>
+        </el-table-column>
         <el-table-column prop="itemId" label="商品ID" width="150" show-overflow-tooltip />
         <el-table-column prop="itemTitle" label="商品标题" min-width="200" show-overflow-tooltip />
         <el-table-column label="关联商品" width="130">
@@ -280,8 +305,30 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
+import { CopyDocument, Search } from '@element-plus/icons-vue'
 import api from '@/api/request'
 const router = useRouter()
+// 筛选关键词（搜订单号/商品标题/买家）+ 重置
+const keyword = ref('')
+function handleResetFilters() {
+  keyword.value = ''
+  selectedAccountId.value = null
+  page.value = 1
+  loadOrders()
+}
+// 复制订单号到剪贴板（卖家高频操作：对账/闲鱼端查单）
+async function copyOrderId(id) {
+  if (!id) return
+  try {
+    await navigator.clipboard.writeText(id)
+    ElMessage.success('订单号已复制')
+  } catch {
+    const ta = document.createElement('textarea')
+    ta.value = id; document.body.appendChild(ta); ta.select()
+    document.execCommand('copy'); document.body.removeChild(ta)
+    ElMessage.success('订单号已复制')
+  }
+}
 import { getOrderDetail } from '@/api/order'
 
 // ===== 账号选择 =====
@@ -435,6 +482,10 @@ async function loadOrders() {
     }
     if (activeTab.value !== 'ALL') {
       params.type = activeTab.value
+    }
+    // 关键词搜索透传（搜订单号/商品标题/买家，后端 LIKE OR 三列）
+    if (keyword.value && keyword.value.trim()) {
+      params.keyword = keyword.value.trim()
     }
     const res = await api.get('/orders', { params })
     if (res.success) {

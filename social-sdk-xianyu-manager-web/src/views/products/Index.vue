@@ -60,12 +60,16 @@
           <el-button v-if="activeTab === 'local'" type="success" :loading="batchPublishing" @click="handleBatchPublish">
             <el-icon><UploadFilled /></el-icon> 批量发布
           </el-button>
-          <el-button v-if="activeTab === 'local'" type="danger" :disabled="!selectedLocalProducts.length" @click="handleBatchDelete">
-            <el-icon><Delete /></el-icon> 批量删除
-          </el-button>
-          <el-button v-if="activeTab === 'local'" type="warning" :disabled="!selectedLocalProducts.length" @click="showBatchShippingDialog = true">
-            <el-icon><EditPen /></el-icon> 批量改运费
-          </el-button>
+          <el-tooltip :content="selectedLocalProducts.length ? '批量删除选中商品' : '请先勾选商品'" placement="top">
+            <el-button v-if="activeTab === 'local'" type="danger" :disabled="!selectedLocalProducts.length" @click="handleBatchDelete">
+              <el-icon><Delete /></el-icon> 批量删除
+            </el-button>
+          </el-tooltip>
+          <el-tooltip :content="selectedLocalProducts.length ? '批量改选中商品运费偏好' : '请先勾选商品'" placement="top">
+            <el-button v-if="activeTab === 'local'" type="warning" :disabled="!selectedLocalProducts.length" @click="showBatchShippingDialog = true">
+              <el-icon><EditPen /></el-icon> 批量改运费
+            </el-button>
+          </el-tooltip>
           <el-button v-if="activeTab === 'local'" type="warning" @click="showImportDialog = true">
             <el-icon><Download /></el-icon> 批量导入
           </el-button>
@@ -77,6 +81,15 @@
           </el-button>
         </div>
       </div>
+
+      <!-- 选中计数提示（批量操作可视化，仅本地商品 tab 显示） -->
+      <el-alert
+        v-if="activeTab === 'local' && selectedLocalProducts.length > 0"
+        type="success" :closable="false" show-icon
+        style="margin-bottom: 12px;"
+      >
+        <template #title>已选中 <b>{{ selectedLocalProducts.length }}</b> 个商品，可执行批量发布/删除/改运费操作</template>
+      </el-alert>
 
       <el-table :data="activeTab === 'xianyu' ? products : localProducts" stripe v-loading="loading" @selection-change="onLocalSelectionChange">
         <!-- 闲鱼商品列 -->

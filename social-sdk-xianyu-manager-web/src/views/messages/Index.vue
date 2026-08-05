@@ -125,6 +125,19 @@
 
           <!-- 输入框 -->
           <div class="chat-input">
+            <div class="quick-reply-bar">
+              <el-select
+                v-model="quickReplyPlaceholder"
+                placeholder="快捷话术"
+                size="small"
+                style="width: 160px;"
+                :disabled="!selectedSession"
+                @change="applyQuickReply"
+              >
+                <el-option v-for="s in QUICK_REPLIES" :key="s" :label="s.length > 18 ? s.slice(0, 18) + '…' : s" :value="s" />
+              </el-select>
+              <span class="quick-reply-tip">选中即填入输入框，可再编辑后发送</span>
+            </div>
             <el-input
               v-model="newMessage"
               type="textarea"
@@ -147,9 +160,11 @@
 
 <script setup>
 import { ref, onMounted, nextTick, watch, onUnmounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Loading, Search } from '@element-plus/icons-vue'
 import api from '@/api/request'
+const route = useRoute()
 
 const accounts = ref([])
 const sessions = ref([])
@@ -157,6 +172,21 @@ const messages = ref([])
 const selectedAccount = ref(null)
 const selectedSession = ref('')
 const newMessage = ref('')
+// 快捷话术：卖家用预话术一键填入输入框，可再编辑后发送（不直接发，避免误触）
+const quickReplyPlaceholder = ref('')
+const QUICK_REPLIES = [
+  '亲，您好！请问有什么可以帮您的？',
+  '亲，您下单后我们会尽快为您发货，请耐心等待～',
+  '亲，您的订单已经发货，请注意查收哦～',
+  '亲，如果您收到商品满意的话，麻烦帮忙给个好评，非常感谢！🙏',
+  '亲，有什么问题随时联系我，祝您使用愉快！',
+  '亲，确认收货后有任何问题都可以联系我们售后，感谢支持！'
+]
+function applyQuickReply(val) {
+  if (!val) return
+  newMessage.value = val
+  quickReplyPlaceholder.value = ''  // 清空选中态，避免重复点同一条不触发 change
+}
 const syncing = ref(false)
 const chatBoxRef = ref(null)
 const searchText = ref('')
@@ -531,9 +561,29 @@ watch(selectedAccount, (val) => {
 
 onMounted(async () => {
   await loadAccounts()
-  // 自动选中第一个账号 → 触发 watch(selectedAccount) → 启动轮询 + 倒计时
-  if (accounts.value.length > 0 && !selectedAccount.value) {
-    selectedAccount.value = accounts.value[0].id
+  // 跨页跳转定位：orders 页「联系买家」跳过来带 buyerId/orderId/buyerNick，自动选中该买家会话
+  const q = route.query || {}
+  const jumpBuyerId = q.buyerId ? String(q.buyerId) : ''
+  const jumpOrderId = q.orderId ? String(q.orderId) : ''
+  const jumpBuyerNick = q.buyerNick ? String(q.buyerNick) : ''
+  if (jumpBuyerId || jumpBuyerNick) {
+    // 在所有账号里找含该买家会话的：先按 buyerNick 显式匹配会话标题，找不到再跨账号搜 buyerId
+    let matched = false
+    for (const acc of accounts.value) {
+      selectedAccount.value = acc.id
+      await loadSessions()
+      const hit = sessions.value.find(s =>
+        (jumpBuyerNick && s.counterpartyName && s.counterpartyName.includes(jumpBuyerNick))
+        || (jumpBuyerId && s.counterpartyId && String(s.counterpartyId).includes(jumpBuyerId))
+      )
+      if (hit) { selectSession(hit); matched = true; break }
+    }
+    if (!matched) ElMessage.warning(`未找到该买家的会话（buyerId=${jumpBuyerId || '空'} orderId=${jumpOrderId || '空'}），请手动在左侧列表选择`)
+  } else {
+    // 默认：自动选中第一个账号 → 触发 watch(selectedAccount) → 启动轮询 + 倒计时
+    if (accounts.value.length > 0 && !selectedAccount.value) {
+      selectedAccount.value = accounts.value[0].id
+    }
   }
 })
 
