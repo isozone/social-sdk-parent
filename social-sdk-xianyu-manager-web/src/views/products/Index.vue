@@ -230,6 +230,11 @@
         <el-table v-if="importPreview && importPreview.items && importPreview.items.length" :data="importPreview.items" stripe max-height="300">
           <el-table-column prop="rowNum" label="行号" width="60" />
           <el-table-column prop="title" label="标题" min-width="160" show-overflow-tooltip />
+          <el-table-column prop="shippingMode" label="运费" width="90">
+            <template #default="{ row }">
+              <el-tag size="small" effect="plain" :type="shippingTagType(row.shippingMode)">{{ shippingLabel(row.shippingMode) }}</el-tag>
+            </template>
+          </el-table-column>
           <el-table-column label="价格" width="80">
             <template #default="{ row }">¥{{ row.price }}</template>
           </el-table-column>
@@ -1117,6 +1122,17 @@ async function handleBatchUpdateShippingMode() {
 
 function onLocalSelectionChange(selection) {
   selectedLocalProducts.value = selection
+}
+
+// 运费偏好格式化（预览表格/批量改运费对话框共用）
+function shippingLabel(mode) {
+  if (!mode) return '无需邮寄'
+  const m = String(mode).toUpperCase()
+  return m === 'FREE' ? '包邮' : m === 'DISTANCE' ? '按距离计费' : '无需邮寄'
+}
+function shippingTagType(mode) {
+  const m = String(mode || 'NONE').toUpperCase()
+  return m === 'FREE' ? 'success' : m === 'DISTANCE' ? 'warning' : 'info'
 }
 
 function handleLocalUploadChange(list) { localImageFileList.value = list }

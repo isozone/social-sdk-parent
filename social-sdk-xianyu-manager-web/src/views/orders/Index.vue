@@ -134,6 +134,7 @@
               </el-button>
             </template>
             <el-button size="small" @click="showDetail(row)">详情</el-button>
+            <el-button size="small" type="primary" plain @click="contactBuyer(row)">联系买家</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -276,9 +277,11 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import api from '@/api/request'
+const router = useRouter()
 import { getOrderDetail } from '@/api/order'
 
 // ===== 账号选择 =====
@@ -555,6 +558,14 @@ onMounted(async () => {
   await loadAccounts()
   await loadOrders()
 })
+
+// 联系买家：跳到消息页并带 buyerId/orderId 参数，让会话页自动定位该买家会话
+function contactBuyer(row) {
+  const query = { orderId: row.orderId || row.id || '' }
+  if (row.buyerId) query.buyerId = row.buyerId
+  if (row.buyerNick) query.buyerNick = row.buyerNick
+  router.push({ path: '/messages', query })
+}
 </script>
 
 <style scoped>
