@@ -33,6 +33,9 @@ public class XianyuProduct extends BaseEntity {
     /** 发货内容模板（虚拟商品用） */
     private String deliverContentTemplate;
 
+    /** 运费偏好：NONE=无需邮寄（默认）/ FREE=包邮 / DISTANCE=按距离计费 */
+    private String shippingMode;
+
     private String detailUrl;
     private String imageUrl; // 主图 URL（商品列表返回的首图）
     private Integer viewCount;

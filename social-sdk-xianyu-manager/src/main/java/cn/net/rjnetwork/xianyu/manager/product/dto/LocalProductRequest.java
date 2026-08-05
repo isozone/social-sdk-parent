@@ -20,6 +20,9 @@ public class LocalProductRequest {
     private String deliverType;
     private String deliverContentTemplate;
 
+    /** 运费偏好：NONE=无需邮寄（默认）/ FREE=包邮 / DISTANCE=按距离计费 */
+    private String shippingMode;
+
     /** DRAFT 保存 / SUBMIT 提交发布 */
     private String action;
 }

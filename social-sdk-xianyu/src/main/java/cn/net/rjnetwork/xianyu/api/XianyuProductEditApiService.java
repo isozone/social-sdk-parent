@@ -143,13 +143,15 @@ public class XianyuProductEditApiService {
      * @param goodsType       商品类型 PHYSICAL/VIRTUAL（本地 DB，可空 → 默认 PHYSICAL）
      * @param deliverType     发货方式 CARD/ACCOUNT/LINK/FILE（本地 DB，虚拟商品用，可空）
      * @param deliverContentTemplate 发货内容模板（本地 DB，虚拟商品用，可空）
+     * @param shippingMode    运费偏好 NONE/FREE/DISTANCE（可空 → 默认 NONE 无需邮寄）
      * @return 新商品的发布结果，data 含新 itemId
      */
     public JsonNode republishWithLocalFields(
             String title, String description,
             String priceCent, String origPriceCent, String stock,
             List<String> imageUrls,
-            String catId, String goodsType, String deliverType, String deliverContentTemplate) {
+            String catId, String goodsType, String deliverType, String deliverContentTemplate,
+            String shippingMode) {
         if (publishApiService == null) {
             throw new IllegalStateException("republishWithLocalFields 需要 XianyuPublishApiService");
         }
@@ -187,18 +189,16 @@ public class XianyuProductEditApiService {
         // 3. 标签/地址/运费：用默认值（本地 DB 没存这些字段，发布时也是用默认值）
         List<Map<String, Object>> labelExtList = new ArrayList<>();  // 无标签
         Map<String, Object> addrDTO = new LinkedHashMap<>();        // 默认地址（闲鱼端用账号默认收货地址）
-        // 运费：虚拟商品免邮，实物默认按距离计费
+        // 运费：由调用方透传 shippingMode 决定（NONE/FREE/DISTANCE），默认 NONE=无需邮寄
         Map<String, Object> deliverySettings = new LinkedHashMap<>();
-        boolean isVirtual = "VIRTUAL".equalsIgnoreCase(goodsType);
-        if (isVirtual) {
-            deliverySettings.put("supportFreight", false);
-            deliverySettings.put("canFreeShipping", true);
-            deliverySettings.put("onlyTakeSelf", false);
-        } else {
-            deliverySettings.put("supportFreight", true);
-            deliverySettings.put("canFreeShipping", false);
-            deliverySettings.put("onlyTakeSelf", false);
-            deliverySettings.put("templateId", "-100");  // 按距离计费
+        String mode = shippingMode != null ? shippingMode : "NONE";
+        boolean supportFreight = !"NONE".equalsIgnoreCase(mode);
+        boolean canFreeShipping = !"DISTANCE".equalsIgnoreCase(mode);
+        deliverySettings.put("supportFreight", supportFreight);
+        deliverySettings.put("canFreeShipping", canFreeShipping);
+        deliverySettings.put("onlyTakeSelf", false);
+        if (supportFreight) {
+            deliverySettings.put("templateId", "-100");  // 按距离计费模板
         }
 
         // 4. 调 publishItem 发新商品（itemId=null → pcMainPublish 场景，真抓验证闲鱼 PC 端无编辑重发）

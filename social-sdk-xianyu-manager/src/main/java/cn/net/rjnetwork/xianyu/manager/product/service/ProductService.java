@@ -269,14 +269,20 @@ public class ProductService {
             product.setVideos(toJsonArray(xianyuVideoUrls));
         }
 
-        // 7. 步骤 D：运费设置
-        // 全品类统一「无需邮寄」：平台不收运费、不走物流（supportFreight=false + canFreeShipping=true），
-        // 不再区分实物/虚拟——实物也按无需邮寄上架，避免买家端被「按距离计费」劝退。
-        // templateId 仅在 supportFreight=true 时有意义，无需邮寄时不传。
+        // 7. 步骤 D：运费设置（由前端透传 shippingMode 决定，默认 NONE=无需邮寄）
+        // NONE  = 无需邮寄（supportFreight=false + canFreeShipping=true，不传 templateId）
+        // FREE  = 包邮（supportFreight=true + canFreeShipping=true，templateId=-100 按距离计费但包邮）
+        // DISTANCE = 按距离计费（supportFreight=true + canFreeShipping=false，templateId=-100）
         Map<String, Object> deliverySettings = new LinkedHashMap<>();
-        deliverySettings.put("supportFreight", false);
-        deliverySettings.put("canFreeShipping", true);
+        String mode = request.getShippingMode() != null ? request.getShippingMode() : "NONE";
+        boolean supportFreight = !"NONE".equalsIgnoreCase(mode);
+        boolean canFreeShipping = !"DISTANCE".equalsIgnoreCase(mode);
+        deliverySettings.put("supportFreight", supportFreight);
+        deliverySettings.put("canFreeShipping", canFreeShipping);
         deliverySettings.put("onlyTakeSelf", false);
+        if (supportFreight) {
+            deliverySettings.put("templateId", "-100");  // 按距离计费模板
+        }
 
         // 8. 步骤 E：价格转分（元 → 分）
         String priceInCent = null;
@@ -860,7 +866,8 @@ public class ProductService {
                 newPriceCent, origPriceCent, stock,
                 imageUrls,
                 product.getCategoryId(), product.getGoodsType(),
-                product.getDeliverType(), product.getDeliverContentTemplate());
+                product.getDeliverType(), product.getDeliverContentTemplate(),
+                product.getShippingMode());
         } catch (IllegalStateException e) {
             // 风控拦或必填字段缺，抛清晰错误给用户
             throw new IllegalStateException(e.getMessage());
@@ -964,7 +971,8 @@ public class ProductService {
                 priceCent, origPriceCent, String.valueOf(stock),
                 imageUrls,
                 product.getCategoryId(), product.getGoodsType(),
-                product.getDeliverType(), product.getDeliverContentTemplate());
+                product.getDeliverType(), product.getDeliverContentTemplate(),
+                product.getShippingMode());
         } catch (IllegalStateException e) {
             throw new IllegalStateException(e.getMessage());
         }

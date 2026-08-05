@@ -1601,9 +1601,21 @@ public class MessageService {
         if (incomingMessage == null || !"INCOMING".equals(incomingMessage.getDirection())) {
             return null;
         }
-        // 系统消息（tip/提醒，如"你已发货"）不是买家真实消息，不触发自动回复
-        if ("SYSTEM".equals(incomingMessage.getMsgType())) {
-            log.info("[MESSAGE] auto reply skipped (system message): msgId={} session={}", incomingMessage.getMsgId(), incomingMessage.getSessionId());
+        // 系统消息（tip/提醒，如"你已发货"/"买家已确认收货"/"快给ta一个评价吧"）不是买家真实消息，不触发自动回复。
+        // 过滤两条兜底：
+        //   a) msgType 已标 SYSTEM：LWP 链路 parseLwpContent 把 contentType=14 的 tip 消息落库时赋的；
+        //   b) content 含「系统消息」前缀或匹配闲鱼 tip 话术：WebSocket/定时同步链路绕过了 parseLwpContent，
+        //      msgType 仍是 TEXT，靠内容特征兜住——否则 AI 会对着「买家已确认收货」连发多条感谢回复刷屏。
+        String content = incomingMessage.getContent();
+        boolean isSystem = "SYSTEM".equals(incomingMessage.getMsgType())
+                || (content != null && (content.startsWith("【系统消息】")
+                    || content.contains("已确认收货") || content.contains("交易成功")
+                    || content.contains("给ta一个评价") || content.contains("给个评价")
+                    || content.contains("说说这次的交易体验")));
+        if (isSystem) {
+            log.info("[MESSAGE] auto reply skipped (system message): msgId={} session={} type={} contentHead={}",
+                    incomingMessage.getMsgId(), incomingMessage.getSessionId(), incomingMessage.getMsgType(),
+                    content == null ? "" : content.length() > 40 ? content.substring(0, 40) : content);
             return null;
         }
         // 无内容（图片等媒体消息可能无文本）或无发送者，不触发自动回复

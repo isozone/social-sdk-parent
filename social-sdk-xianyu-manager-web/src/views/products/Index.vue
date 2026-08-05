@@ -423,6 +423,14 @@
             </el-form-item>
           </el-col>
         </el-row>
+        <el-form-item label="运费偏好">
+          <el-select v-model="localForm.shippingMode" style="width: 100%;">
+            <el-option label="无需邮寄" value="NONE" />
+            <el-option label="包邮" value="FREE" />
+            <el-option label="按距离计费" value="DISTANCE" />
+          </el-select>
+          <div style="font-size: 12px; color: var(--text-3); margin-top: 4px;">无需邮寄=平台不收运费不走物流；包邮=卖家承担；按距离计费=买家承担</div>
+        </el-form-item>
         <el-form-item label="发货类型" v-if="localForm.goodsType === 'VIRTUAL'">
           <el-select v-model="localForm.deliverType" style="width: 100%;" @change="onDeliverTypeChange">
             <el-option label="卡密" value="CARD" />
@@ -618,6 +626,7 @@ const localForm = reactive({
   goodsType: 'PHYSICAL',
   deliverType: '',
   deliverContentTemplate: '',
+  shippingMode: 'NONE',  // 运费偏好：NONE=无需邮寄(默认) / FREE=包邮 / DISTANCE=按距离计费
   images: [],
   action: 'DRAFT'
 })
@@ -856,7 +865,7 @@ async function loadLocalProducts() {
 function resetLocalForm() {
   Object.assign(localForm, {
     id: null, accountId: null, title: '', price: 0, originalPrice: 0, stock: 1,
-    description: '', goodsType: 'PHYSICAL', deliverType: '', deliverContentTemplate: '', images: [], action: 'DRAFT'
+    description: '', goodsType: 'PHYSICAL', deliverType: '', deliverContentTemplate: '', shippingMode: 'NONE', images: [], action: 'DRAFT'
   })
   Object.assign(deliverForm, { link: '', cardsText: '', accountsText: '', filePath: '', message: '' })
   localImageFileList.value = []
@@ -912,6 +921,7 @@ function editLocalProduct(row) {
     goodsType: row.goodsType || 'PHYSICAL',
     deliverType: row.deliverType || '',
     deliverContentTemplate: row.deliverContentTemplate || '',
+    shippingMode: row.shippingMode || 'NONE',
     action: 'DRAFT'
   })
   parseDeliverJson(row.deliverContentTemplate || '')

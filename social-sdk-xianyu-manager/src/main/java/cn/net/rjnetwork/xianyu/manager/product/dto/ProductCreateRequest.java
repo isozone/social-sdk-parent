@@ -25,4 +25,7 @@ public class ProductCreateRequest {
 
     /** 发货内容模板（虚拟商品用） */
     private String deliverContentTemplate;
+
+    /** 运费偏好：NONE=无需邮寄（默认）/ FREE=包邮 / DISTANCE=按距离计费 */
+    private String shippingMode;
 }
