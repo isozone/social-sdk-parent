@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS xianyu_product (
     goods_type VARCHAR(16) DEFAULT 'PHYSICAL', -- PHYSICAL / VIRTUAL
     deliver_type VARCHAR(16), -- CARD / ACCOUNT / LINK / FILE (虚拟商品用)
     deliver_content_template TEXT, -- 发货内容模板(虚拟商品用)
+    shipping_mode VARCHAR(16) DEFAULT 'NONE', -- NONE=无需邮寄/FREE=包邮/DISTANCE=按距离计费
     detail_url VARCHAR(512),
     image_url VARCHAR(512), -- 主图 URL（商品列表返回的首图）
     view_count INTEGER DEFAULT 0,

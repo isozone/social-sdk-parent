@@ -408,6 +408,10 @@ public class DatabaseInitializer {
         ensureColumn("xianyu_product", "pic_width", "INTEGER");
         ensureColumn("xianyu_product", "pic_height", "INTEGER");
         ensureColumn("xianyu_product", "has_video", "BOOLEAN");
+        // 运费偏好列（NONE=无需邮寄/FREE=包邮/DISTANCE=按距离计费）：
+        // 实体 XianyuProduct.shippingMode 映射，旧库升级需 ALTER 兜底，否则 MyBatis-Plus
+        // 全字段 SELECT 报 Unknown column 'shipping_mode'
+        ensureColumn("xianyu_product", "shipping_mode", "VARCHAR(16) DEFAULT 'NONE'");
     }
 
     private void ensureAiColumns() {
