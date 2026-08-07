@@ -220,8 +220,12 @@ public class CookieRenewService {
         XianyuLoginApiService.LoginStatusResult verify = new XianyuLoginApiService(newCookie).checkLoginStatus(newCookie);
         if (verify == null || !verify.loggedIn) {
             circuitBreaker.recordFailure(account.getId(), "COOKIE_RENEW", "新 Cookie 校验未通过");
-            // Cookie 彻底失效 → 触发 A3 登录续期通知
-            publishLoginExpired(account);
+            // 仅「真正登录态失效」才推送 ACCOUNT_COOKIE_EXPIRED；
+            // 可恢复签名错误（TOKEN_EXOIRED / ILLEGAL_REQUEST / TOKEN_EMPTY 等）只是 _m_h5_tk 抖动，
+            // 登录 cookie 本体仍健康，误推送会让用户以为 cookie 过期。
+            if (isRealLoginExpired(verify)) {
+                publishLoginExpired(account);
+            }
             return RenewResult.FAILED;
         }
 
@@ -236,7 +240,17 @@ public class CookieRenewService {
         return RenewResult.SUCCESS;
     }
 
-    /** 检测账号当前 Cookie 状态：SUCCESS（健康）/ EXPIRED（失效）/ FAILED（连接异常）。 */
+    /**
+     * 检测账号当前 Cookie 状态：SUCCESS（健康）/ EXPIRED（失效）/ FAILED（连接异常或可恢复错误）。
+     *
+     * <p>严格区分「真正登录态失效」与「可恢复签名错误」：</p>
+     * <ul>
+     *   <li>TOKEN_EXOIRED / ILLEGAL_REQUEST / TOKEN_EMPTY 是 _m_h5_tk 签名 token 过期或预热抖动，
+     *       登录态 cookie 本体仍健康（闲鱼登录 cookie 可存活几十天），不应判为 EXPIRED 触发整号刷新。
+     *       返回 FAILED 让上层按「连接异常」处理，等待下一轮重试。</li>
+     *   <li>仅明确的登录失效（login-error / user-validate / session-expired / fail_sys_login）才判 EXPIRED。</li>
+     * </ul>
+     */
     private RenewResult checkCookieStatus(XianyuAccount account) {
         String cookie = account.getCookieHeader();
         if (cookie == null || cookie.isBlank()) return RenewResult.EXPIRED;
@@ -244,7 +258,18 @@ public class CookieRenewService {
             XianyuLoginApiService.LoginStatusResult r = new XianyuLoginApiService(cookie).checkLoginStatus(cookie);
             if (r != null && r.loggedIn) return RenewResult.SUCCESS;
             String msg = r == null ? "" : (r.message == null ? "" : r.message.toLowerCase());
-            if (msg.contains("login") || msg.contains("token") || msg.contains("empty")) return RenewResult.EXPIRED;
+            // 可恢复签名错误：不判 EXPIRED，避免误触发整号 cookie 刷新
+            if (msg.contains("token_exoired")
+                    || msg.contains("illegal_request")
+                    || msg.contains("token_empty")
+                    || msg.contains("recoverable sign error")) {
+                return RenewResult.FAILED;
+            }
+            // 真正登录态失效：login-error / user-validate / session-expired / fail_sys_login 等
+            if (msg.contains("login") || msg.contains("user_validate") || msg.contains("session_expired")) {
+                return RenewResult.EXPIRED;
+            }
+            // 其余 FAIL_SYS_xxx 系统错误：连接异常/限流等，不算 cookie 失效
             return RenewResult.FAILED;
         } catch (Exception e) {
             return RenewResult.FAILED;
@@ -319,6 +344,40 @@ public class CookieRenewService {
         String name = Optional.ofNullable(account.getDisplayName()).orElse(account.getAccountName());
         eventPublisher.publishEvent(new NotifyEvent("ACCOUNT_COOKIE_EXPIRED", account.getId(), name,
                 Map.of("accountName", name, "reason", "cookie_renew_failed")));
+    }
+
+    /**
+     * 判断登录态校验结果是否属于「真正登录态失效」。
+     *
+     * <p>严格区分两类失败：</p>
+     * <ul>
+     *   <li><b>可恢复签名错误</b>（TOKEN_EXOIRED / ILLEGAL_REQUEST / TOKEN_EMPTY / recoverable sign error）：
+     *       _m_h5_tk 签名 token 过期或预热抖动，登录态 cookie 本体仍健康（闲鱼登录 cookie 可存活几十天），
+     *       <b>不算</b> cookie 过期，不应推送 ACCOUNT_COOKIE_EXPIRED。</li>
+     *   <li><b>真正登录态失效</b>（login-error / user-validate / session-expired / fail_sys_login）：
+     *       登录 cookie 真的失效，需人工重新登录。</li>
+     * </ul>
+     *
+     * <p>实现原则：<b>白名单确认</b>——只有明确的登录失效码才返回 true，
+     * 其余（含 null / 空消息 / 系统错误 / 限流 / token 过期等）一律返回 false，
+     * 宁可多重试也不误报过期。</p>
+     */
+    private boolean isRealLoginExpired(XianyuLoginApiService.LoginStatusResult verify) {
+        if (verify == null || verify.message == null) return false;
+        String msg = verify.message.toLowerCase();
+        // 可恢复签名错误：明确排除
+        if (msg.contains("token_exoired")
+                || msg.contains("illegal_request")
+                || msg.contains("token_empty")
+                || msg.contains("recoverable sign error")) {
+            return false;
+        }
+        // 真正登录态失效：白名单
+        return msg.contains("not logged in")
+                || msg.contains("login error")
+                || msg.contains("user_validate")
+                || msg.contains("session_expired")
+                || msg.contains("fail_sys_login");
     }
 
     /** 单账号刷新结果。 */

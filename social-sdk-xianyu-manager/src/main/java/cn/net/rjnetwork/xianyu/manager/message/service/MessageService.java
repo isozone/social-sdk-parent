@@ -686,22 +686,66 @@ public class MessageService {
      * 说明账号登录 Cookie 已过期，滑块过了也进不了消息页。</p>
      * <p>动作：同时把账号 status 标记为 COOKIE_EXPIRED，让上层任务跳过该账号，
      * 等用户在网页端重新登录后恢复。</p>
+     *
+     * <p><b>加固：二次复核，避免误判过期</b><br>
+     * 上游 captchaSolver.solve 返回 loginExpired 的场景本身较可靠（IM 页真跳登录页），
+     * 但仍可能在 _m_h5_tk token 过期、风控跳转、页面加载抖动等情况下误判。
+     * 因此 publishLoginExpired 入口再做一次轻量 MTOP 登录态校验：
+     * <ul>
+     *   <li>校验确认 loggedIn=false 且不是可恢复签名错误 → 才标记 COOKIE_EXPIRED + 发事件</li>
+     *   <li>校验仍 loggedIn=true，或属可恢复签名错误（TOKEN_EXOIRED / ILLEGAL_REQUEST / TOKEN_EMPTY）→
+     *       不标记过期、不发事件，避免把还活几十天的登录 cookie 误判失效</li>
+     *   <li>复核本身抛异常 → 不标记过期，等下轮重试再判定（宁可多重试也不误报）</li>
+     * </ul>
+     * </p>
      */
     private void publishLoginExpired(XianyuAccount acc) {
         try {
             String accountName = accountName(acc.getId());
-            // 更新账号状态为 COOKIE_EXPIRED，避免后续定时任务继续重试同一个失效账号
-            acc.setStatus("COOKIE_EXPIRED");
-            acc.setLastError("Login cookie expired, IM page redirected to login");
-            acc.setUpdatedAt(java.time.LocalDateTime.now());
-            accountMapper.updateById(acc);
-            eventPublisher.publishEvent(new NotifyEvent("ACCOUNT_COOKIE_EXPIRED", acc.getId(), accountName,
-                    Map.of("accountName", accountName)));
-            log.warn("[MESSAGE] Published ACCOUNT_COOKIE_EXPIRED for account {} ({})",
-                    acc.getId(), accountName);
+
+            // 二次复核：用账号当前登录 cookie 调一次 MTOP 登录态接口
+            String loginCookie = acc.getCookieHeader();
+            if (loginCookie == null || loginCookie.isBlank()) {
+                // 登录 cookie 真空了，确属登录态失效
+                markCookieExpired(acc, accountName);
+                return;
+            }
+            cn.net.rjnetwork.xianyu.api.XianyuLoginApiService.LoginStatusResult verify =
+                    new cn.net.rjnetwork.xianyu.api.XianyuLoginApiService(loginCookie).checkLoginStatus(loginCookie);
+            // 校验仍登录态 → 上游 loginExpired 是误判，不标记过期
+            if (verify != null && verify.loggedIn) {
+                log.warn("[MESSAGE] publishLoginExpired 复核：账号 {} 仍为登录态，跳过 COOKIE_EXPIRED 标记（疑似误判）",
+                        acc.getId());
+                return;
+            }
+            // 可恢复签名错误（_m_h5_tk token 抖动）→ 登录 cookie 本体仍健康，不标记过期
+            String msg = verify == null || verify.message == null ? "" : verify.message.toLowerCase();
+            if (msg.contains("token_exoired")
+                    || msg.contains("illegal_request")
+                    || msg.contains("token_empty")
+                    || msg.contains("recoverable sign error")) {
+                log.warn("[MESSAGE] publishLoginExpired 复核：账号 {} 命中可恢复签名错误 ({}), 跳过 COOKIE_EXPIRED 标记",
+                        acc.getId(), msg);
+                return;
+            }
+
+            // 确认真登录态失效 → 标记 + 发事件
+            markCookieExpired(acc, accountName);
         } catch (Exception e) {
             log.warn("[MESSAGE] publish ACCOUNT_COOKIE_EXPIRED failed: {}", e.getMessage());
         }
+    }
+
+    /** 真正标记账号 COOKIE_EXPIRED + 发事件。 */
+    private void markCookieExpired(XianyuAccount acc, String accountName) {
+        acc.setStatus("COOKIE_EXPIRED");
+        acc.setLastError("Login cookie expired, IM page redirected to login");
+        acc.setUpdatedAt(java.time.LocalDateTime.now());
+        accountMapper.updateById(acc);
+        eventPublisher.publishEvent(new NotifyEvent("ACCOUNT_COOKIE_EXPIRED", acc.getId(), accountName,
+                Map.of("accountName", accountName)));
+        log.warn("[MESSAGE] Published ACCOUNT_COOKIE_EXPIRED for account {} ({})",
+                acc.getId(), accountName);
     }
 
     /**
