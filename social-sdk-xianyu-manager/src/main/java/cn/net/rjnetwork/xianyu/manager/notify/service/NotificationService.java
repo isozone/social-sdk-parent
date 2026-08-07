@@ -16,13 +16,17 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -46,13 +50,44 @@ public class NotificationService {
     private final SendRateLimiter rateLimiter;
     private final RetryService retryService;
 
-    @org.springframework.beans.factory.annotation.Value("${notify.rate-limit-retry-delay-seconds:30}")
+    @Value("${notify.rate-limit-retry-delay-seconds:30}")
     private int rateLimitRetryDelay;
 
     /** 去重缓存：scenario::accountId -> 上次发送时间；冷却内不重复发 */
     private final Cache<String, Long> dedup = Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofHours(2))
             .build();
+
+    // ==================== NEW_MESSAGE 聚合缓冲 ====================
+    //
+    // 站内消息推送频繁的根因：闲鱼消息每 30 秒轮询一次，每条新买家消息都会立即触发
+    // NEW_MESSAGE 通知。当买家连续发多条消息（或多个买家同时发），30 秒冷却仍然刷屏。
+    //
+    // 方案：NEW_MESSAGE 不再立即推送，而是按账号聚合成摘要，冷却时间到后再批量刷出。
+    // 聚合维度：accountId（同账号多条消息合并为一条摘要）。
+    // 冷却时间：notify.new-message.cooldown-seconds（默认 300 秒 / 5 分钟）。
+    // 刷出时机：① 聚合缓冲达到 maxBufferSize 条立即刷出；② 定时任务每分钟扫描超时缓冲。
+    //
+    // 聚合后的摘要内容示例：
+    //   标题：账号 xxx 收到 3 条新消息
+    //   正文：账号 xxx 收到来自买家的消息：
+    //        - 买家A: 在吗
+    //        - 买家B: 这个还有吗
+    //        - 买家A: 多少钱
+
+    /** NEW_MESSAGE 聚合冷却时间（秒），默认 5 分钟 */
+    @Value("${notify.new-message.cooldown-seconds:300}")
+    private int newMessageCooldownSeconds;
+
+    /** NEW_MESSAGE 聚合缓冲单账号最大条数，达到立即刷出 */
+    @Value("${notify.new-message.max-buffer-size:10}")
+    private int newMessageMaxBufferSize;
+
+    /** NEW_MESSAGE 聚合缓冲：accountId -> 待刷出的消息列表 */
+    private final ConcurrentMap<Long, List<NotifyEvent>> newMessageBuffer = new ConcurrentHashMap<>();
+
+    /** NEW_MESSAGE 聚合缓冲：accountId -> 首条消息进入缓冲的时间戳 */
+    private final ConcurrentMap<Long, Long> newMessageBufferSince = new ConcurrentHashMap<>();
 
     public NotificationService(NotifyChannelMapper channelMapper,
                               NotifyTemplateMapper templateMapper,
@@ -82,6 +117,12 @@ public class NotificationService {
         NotifyScenario scenario = NotifyScenario.fromName(event.getScenario());
         if (scenario == null) {
             logger.warn("未知通知场景：{}", event.getScenario());
+            return;
+        }
+
+        // NEW_MESSAGE 走聚合缓冲，不立即推送
+        if ("NEW_MESSAGE".equals(event.getScenario())) {
+            bufferNewMessage(event);
             return;
         }
 
