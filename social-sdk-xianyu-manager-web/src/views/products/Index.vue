@@ -12,7 +12,7 @@
             <div class="card-sub">闲鱼商品与本地商品统一管控，支持 AI 文案优化、CSV 批量导入</div>
           </div>
         </div>
-        <el-button type="primary" @click="activeTab === 'xianyu' ? (showCreateDialog = true) : (showLocalCreateDialog = true)">
+        <el-button type="primary" @click="activeTab === 'xianyu' ? (showCreateDialog = true) : openLocalCreate()">
           <el-icon><Plus /></el-icon> {{ activeTab === 'xianyu' ? '创建商品' : '新建本地商品' }}
         </el-button>
       </div>
@@ -434,7 +434,7 @@
     </el-dialog>
 
     <!-- 本地商品 创建/编辑对话框 -->
-    <el-dialog v-model="showLocalCreateDialog" :title="localForm.id ? '编辑本地商品' : '新建本地商品'" width="640px">
+    <el-dialog v-model="showLocalCreateDialog" :title="localForm.id ? '编辑本地商品' : '新建本地商品'" width="640px" @closed="resetLocalForm">
       <el-form ref="localFormRef" :model="localForm" label-width="90px">
         <el-form-item label="发布账号" required>
           <el-select v-model="localForm.accountId" placeholder="选择要发布的闲鱼账号" style="width: 100%;">
@@ -934,6 +934,16 @@ function resetLocalForm() {
   })
   Object.assign(deliverForm, { link: '', cardsText: '', accountsText: '', filePath: '', message: '' })
   localImageFileList.value = []
+}
+
+/**
+ * 打开「新建本地商品」对话框。
+ * 必须先重置表单再打开：否则编辑过某商品后关闭对话框，localForm 仍残留上次编辑数据，
+ * 直接新建会被旧内容填充。关闭对话框（@closed）也会重置，双保险。
+ */
+function openLocalCreate() {
+  resetLocalForm()
+  showLocalCreateDialog.value = true
 }
 
 async function handleLocalSave() {
