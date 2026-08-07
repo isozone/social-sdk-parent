@@ -294,11 +294,15 @@ public class ProductService {
             origPriceInCent = String.valueOf(request.getOriginalPrice().multiply(java.math.BigDecimal.valueOf(100)).longValue());
         }
 
-        // 9. 步骤 F：真调 publishItem 提交发布
+        // 9. 步骤 F：真调 publishItem 提交发布（11 参重载，库存真实透传）
+        // 原 9 参重载内部写死 quantity="1"：本地商品设 100 库存发布后闲鱼端仍是 1，
+        // 买家下单 1 件库存归零自动下架 → 表现为"下单后商品消失"。改用 11 参重载透传 stock。
         JsonNode pubResp = publishApi.publishItem(
+                null,   // itemId=null → 发新商品
                 request.getTitle() != null ? request.getTitle() : "",
                 request.getDescription() != null ? request.getDescription() : "",
                 priceInCent, origPriceInCent,
+                String.valueOf(request.getStock() != null && request.getStock() > 0 ? request.getStock() : 1),
                 imageInfoList, catDTO, new ArrayList<>(), addrDTO, deliverySettings
         );
 
