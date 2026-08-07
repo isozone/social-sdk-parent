@@ -148,9 +148,8 @@ public class NotificationService {
                 tpl != null && tpl.getBodyTpl() != null ? tpl.getBodyTpl() : scenario.getDefaultBody(),
                 event.getVars());
 
-        // 落站内收件箱（站内 + 外部统一）
+        // 落站内收件箱 + 实时广播 + 按订阅分发外部通道
         saveInApp(event, title, body);
-        // 站内实时广播（前端若接 STOMP 即可即时收到）
         try {
             Map<String, Object> broadcastPayload = new LinkedHashMap<>();
             broadcastPayload.put("type", "notification");
@@ -164,8 +163,164 @@ public class NotificationService {
             logger.warn("[NotifyLoop] IN_APP_BROADCAST_FAILED scenario={} accountId={} error={}",
                     event.getScenario(), event.getAccountId(), e.getMessage());
         }
+        dispatchExternal(event, title, body);
+    }
 
-        // 按订阅规则分发外部通道
+    // ==================== NEW_MESSAGE 聚合缓冲实现 ====================
+
+    /**
+     * 把单条 NEW_MESSAGE 事件加入账号聚合缓冲。
+     * <p>聚合策略：</p>
+     * <ul>
+     *   <li>缓冲为空 → 记录首条时间戳，加入缓冲</li>
+     *   <li>缓冲未满且未超时 → 加入缓冲，等定时任务刷出</li>
+     *   <li>缓冲达到 maxBufferSize → 立即刷出（防止突发消息堆积太久）</li>
+     * </ul>
+     */
+    private void bufferNewMessage(NotifyEvent event) {
+        Long accountId = event.getAccountId();
+        if (accountId == null) {
+            // 没有账号维度的 NEW_MESSAGE 直接发（兼容旧调用）
+            dispatchImmediate(event);
+            return;
+        }
+
+        List<NotifyEvent> buffer = newMessageBuffer.computeIfAbsent(accountId, k -> new ArrayList<>());
+        synchronized (buffer) {
+            if (buffer.isEmpty()) {
+                newMessageBufferSince.put(accountId, System.currentTimeMillis());
+            }
+            buffer.add(event);
+            logger.debug("[NotifyLoop] NEW_MESSAGE_BUFFERED accountId={} bufferSize={}",
+                    accountId, buffer.size());
+
+            // 达到单账号缓冲上限 → 立即刷出
+            if (buffer.size() >= newMessageMaxBufferSize) {
+                flushAccountBuffer(accountId);
+            }
+        }
+    }
+
+    /**
+     * 定时扫描聚合缓冲，把超时（达到 cooldown）的缓冲刷出。
+     * <p>每分钟执行一次，扫描所有有缓冲的账号，
+     * 若首条消息进入缓冲时间 + cooldown 已过，则刷出。</p>
+     */
+    @Scheduled(fixedDelayString = "${notify.new-message.flush-interval-ms:60000}")
+    public void flushExpiredBuffers() {
+        if (newMessageBuffer.isEmpty()) return;
+        long now = System.currentTimeMillis();
+        long cooldownMs = newMessageCooldownSeconds * 1000L;
+
+        // 快照账号列表，避免遍历时 flushAccountBuffer 改变 map
+        List<Long> accountIds = new ArrayList<>(newMessageBuffer.keySet());
+        for (Long accountId : accountIds) {
+            Long since = newMessageBufferSince.get(accountId);
+            if (since == null) {
+                // 缓冲已被清空但 since 残留 → 清理
+                newMessageBufferSince.remove(accountId);
+                continue;
+            }
+            if ((now - since) >= cooldownMs) {
+                flushAccountBuffer(accountId);
+            }
+        }
+    }
+
+    /**
+     * 刷出指定账号的聚合缓冲，合成一条摘要通知后走正常分发链路。
+     */
+    private void flushAccountBuffer(Long accountId) {
+        List<NotifyEvent> buffer = newMessageBuffer.remove(accountId);
+        newMessageBufferSince.remove(accountId);
+        if (buffer == null || buffer.isEmpty()) return;
+
+        // 取第一条事件作为基准（accountId、accountName 一致）
+        NotifyEvent base = buffer.get(0);
+        int total = buffer.size();
+
+        // 合成聚合摘要标题/正文
+        String title = "账号 " + base.getAccountName() + " 收到 " + total + " 条新消息";
+        StringBuilder bodySb = new StringBuilder();
+        bodySb.append("账号 ").append(base.getAccountName()).append(" 收到来自买家的消息：\n");
+        int shown = 0;
+        for (NotifyEvent ev : buffer) {
+            if (shown >= 5) {
+                bodySb.append("... 等 ").append(total - 5).append(" 条\n");
+                break;
+            }
+            Map<String, Object> vars = ev.getVars();
+            String senderName = vars.getOrDefault("senderName", "").toString();
+            String content = vars.getOrDefault("content", "").toString();
+            // 截断过长内容
+            if (content.length() > 50) content = content.substring(0, 50) + "...";
+            bodySb.append("- ").append(senderName.isEmpty() ? "买家" : senderName)
+                  .append(": ").append(content).append("\n");
+            shown++;
+        }
+
+        // 构造聚合 NotifyEvent，走正常分发链路
+        Map<String, Object> aggVars = new LinkedHashMap<>();
+        aggVars.put("accountName", base.getAccountName());
+        aggVars.put("messageCount", total);
+        aggVars.put("summary", bodySb.toString());
+        NotifyEvent aggEvent = new NotifyEvent("NEW_MESSAGE", accountId, base.getAccountName(), aggVars);
+
+        // 聚合后直接走立即分发（绕过 dedup，因为聚合本身就是频控）
+        dispatchAggregated(aggEvent, title, bodySb.toString());
+        logger.info("[NotifyLoop] NEW_MESSAGE_FLUSHED accountId={} count={}", accountId, total);
+    }
+
+    /**
+     * 聚合摘要的直接分发（不经过 dedup 冷却，因为聚合本身就是频控）。
+     * 落站内收件箱 + 实时广播 + 按订阅分发外部通道。
+     */
+    private void dispatchAggregated(NotifyEvent event, String title, String body) {
+        // 落站内收件箱
+        saveInApp(event, title, body);
+        // 站内实时广播
+        try {
+            Map<String, Object> broadcastPayload = new LinkedHashMap<>();
+            broadcastPayload.put("type", "notification");
+            broadcastPayload.put("scenario", event.getScenario());
+            broadcastPayload.put("title", title);
+            broadcastPayload.put("body", body);
+            broadcastPayload.put("accountId", event.getAccountId());
+            broadcaster.broadcastAll(mapper.writeValueAsString(broadcastPayload));
+            logger.info("[NotifyLoop] IN_APP_BROADCAST scenario={} accountId={}",
+                    event.getScenario(), event.getAccountId());
+        } catch (Exception e) {
+            logger.warn("[NotifyLoop] IN_APP_BROADCAST_FAILED scenario={} accountId={} error={}",
+                    event.getScenario(), event.getAccountId(), e.getMessage());
+        }
+        // 按订阅规则分发外部通道（复用原逻辑）
+        dispatchExternal(event, title, body);
+    }
+
+    /**
+     * 无账号维度的 NEW_MESSAGE 直接分发（兼容旧调用路径）。
+     */
+    private void dispatchImmediate(NotifyEvent event) {
+        NotifyScenario scenario = NotifyScenario.fromName(event.getScenario());
+        if (scenario == null) return;
+        NotifyTemplate tpl = templateMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<NotifyTemplate>()
+                        .eq(NotifyTemplate::getScenario, event.getScenario())
+                        .eq(NotifyTemplate::getEnabled, true));
+        String title = TemplateRenderer.render(
+                tpl != null && tpl.getTitleTpl() != null ? tpl.getTitleTpl() : scenario.getDefaultTitle(),
+                event.getVars());
+        String body = TemplateRenderer.render(
+                tpl != null && tpl.getBodyTpl() != null ? tpl.getBodyTpl() : scenario.getDefaultBody(),
+                event.getVars());
+        saveInApp(event, title, body);
+        dispatchExternal(event, title, body);
+    }
+
+    /**
+     * 按订阅规则分发外部通道（从 onEvent 抽取，聚合与立即分发共用）。
+     */
+    private void dispatchExternal(NotifyEvent event, String title, String body) {
         List<NotifySubscription> subs = subscriptionMapper.selectList(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<NotifySubscription>()
                         .eq(NotifySubscription::getScenario, event.getScenario())
@@ -175,22 +330,18 @@ public class NotificationService {
                     event.getScenario(), event.getAccountId());
             return;
         }
-
         for (NotifySubscription sub : subs) {
             NotifyChannel channel = channelMapper.selectById(sub.getChannelId());
             if (channel == null || !Boolean.TRUE.equals(channel.getEnabled())) continue;
-            // 账号范围过滤
             if ("CUSTOM".equals(sub.getAccountScope())
                     && event.getAccountId() != null
                     && !accountInList(sub.getAccountIds(), event.getAccountId())) {
                 continue;
             }
-            // 解密配置并分发
             String decrypted = cryptoUtil.decrypt(channel.getConfigJson());
             channel.setConfigJson(decrypted);
             List<String> recipients = resolveRecipients(sub, channel);
 
-            // 通道限频：超限则转入重试队列短延时重发，不直接丢弃
             int channelRate = 0;
             try {
                 JsonNode cfgNode = mapper.readTree(channel.getConfigJson());
@@ -209,15 +360,13 @@ public class NotificationService {
                 if (adapter == null) {
                     throw new IllegalStateException("无对应通道适配器： " + channel.getType());
                 }
-                logger.info("[NotifyLoop] EXTERNAL_SEND_START scenario={} channelId={} channelType={} channelName={} recipients={}",
-                        event.getScenario(), channel.getId(), channel.getType(), channel.getName(), recipients);
                 adapter.send(channel, title, body, recipients, event.getVars());
                 writeLog(event, channel, recipients, "SENT", null);
-                logger.info("[NotifyLoop] EXTERNAL_SENT scenario={} channelId={} channelType={} channelName={} recipients={}",
-                        event.getScenario(), channel.getId(), channel.getType(), channel.getName(), recipients);
+                logger.info("[NotifyLoop] EXTERNAL_SENT scenario={} channelId={} channelName={}",
+                        event.getScenario(), channel.getId(), channel.getName());
             } catch (Exception e) {
-                logger.warn("[NotifyLoop] EXTERNAL_FAILED scenario={} channelId={} channelType={} channelName={} error={}",
-                        event.getScenario(), channel.getId(), channel.getType(), channel.getName(), e.getMessage(), e);
+                logger.warn("[NotifyLoop] EXTERNAL_FAILED scenario={} channelId={} error={}",
+                        event.getScenario(), channel.getId(), e.getMessage(), e);
                 writeLog(event, channel, recipients, "FAILED", e.getMessage());
                 retryService.enqueue(event, channel, recipients, title, body, e.getMessage());
             }
