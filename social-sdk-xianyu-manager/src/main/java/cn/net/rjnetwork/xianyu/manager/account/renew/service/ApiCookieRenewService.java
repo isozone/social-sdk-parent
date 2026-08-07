@@ -79,6 +79,21 @@ public class ApiCookieRenewService {
             // 2. 校验新 cookie 仍登录态
             XianyuLoginApiService.LoginStatusResult verify =
                     new XianyuLoginApiService(newCookie).checkLoginStatus(newCookie);
+            // 可恢复签名错误（TOKEN_EXOIRED/ILLEGAL_REQUEST/TOKEN_EMPTY）：
+            // _m_h5_tk 预热抖动导致，登录态 cookie 本体仍健康。
+            // 重新构造 client 走一次完整 primeToken→callMtop→校验，再失败才降级 A1。
+            if ((verify == null || !verify.loggedIn)
+                    && isRecoverableSignError(verify)) {
+                log.info("[A2] account {} hit recoverable sign error ({}), retry once",
+                        account.getId(), verify == null ? "" : verify.message);
+                XianyuMtopApiClient retryClient = xianyuMtopClientFactory.create(account);
+                retryClient.callMtop(USER_INFO_API, USER_INFO_VERSION, "{}");
+                String retryCookie = retryClient.getMergedCookie();
+                if (retryCookie != null && !retryCookie.isBlank()) {
+                    verify = new XianyuLoginApiService(retryCookie).checkLoginStatus(retryCookie);
+                    newCookie = retryCookie;
+                }
+            }
             if (verify == null || !verify.loggedIn) {
                 circuitBreaker.recordFailure(account.getId(), "API_COOKIE_RENEW", "新 cookie 校验未通过");
                 // A2 失败 → 调用方降级到 A1（浏览器刷新）
@@ -105,6 +120,21 @@ public class ApiCookieRenewService {
             log.warn("[A2] account {} API renew failed: {}", account.getId(), reason);
             return RenewResult.FAILED;
         }
+    }
+
+    /**
+     * 判断登录态校验失败是否属于可恢复的签名错误。
+     * <p>TOKEN_EXOIRED / ILLEGAL_REQUEST / TOKEN_EMPTY 是 _m_h5_tk 预热抖动导致，
+     * 登录态 cookie 本体仍健康，重试一次完整 primeToken→callMtop 即可恢复，
+     * 不应直接降级到 A1 启浏览器。</p>
+     */
+    private boolean isRecoverableSignError(XianyuLoginApiService.LoginStatusResult verify) {
+        if (verify == null || verify.message == null) return false;
+        String msg = verify.message.toLowerCase();
+        return msg.contains("token_exoired")
+                || msg.contains("illegal_request")
+                || msg.contains("token_empty")
+                || msg.contains("recoverable sign error");
     }
 
     /** 复用 A1 的 RenewResult 枚举，语义一致。 */

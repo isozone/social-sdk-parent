@@ -225,7 +225,12 @@ public class XianyuMtopApiClient {
      * @return 响应 JSON
      */
     public JsonNode callMtop(String api, String version, String dataJson) {
-        primeTokenIfNeeded();
+        // 预热失败时再试一次；仍失败则直接返回可恢复错误，避免拿旧 token 反复签名
+        boolean primed = primeTokenIfNeeded();
+        if (!primed) {
+            tokenPrimed = false;
+            primeTokenIfNeeded();
+        }
         String v = (version != null && !version.isBlank()) ? version : "1.0";
 
         try {
@@ -242,7 +247,10 @@ public class XianyuMtopApiClient {
             // 处理 token 过期：返回 ret[0]=FAIL_SYS_TOKEN_EXOIRED 时，重新预热后重试一次
             if (isTokenExpired(resp)) {
                 tokenPrimed = false;
-                primeTokenIfNeeded();
+                // 预热失败不继续重试，否则拿旧 token 必然再次 TOKEN_EXOIRED
+                if (!primeTokenIfNeeded()) {
+                    return resp;
+                }
                 XianyuMtopRequestBuilder retry = new XianyuMtopRequestBuilder(api)
                         .setCookie(getMergedCookie())
                         .setVersion(v)
@@ -335,12 +343,16 @@ public class XianyuMtopApiClient {
     /**
      * 预热 _m_h5_tk cookie：调用一次轻量接口让服务端下发该 cookie。
      * 闲鱼所有 MTOP 接口都需要 _m_h5_tk 中的 token 来计算 sign。
+     *
+     * @return {@code true} 预热成功（cookie 中已有未过期 _m_h5_tk）；
+     *         {@code false} 预热失败（网络抖动 / 代理失败 / 服务端未下发），
+     *         此时调用方不应继续签名请求，否则会反复得到 FAIL_SYS_TOKEN_EXOIRED。
      */
-    public synchronized void primeTokenIfNeeded() {
-        if (tokenPrimed && hasValidMtopToken(getMergedCookie())) return;
+    public synchronized boolean primeTokenIfNeeded() {
+        if (tokenPrimed && hasValidMtopToken(getMergedCookie())) return true;
         if (hasValidMtopToken(getMergedCookie())) {
             tokenPrimed = true;
-            return;
+            return true;
         }
         // _m_h5_tk 的后缀是过期时间戳。过期 token 继续带着请求会反复得到
         // FAIL_SYS_TOKEN_EXOIRED，必须先从登录 cookie 和 IM cookie 中剔除，让 MTOP 重新下发。
@@ -369,9 +381,17 @@ public class XianyuMtopApiClient {
 
             HttpResponse<String> response = httpClient.send(rb.build(), HttpResponse.BodyHandlers.ofString());
             this.cookie = mergeCookieFromResponse(cookie, response);
-            tokenPrimed = true;
+            // 真正判定预热是否成功：新 cookie 中必须含未过期 _m_h5_tk
+            boolean primed = hasValidMtopToken(getMergedCookie());
+            if (primed) {
+                tokenPrimed = true;
+                return true;
+            }
+            // 预热未拿到合法 token，不置 tokenPrimed，允许下次重试
+            return false;
         } catch (Exception e) {
             System.err.println("[MTOP primeTokenIfNeeded Error] " + e.getMessage());
+            return false;
         }
     }
 

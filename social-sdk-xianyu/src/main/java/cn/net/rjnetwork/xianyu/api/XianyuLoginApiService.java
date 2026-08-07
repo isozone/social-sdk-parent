@@ -335,6 +335,17 @@ public class XianyuLoginApiService {
                     return result;
                 }
                 if (r0.startsWith("FAIL_")) {
+                    // FAIL_ 兜底前先排除可恢复的签名错误（token 过期/非法请求/token 缺失）。
+                    // 这些是 _m_h5_tk 预热或网络抖动导致，登录态 cookie 本体仍然健康，
+                    // 不应判成未登录触发整号刷新。返回 unknown 让上层走续期重试。
+                    String upper = r0.toUpperCase();
+                    if (upper.contains("TOKEN_EXOIRED")
+                            || upper.contains("ILLEGAL_REQUEST")
+                            || upper.contains("TOKEN_EMPTY")) {
+                        result.loggedIn = false;
+                        result.message = "Recoverable sign error: " + r0;
+                        return result;
+                    }
                     result.loggedIn = false;
                     result.message = "MTOP call failed: " + r0;
                     return result;
@@ -378,6 +389,12 @@ public class XianyuLoginApiService {
      * 判断 MTOP 失败码是否属于登录态失效（而非接口不存在/系统错误/限流等临时错误）。
      * <p>FAIL_SYS_API_NOT_FOUNDED（接口名不存在）不属于 Cookie 失效——它是接口命名/版本问题；
      * 限流（FAIL_SYS_RATE_LIMIT 等）与系统错误也不是登录问题，误判会让用户反复刷新 Cookie。</p>
+     *
+     * <p>特别注意：<b>token 过期（FAIL_SYS_TOKEN_EXOIRED）不是登录态失效</b>。
+     * `_m_h5_tk` 是 MTOP 签名 token，寿命通常只有数小时到一天，过期后只需重新预热
+     * 即可重新下发；而闲鱼真正的登录态 cookie（cookie2/unb/sgcookie 等）能存活几十天。
+     * 若把 token 过期当成整号 cookie 失效，会出现"一天就报过期、但 cookie 实际还能活几十天"
+     * 的误判。故 TOKEN_EXOIRED / ILLEGAL_REQUEST / TOKEN_EMPTY 等可恢复签名错误不在此列。</p>
      */
     private boolean isLoginFailureCode(String code) {
         if (code == null || code.isEmpty()) return false;
@@ -386,10 +403,15 @@ public class XianyuLoginApiService {
         if (upper.contains("API_NOT_FOUNDED") || upper.contains("API NOT FOUND")) {
             return false;
         }
-        // 仅明确的登录态失效码才判为未登录：用户校验失败、token 过期、会话过期、登录错误等
+        // token 过期 / 签名非法 / token 缺失：可恢复的签名错误，不是登录态失效
+        if (upper.contains("TOKEN_EXOIRED")
+                || upper.contains("ILLEGAL_REQUEST")
+                || upper.contains("TOKEN_EMPTY")) {
+            return false;
+        }
+        // 仅明确的登录态失效码才判为未登录：用户校验失败、会话过期、登录错误等
         return code.contains("mtop.permission.login-error")
                 || upper.contains("USER_VALIDATE")
-                || upper.contains("TOKEN_EXOIRED")
                 || upper.contains("SESSION_EXPIRED")
                 || upper.contains("_LOGIN")
                 || upper.equals("FAIL_SYS_LOGIN");
