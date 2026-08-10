@@ -589,8 +589,11 @@ public class ChromeSession {
             args.add("--lang=zh-CN");
         }
 
-        if (config.isHeadless()) {
-            // headless/Docker 环境才追加容器类参数，不污染本机桌面模式指纹。
+        // headless / Docker / root 环境必须追加容器类参数。
+        // root 用户下 Chrome 不带 --no-sandbox 会直接退出:
+        // "Running as root without --no-sandbox is not supported"
+        boolean runAsRoot = "root".equals(System.getProperty("user.name"));
+        if (config.isHeadless() || runAsRoot) {
             args.add("--no-sandbox");
             args.add("--disable-dev-shm-usage");
             args.add("--disable-gpu-sandbox");

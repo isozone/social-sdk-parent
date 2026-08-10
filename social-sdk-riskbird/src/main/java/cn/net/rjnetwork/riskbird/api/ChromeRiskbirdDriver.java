@@ -109,6 +109,24 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
             // 等待二维码图片出现并返回其 URL
             page.waitForSelector(config.getQrImageSelector(), config.getSearchTimeoutMs());
             String qrUrl = page.attr(config.getQrImageSelector(), "src");
+            // 风鸟页面返回的二维码 img src 是相对路径(如 /riskbird-api/createQrCode?uuid=xxx),
+            // 需补全为绝对 URL,否则前端会用 CRM 域名拼接导致图片 404 无法显示
+            if (qrUrl != null && qrUrl.startsWith("/")) {
+                try {
+                    java.net.URI pageUri = new java.net.URI(page.url());
+                    String host = pageUri.getHost() == null ? "" : pageUri.getHost();
+                    int port = pageUri.getPort();
+                    qrUrl = pageUri.getScheme() + "://" + host + (port > 0 ? ":" + port : "") + qrUrl;
+                } catch (Exception e) {
+                    log.warn("[RISKBIRD] 二维码 URL 补全失败, 使用原始值: {}, err={}", qrUrl, e.getMessage());
+                }
+            }
+            // 风鸟 createQrCode 接口需要同会话 Cookie,前端 <img> 直接加载会 401;
+            // 故在 Chrome 会话内 fetch 图片并转成 base64 data URL 返回,前端可直接显示。
+            String qrDataUrl = fetchQrAsDataUrl(page, qrUrl);
+            if (qrDataUrl != null && !qrDataUrl.isBlank()) {
+                qrUrl = qrDataUrl;
+            }
             log.info("[RISKBIRD] 扫码二维码已就绪, accountId={}, qrUrl={}", accountId, qrUrl);
             return qrUrl;
         } finally {}
@@ -846,5 +864,31 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
                 .cookieHeader(cookieHeader)
                 .message(message)
                 .build();
+    }
+
+    /** 在 Chrome 会话内 fetch 二维码图片并转成 base64 data URL（同会话 Cookie，前端可直接 <img> 显示）。 */
+    private String fetchQrAsDataUrl(ChromePage page, String qrUrl) {
+        if (qrUrl == null || qrUrl.isBlank()) return null;
+        try {
+            String js = "(() => new Promise((resolve) => {"
+                    + "  try { fetch(" + esc(qrUrl) + ", { credentials: 'include' })"
+                    + "    .then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.blob(); })"
+                    + "    .then(blob => { const reader = new FileReader();"
+                    + "      reader.onload = () => resolve(reader.result);"
+                    + "      reader.onerror = () => resolve('');"
+                    + "      reader.readAsDataURL(blob); })"
+                    + "    .catch(() => resolve(''));"
+                    + "  } catch (e) { resolve(''); }"
+                    + "}))()";
+            String dataUrl = page.evalString(js);
+            if (dataUrl != null && dataUrl.startsWith("data:image")) {
+                log.info("[RISKBIRD] 二维码图片已转为 data URL, length={}", dataUrl.length());
+                return dataUrl;
+            }
+            log.warn("[RISKBIRD] 二维码图片转 data URL 失败, 回退原始 URL");
+        } catch (Exception e) {
+            log.warn("[RISKBIRD] 二维码图片转 data URL 异常, 回退原始 URL: {}", e.getMessage());
+        }
+        return null;
     }
 }
