@@ -866,20 +866,17 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
                 .build();
     }
 
-    /** 在 Chrome 会话内 fetch 二维码图片并转成 base64 data URL（同会话 Cookie，前端可直接 <img> 显示）。 */
+    /** 在 Chrome 会话内把已渲染的二维码 <img> 转成 base64 data URL（前端可直接 <img> 显示）。 */
     private String fetchQrAsDataUrl(ChromePage page, String qrUrl) {
         if (qrUrl == null || qrUrl.isBlank()) return null;
         try {
-            String js = "(() => new Promise((resolve) => {"
-                    + "  try { fetch(" + esc(qrUrl) + ", { credentials: 'include' })"
-                    + "    .then(r => { if (!r.ok) throw new Error('http ' + r.status); return r.blob(); })"
-                    + "    .then(blob => { const reader = new FileReader();"
-                    + "      reader.onload = () => resolve(reader.result);"
-                    + "      reader.onerror = () => resolve('');"
-                    + "      reader.readAsDataURL(blob); })"
-                    + "    .catch(() => resolve(''));"
-                    + "  } catch (e) { resolve(''); }"
-                    + "}))()";
+            // 用 canvas 从页面已加载的二维码 img 提取 base64（同会话已具备访问权限，
+            // 避免 fetch 二次请求的 CORS/401 问题；单行 JS 避免多行脚本语法风险）
+            String js = "(() => { const img = document.querySelector('img.xs-login-left-qrcode');"
+                    + " if (!img || !img.complete || img.naturalWidth === 0) return '';"
+                    + " const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;"
+                    + " c.getContext('2d').drawImage(img, 0, 0);"
+                    + " try { return c.toDataURL('image/png'); } catch (e) { return ''; } })()";
             String dataUrl = page.evalString(js);
             if (dataUrl != null && dataUrl.startsWith("data:image")) {
                 log.info("[RISKBIRD] 二维码图片已转为 data URL, length={}", dataUrl.length());

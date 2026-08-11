@@ -97,6 +97,14 @@ public class ChromeBrowser {
         if (profile != null && profile.isAlive()) {
             return profile;
         }
+        // 应用重启后 activeProfiles 为空：优先复用已运行容器（保留扫码登录态），
+        // 避免与残留进程争用同一 profileDir/端口导致登录态丢失或重复启动
+        if (profileManager.reattachAccount(accountId)) {
+            ChromeProfile attached = profileManager.getProfile(accountId).orElse(null);
+            if (attached != null) {
+                return attached;
+            }
+        }
         return profileManager.launchAccount(accountId, "account-" + accountId);
     }
 
