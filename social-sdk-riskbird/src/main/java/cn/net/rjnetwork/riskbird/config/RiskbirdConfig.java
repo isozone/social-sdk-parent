@@ -96,8 +96,8 @@ public class RiskbirdConfig {
     /** 搜索接口 URL 关键字（ChromeNetwork 抓包匹配，命中即解析为搜索结果）。 */
     private String[] searchApiUrlKeywords = {"search", "query", "ent", "company"};
 
-    /** 搜索结果列表项选择器（DOM 兜底通道；实测结果卡片 class 含 card/company）。 */
-    private String searchResultItemSelector = "[class*=company-card], [class*=ent-card], [class*=result-card], [class*=card] [class*=name]";
+    /** 搜索结果列表项选择器（DOM 兜底通道；真实搜索页结果项 class=company-item，含公司名+状态+负责人）。 */
+    private String searchResultItemSelector = "[class*=company-item], [class*=company-card], [class*=ent-card], [class*=result-card], [class*=card] [class*=name]";
 
     /** 企业详情页关键信息行选择器（DOM 兜底，预留；实测详情为文本布局，已改文本解析）。 */
     private String detailRowSelector = "[class*=base-info] tr, [class*=base-info] li";

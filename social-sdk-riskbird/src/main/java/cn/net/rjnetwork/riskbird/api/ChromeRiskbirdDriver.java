@@ -44,6 +44,20 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
     private final ChromeBrowser chromeBrowser;
     private final long accountId;
 
+    /**
+     * 账号最新登录态 cookie header（宿主扫码登录成功后调 setAccountCookie 注入）。
+     * SDK 用它兜底：采集时 Chrome profile cookie 被 prepareQrLogin 清掉后，
+     * search 开页后自动注入此 cookie 恢复登录态，否则风鸟按未登录搜命中 0 条。
+     */
+    private volatile String accountCookieHeader;
+
+    /** 宿主扫码登录成功后调此注入最新 cookie，供后续 search 兜底恢复登录态。 */
+    public void setAccountCookie(String cookieHeader) {
+        this.accountCookieHeader = cookieHeader;
+        log.info("[RISKBIRD] setAccountCookie 注入, accountId={}, cookieLen={}",
+                accountId, cookieHeader == null ? 0 : cookieHeader.length());
+    }
+
     public ChromeRiskbirdDriver(RiskbirdConfig config, ChromeBrowser chromeBrowser, long accountId) {
         this.config = config;
         this.chromeBrowser = chromeBrowser;
@@ -83,7 +97,21 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
             page.navigate(config.getLoginSuccessUrl());
             // 等 SPA 渲染稳定（登录入口 / 事件绑定就绪），避免过早交互无效
             HumanDelay.sleep(2000, 3500);
-            page.waitForSelector(config.getLoginEntrySelector(), config.getSearchTimeoutMs());
+
+            // 已登录态兜底：复用 profile 的 Chrome 可能停在登录后页（userinfo-auth-btn 不出现），
+            // 导致 waitForExists 超时。检测到已登录态则清登录 cookie + reload 回未登录首页，
+            // 再等登录入口。风鸟登录态靠 cookie（非 localStorage），清 cookie 即可退出。
+            if (isLoggedIn(page)) {
+                log.info("[RISKBIRD] 检测到已登录态, 清 cookie 后重新加载未登录页, accountId={}", accountId);
+                clearRiskbirdCookies(page);
+                page.navigate(config.getLoginSuccessUrl());
+                HumanDelay.sleep(2000, 3500);
+            }
+
+            // 登录入口只需「存在于 DOM」即可点击，不能等「可见」：
+            // 实测 Nuxt SSR hydration 早期，userinfo-auth-btn-gohst 的 offsetParent 可能短暂为 null
+            // （popover 容器未挂载完成），waitForSelector→waitForVisible 会误判超时。
+            waitForExists(page, config.getLoginEntrySelector(), config.getSearchTimeoutMs());
 
             // 触发登录 popover：真实鼠标点击登录入口（hover 亦可），让 popover 内容挂载到 DOM。
             // 实测：.popover-btn 由 Element UI popover 渲染，内容常驻 DOM 但容器隐藏（0 尺寸），
@@ -107,7 +135,9 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
             HumanDelay.sleep(1200, 2200); // 等二维码异步渲染
 
             // 等待二维码图片出现并返回其 URL
-            page.waitForSelector(config.getQrImageSelector(), config.getSearchTimeoutMs());
+            // 二维码 img 在 Element UI popover 内，popover 容器隐藏（0 尺寸），
+            // img.offsetParent 可能为 null，故只等「存在于 DOM」而非「可见」。
+            waitForExists(page, config.getQrImageSelector(), config.getSearchTimeoutMs());
             String qrUrl = page.attr(config.getQrImageSelector(), "src");
             // 风鸟页面返回的二维码 img src 是相对路径(如 /riskbird-api/createQrCode?uuid=xxx),
             // 需补全为绝对 URL,否则前端会用 CRM 域名拼接导致图片 404 无法显示
@@ -138,13 +168,46 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
         ensureContainer();
         long deadline = System.currentTimeMillis() + config.getLoginTimeoutMs();
         while (System.currentTimeMillis() < deadline) {
-            if (isLoggedIn()) {
+            // 登录态判定：读当前页面状态（不开新页面、不 navigate，避免打断扫码 popover）。
+            // 不调无参 isLoggedIn()：Chrome 126+ 的 CDP cookie store 对 httpOnly+secure 的
+            // token/userinfo cookie 完全不返回，导致永远误判未登录。
+            if (isloggedInByCurrentPage()) {
                 String cookie = extractCookieHeaderQuietly();
+                log.info("[RISKBIRD] 扫码登录成功, accountId={}", accountId);
                 return loginResult(true, null, cookie, "扫码登录成功");
             }
             Thread.sleep(config.getQrPollIntervalMs());
         }
+        log.warn("[RISKBIRD] 扫码登录超时, accountId={}", accountId);
         return loginResult(false, null, null, "扫码登录超时");
+    }
+
+    /**
+     * 当前页面状态判定登录态（不开新页面、不 navigate，避免打断扫码 popover）。
+     * <p>
+     * 扫码成功后风鸟页面会自动跳转（URL 变化）或二维码 popover 消失，
+     * 此时登录入口 {@code [class*=userinfo-auth-btn]} 重新出现意味着未登录态回退，
+     * 反之消失则视为已登录。判定依据（任一命中即视为已登录）：
+     * <ul>
+     *   <li>当前 URL 含登录成功关键字（dashboard/member/home/index 等）</li>
+     *   <li>页面 title 含登录后特征（如「企业查询平台」且登录入口不存在）</li>
+     *   <li>登录入口不存在于 DOM（已登录态站点会隐藏登录/注册按钮）</li>
+     * </ul>
+     */
+    private boolean isloggedInByCurrentPage() throws IOException, TimeoutException, InterruptedException {
+        try (ChromePage page = chromeBrowser.openPage(accountId)) {
+            // 不 navigate：复用当前页面状态，避免销毁扫码 popover
+            String url = page.url();
+            if (url != null) {
+                for (String kw : config.getLoginSuccessUrlKeywords()) {
+                    if (url.contains(kw)) {
+                        return true;
+                    }
+                }
+            }
+            // 登录入口不存在 = 已登录态（未登录态会显示登录/注册按钮）
+            return !page.exists(config.getLoginEntrySelector());
+        } finally {}
     }
 
     @Override
@@ -294,9 +357,86 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
             return search(type, keyword, page);
         }
         ensureContainer();
+        // 关键修复：带 filter 时 keyword 命中 0 条（如采集传地区名"河南省"当企业名搜），
+        // 自动换泛 keyword 重试——风鸟筛选是页面交互不是 URL 参数，泛 keyword + filter 驱动筛选检索。
+        // 泅词表：风鸟站点按企业名搜，泛词能命中全国企业，筛选点击后缩小到目标地区/行业。
+        java.util.List<String> fallbackKeywords = new java.util.ArrayList<>();
+        if (keyword != null && !keyword.isBlank()) fallbackKeywords.add(keyword);
+        fallbackKeywords.add("公司");
+        fallbackKeywords.add("有限公司");
+        for (String kw : fallbackKeywords) {
+            try {
+                RiskbirdSearchResult r = searchWithFilterRetry(type, kw, page, filter);
+                if (r != null && r.isSuccess() && r.getTotal() != null && r.getTotal() > 0) {
+                    return r;
+                }
+                // 命中 0 条或未命中：换下一个泸词重试（除非是登录拦截，那直接返回）
+                if (r != null && r.getError() != null && r.getError().contains("未登录")) {
+                    return r;
+                }
+                log.info("[RISKBIRD] keyword={} 命中 0 条，换泸词重试, type={}, page={}", kw, type, page);
+            } catch (Exception e) {
+                log.warn("[RISKBIRD] searchWithFilterRetry keyword={} 失败: {}", kw, e.getMessage());
+            }
+        }
+        return RiskbirdSearchResult.builder().keyword(keyword).success(false)
+                .error("带筛选搜索未命中结果（所有泸词都命中 0 条，需换 keyword 或筛选条件）")
+                .channel("dom").total(0).build();
+    }
+
+    private RiskbirdSearchResult searchWithFilterRetry(RiskbirdConfig.QueryType type, String keyword, int page,
+                                                       RiskbirdSearchFilter filter)
+            throws IOException, TimeoutException, InterruptedException {
         try (ChromePage pg = chromeBrowser.openPage(accountId)) {
-            pg.navigate(searchUrl(type, keyword, page));
+            String navUrl = searchUrl(type, keyword, page);
+            log.info("[RISKBIRD] search navigate: type={}, keyword={}, page={}, url={}", type, keyword, page, navUrl);
+            pg.navigate(navUrl);
+            // 关键兜底：prepareQrLogin 会清掉 Chrome profile cookie，采集复用同 profile 时
+            // 风鸟按未登录搜命中 0 条。开页后立即注入 DB cookie 恢复登录态。
+            injectCookiesIfNeeded(pg);
             pg.waitForLoadState(20);
+            // 等 SPA hydration + 登录态稳定：宿主采集可能并发触发扫码重登（清 cookie + 重登），
+            // 重登中 Chrome 的 userinfo-auth-btn 登录入口还在 → 此时跑筛选会命中失败。
+            // 显式等登录入口消失（确认已登录态稳定），最多等 30 秒，再跑筛选交互。
+            long loginStableDeadline = System.currentTimeMillis() + 30_000;
+            while (System.currentTimeMillis() < loginStableDeadline) {
+                if (!pg.exists(config.getLoginEntrySelector())) {
+                    break; // 登录入口消失 = 已登录态稳定
+                }
+                HumanDelay.sleep(1500, 2500);
+            }
+            // Nuxt SPA hydration 异步挂载筛选面板，waitForLoadState 只等网络空闲；
+            // headless Chrome（服务器无 X server）hydration 比 headed 慢得多，实测 6 秒不够
+            // filter-item-tag-item 渲染就绪 → 命中失败。显式等 8-12 秒让 hydration 完成，
+            // 再等 filter-item-tag-item 出现，最后跑筛选交互。
+            HumanDelay.sleep(8000, 12000);
+            // 关键守门：先校验 navigate 命中条数 >0 才跑筛选。
+            // 命中 0 条时筛选 DOM 根本不渲染 → applyFilter 全找不到 → fetched=0（真根因）。
+            // 等待「总数」或「未命中提示」先到先得，最多等 searchTimeoutMs。
+            Integer preTotal = null;
+            long preDeadline = System.currentTimeMillis() + config.getSearchTimeoutMs();
+            while (System.currentTimeMillis() < preDeadline) {
+                String preBody = pg.evalString("(document.body.innerText || '').slice(0, 3000)");
+                if (preBody != null && preBody.contains(config.getLoginRequiredText())) {
+                    return RiskbirdSearchResult.builder().keyword(keyword).success(false)
+                            .error("未登录或查询次数已达上限，请先扫码登录").channel("dom").build();
+                }
+                preTotal = parseTotalCount(preBody);
+                if (preTotal != null) break; // 解析到 total（含 0）即定型
+                if (preBody != null && (preBody.contains("暂时没有找到") || preBody.contains("0 条相关"))) {
+                    preTotal = 0; break;
+                }
+                Thread.sleep(500);
+            }
+            if (preTotal == null || preTotal <= 0) {
+                return RiskbirdSearchResult.builder().keyword(keyword).success(false)
+                        .error("搜索 keyword 未命中任何企业（筛选无意义，需换 keyword）")
+                        .channel("dom").total(preTotal == null ? 0 : preTotal).build();
+            }
+            // 筛选面板（filter-item-tag-item）是 Nuxt SPA 异步 hydration 渲染，
+            // waitForLoadState 只等网络空闲，筛选选项可能尚未挂载 → applyFilter 命中失败。
+            // 显式等 filter-item-tag-item 出现在 DOM 再交互（超时 30 秒，headless 更慢）。
+            waitForExists(pg, ".filter-item-tag-item", 30_000);
             // 1. 页面点击筛选项（省份 → 地市 → 行业 → 状态）
             applyFilter(pg, filter);
             // 2. 轮询等待「总数」且结果项渲染完成（筛选后结果为 SPA 异步渲染，total 出现时卡片可能未就绪）
@@ -372,13 +512,26 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
         }
     }
 
-    /** 点击文本匹配的筛选项（精确匹配叶子节点，避免误点导航）。 */
+    /**
+     * 点击文本匹配的筛选项。
+     * <p>真实站点（2026-08-11 实测 DOM）：筛选项渲染在
+     * {@code <span class="filter-item-tag-item">河南 <span class="filter-item-tag-item-count">(10000+)</span></span>}
+     * ——省名是短词（"河南"非"河南省"，"内蒙"非"内蒙古自治区"），计数是子 span 不参与匹配。
+     * 本方法限定在 {@code filter-item-tag-item} 里取首个文本节点（排除计数子 span），用短词包含匹配。
+     */
     private boolean clickFilterItem(ChromePage pg, String text, String section)
             throws IOException, TimeoutException {
+        // 1. 限定在 filter-item-tag-item 里；2. 取该 span 的首个文本节点（排除计数子 span）；
+        // 3. 短词包含：传入"河南省"→匹配选项"河南"（站点用短词），传入"在营"→匹配"在营"。
         boolean ok = pg.evalBool("(() => { "
-                + "const els = Array.from(document.querySelectorAll('span,div,li,a')).filter(e => "
-                + "  (e.innerText||'').trim() === " + esc(text) + " && e.children.length === 0); "
-                + "if (els.length > 0) { els[0].click(); return true; } return false; })()");
+                + "const want = " + esc(text) + ".trim(); "
+                + "const items = Array.from(document.querySelectorAll('.filter-item-tag-item')); "
+                + "const found = items.find(it => { "
+                + "  const firstText = (it.firstChild && it.firstChild.nodeType === 3 ? it.firstChild.nodeValue : '').trim(); "
+                + "  if (!firstText) return false; "
+                + "  return firstText === want || firstText.includes(want) || want.includes(firstText); "
+                + "}); "
+                + "if (found) { found.click(); return true; } return false; })()");
         if (!ok) {
             log.warn("[RISKBIRD] 未找到筛选项: {}={}", section, text);
         } else {
@@ -624,6 +777,7 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
             net.enable(true); // 开启响应体捕获
             try (ChromePage pg = chromeBrowser.openPage(accountId)) {
                 pg.navigate(searchUrl(type, keyword, page));
+                injectCookiesIfNeeded(pg);
                 pg.waitForLoadState(20);
             }
             // 等异步 XHR 到达并捕获
@@ -849,6 +1003,117 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
     }
 
     // ==================== 内部：容器与登录态 ====================
+
+    /**
+     * 检测当前页面是否已登录态。
+     * <p>
+     * 复用 profile 的 Chrome 可能停在登录后页（{@code userinfo-auth-btn} 登录入口消失），
+     * 此时再调 {@link #prepareQrLogin()} 会因等不到登录入口而超时。
+     * <p>
+     * 判定依据（任一命中即视为已登录）：
+     * <ul>
+     *   <li>URL 含 {@link RiskbirdConfig#getLoginSuccessUrlKeywords() 登录成功关键字}之一</li>
+     *   <li>document.cookie 含非空 {@code riskbird} 或 {@code session} 类 token</li>
+     *   <li>页面上不存在登录入口选择器（已登录态会隐藏登录/注册按钮）</li>
+     * </ul>
+     */
+    private boolean isLoggedIn(ChromePage page) throws IOException, TimeoutException {
+        // 1. URL 关键字
+        String url = page.url();
+        if (url != null) {
+            for (String kw : config.getLoginSuccessUrlKeywords()) {
+                if (url.contains(kw)) {
+                    return true;
+                }
+            }
+        }
+        // 2. cookie 含登录 token（非空且非匿名 placeholder）
+        String cookie = page.evalString("document.cookie || ''");
+        if (cookie != null && !cookie.isBlank()) {
+            // 风鸟登录态 cookie 含 riskbird_token / session / token 等关键字
+            String lower = cookie.toLowerCase();
+            if (lower.contains("riskbird_token") || lower.contains("session")
+                    || (lower.contains("token") && !lower.contains("token="))) {
+                return true;
+            }
+        }
+        // 3. 登录入口不存在于 DOM（已登录态会隐藏登录/注册按钮）
+        try {
+            return !page.exists(config.getLoginEntrySelector());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * 兜底注入账号登录态 cookie（prepareQrLogin 清掉 Chrome profile cookie 后恢复登录态）。
+     * 通过 document.cookie 逐个写入 accountCookieHeader 解析出的键值对。
+     * 仅在 accountCookieHeader 非空时注入，避免空注入打断未登录态。
+     */
+    private void injectCookiesIfNeeded(ChromePage pg) throws IOException, TimeoutException {
+        if (accountCookieHeader == null || accountCookieHeader.isBlank()) {
+            return;
+        }
+        try {
+            StringBuilder js = new StringBuilder("(function(){var pairs=");
+            // 用 JSON.stringify 把 cookie header 转成 JS 字符串字面量，避免引号转义陷阱
+            js.append(pg.evalString("JSON.stringify('" + accountCookieHeader.replace("'", "\\'") + "')"));
+            js.append(".split(';');var ok=0;for(var i=0;i<pairs.length;i++){var p=pairs[i].trim();var idx=p.indexOf('=');if(idx>0){var n=p.substring(0,idx).trim();var v=p.substring(idx+1).trim();if(n){document.cookie=n+'='+v+';path=/;max-age=86400';ok++;}}}return 'injected='+ok;})()");
+            String result = pg.evalString(js.toString());
+            log.info("[RISKBIRD] injectCookiesIfNeeded: {}, accountId={}", result, accountId);
+        } catch (Exception e) {
+            log.warn("[RISKBIRD] injectCookiesIfNeeded 失败: {}, accountId={}", e.getMessage(), accountId);
+        }
+    }
+
+    /**
+     * 清除风鸟站点登录 cookie（让 Chrome 回到未登录态）。
+     * <p>
+     * 通过 {@code document.cookie} 逐个置过期删除。风鸟登录态靠 cookie（非 localStorage），
+     * 清 cookie 即可退出。清后需 {@code navigate} 重新加载页面让站点回到未登录首页。
+     */
+    private void clearRiskbirdCookies(ChromePage page) throws IOException, TimeoutException {
+        // 遍历 document.cookie 里的每个 cookie，逐个置过期（max-age=0）删除。
+        // 风鸟域是 www.riskbird.com，path=/，故 domain/path 固定。
+        // 用 ChromeNetwork 通道不可行（chrome devtools 协议清 cookie 需 Network.deleteCookies），
+        // 改用一行紧凑 JS（避免 Java 字符串拼接里的嵌套引号转义陷阱）。
+        String clearJs = "(function(){var d='.riskbird.com';var p='/';var c=document.cookie||'';"
+                + "var ps=c.split(';').map(function(s){return s.trim();});"
+                + "var n=0;for(var i=0;i<ps.length;i++){var k=ps[i].split('=')[0].trim();"
+                + "if(!k)continue;"
+                + "document.cookie=k+'=; expires=Thu, 01 Jan 1970 00:00:00 GMT; domain='+d+'; path='+p;"
+                + "document.cookie=k+'=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path='+p;"
+                + "n++;}"
+                + "return 'cleared='+n+', remaining='+(document.cookie||'').length;})()";
+        String result = page.evalString(clearJs);
+        log.info("[RISKBIRD] 清 cookie 结果: {}, accountId={}", result, accountId);
+    }
+
+    /**
+     * 轮询等待元素「存在于 DOM」（不要求可见）。
+     * <p>
+     * 风鸟登录入口 / 二维码 img 在 Element UI popover 内，popover 容器隐藏（0 尺寸），
+     * {@code offsetParent === null}；Nuxt SSR hydration 早期也会短暂出现这种情况。
+     * 故不能复用 {@code ChromePage#waitForSelector}（其语义是 {@code waitForVisible}），
+     * 否则会误判为「等待元素可见超时」。
+     *
+     * @param page      Chrome 页面句柄
+     * @param selector  CSS 选择器
+     * @param timeoutMs 超时（毫秒）
+     * @throws TimeoutException 超时仍未出现在 DOM
+     */
+    private void waitForExists(ChromePage page, String selector, long timeoutMs)
+            throws IOException, TimeoutException, InterruptedException {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (System.currentTimeMillis() < deadline) {
+            if (page.exists(selector)) {
+                return;
+            }
+            HumanDelay.sleep(150, 250);
+        }
+        // 超时不抛异常——降级让调用方继续尝试（applyFilter 仍可能命中已渲染但晚到的选项）
+        log.warn("[RISKBIRD] 等待元素存在超时（降级继续）: {} ({}ms)", selector, timeoutMs);
+    }
 
     /** 确保账号对应的 Chrome 容器就绪（容器生命周期由上层 ChromeBrowser/ChromeProfileManager 管理）。 */
     private void ensureContainer() {
