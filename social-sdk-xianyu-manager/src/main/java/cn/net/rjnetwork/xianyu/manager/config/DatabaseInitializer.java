@@ -790,6 +790,8 @@ public class DatabaseInitializer {
     private void ensureMarketColumns() {
         // market_snapshot 表补齐（继承 BaseEntity，旧库/当前 schema 可能缺 updated_at/deleted）
         ensureColumn("market_snapshot", "raw_data", "TEXT");
+        // 扩容 raw_data：MySQL TEXT 上限 65KB，改为 MEDIUMTEXT（16MB）避免大数据截断
+        tryExpandColumnType("market_snapshot", "raw_data", "MEDIUMTEXT");
         ensureColumn("market_snapshot", "total_results", "INTEGER DEFAULT 0");
         ensureColumn("market_snapshot", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
         ensureColumn("market_snapshot", "deleted", "INTEGER DEFAULT 0");
@@ -955,6 +957,24 @@ public class DatabaseInitializer {
             }
         } catch (Exception e) {
             logger.debug("ensureColumn {} on {}: {}", column, table, e.getMessage());
+        }
+    }
+
+    /**
+     * 扩容已有列的类型（仅对 MySQL 生效，其他数据库跳过）。
+     * 用于把 TEXT 升级到 MEDIUMTEXT，避免大数据截断。
+     */
+    private void tryExpandColumnType(String table, String column, String newType) {
+        try (java.sql.Connection conn = dataSource.getConnection()) {
+            if (!tableExists(conn, table) || !columnExists(conn, table, column)) return;
+            String dialect = dialect();
+            if (!"mysql".equals(dialect)) return;
+            try (java.sql.Statement st = conn.createStatement()) {
+                st.execute("ALTER TABLE " + table + " MODIFY COLUMN " + column + " " + newType);
+                logger.info("Expanded column {}.{}` to {}", table, column, newType);
+            }
+        } catch (Exception e) {
+            logger.debug("tryExpandColumnType {}.{}` to {}: {}", table, column, newType, e.getMessage());
         }
     }
 

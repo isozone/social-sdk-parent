@@ -169,7 +169,12 @@ public class MarketKeywordService {
             snapshot.setTaskId(null);  // 市场情报抓取不关联监控任务
             snapshot.setKeyword(keyword.getKeyword());
             snapshot.setAccountId(account.getId());
-            snapshot.setRawData(searchResult != null ? searchResult.toString() : "");
+            // 写入原始数据，截断到 1MB 防止 TEXT 字段溢出（MySQL TEXT 上限 65KB，MEDIUMTEXT 上限 16MB）
+            String rawJson = searchResult != null ? searchResult.toString() : "";
+            if (rawJson.length() > 1_000_000) {
+                rawJson = rawJson.substring(0, 1_000_000) + "...[truncated]";
+            }
+            snapshot.setRawData(rawJson);
             snapshot.setSnapshotTime(LocalDateTime.now());
             snapshot.setDeleted(0);
             snapshot.setCreatedAt(LocalDateTime.now());
