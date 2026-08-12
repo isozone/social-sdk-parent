@@ -355,82 +355,95 @@
         </div>
       </el-drawer>
 
-      <!-- VIP 解锁弹窗 -->
-      <el-dialog v-model="vipDialogVisible" title="解锁 I 社区 VIP" width="760px" class="vip-dialog">
-        <div class="vip-hero">
-          <div>
-            <h3>开通后获得唯一 I 社区身份</h3>
-            <p>支付成功后由 I 社区按真实支付渠道分配 ALIX / WXX 前缀账户，并解锁专业版能力。</p>
+      <!-- I 社区接入弹窗 -->
+      <el-dialog v-model="vipDialogVisible" title="I 社区接入" width="680px" class="vip-dialog">
+        <!-- 未接入：引导付费获取密钥 -->
+        <template v-if="vipHeader.configured === false">
+          <div class="vip-hero">
+            <div>
+              <h3>本部署尚未接入 I 社区</h3>
+              <p>在 I 社区按套餐付费获取接入密钥（app-id / secret），保存后自动生效，无需手动配置环境变量。</p>
+            </div>
+            <el-tag type="warning" size="large">未接入</el-tag>
           </div>
-          <el-tag type="warning" size="large">{{ vipHeader.state === 'pending_payment' ? '待支付' : '未解锁' }}</el-tag>
-        </div>
-        <div class="vip-benefits">
-          <div v-for="benefit in vipBenefits" :key="benefit" class="vip-benefit">✓ {{ benefit }}</div>
-        </div>
-        <el-divider content-position="left">步骤 1：绑定邮箱身份</el-divider>
+          <el-alert type="warning" :closable="false" class="vip-guide-alert">
+            <template #title>接入步骤</template>
+            <ol style="margin:0; padding-left:20px; line-height:1.9;">
+              <li>在 I 社区选择「客户端接入密钥」套餐（月付 / 年付）并完成付费；</li>
+              <li>付费后获取本部署专属的 <code>app-id</code> 与 <code>secret</code>；</li>
+              <li>将密钥填入下方表单并保存，后端自动持久化生效，无需修改环境变量；</li>
+              <li>绑定邮箱用于重装/换机时恢复密钥与 VIP 身份。</li>
+            </ol>
+          </el-alert>
+        </template>
+
+        <!-- 已接入：展示状态 -->
+        <template v-else>
+          <div class="vip-hero">
+            <div>
+              <h3>已接入 I 社区</h3>
+              <p>部署密钥有效，可正常使用 VIP 与社区全部功能。</p>
+            </div>
+            <el-tag :type="vipHeader.state === 'expired' ? 'warning' : 'success'" size="large">
+              {{ vipHeader.state === 'expired' ? '已到期' : '已接入' }}
+            </el-tag>
+          </div>
+          <el-descriptions :column="2" border class="vip-identity-alert">
+            <el-descriptions-item label="接入状态">
+              {{ vipHeader.state === 'active' ? '生效中' : (vipHeader.state === 'expired' ? '已到期' : (vipHeader.label || '-')) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="社区身份">{{ vipHeader.communityUid || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="VIP 等级">{{ vipHeader.vipLevel || 'pro' }}</el-descriptions-item>
+            <el-descriptions-item label="到期时间">{{ vipHeader.expiredAt || '-' }}</el-descriptions-item>
+          </el-descriptions>
+        </template>
+
+        <!-- 接入密钥配置（保存自动生效） -->
+        <el-divider content-position="left">接入密钥</el-divider>
+        <el-alert
+          class="vip-identity-alert"
+          :type="vipHeader.configured !== false ? 'success' : 'info'"
+          :closable="false"
+          :title="vipHeader.configured !== false ? `已配置密钥：${accessAppId}` : '填写在 I 社区付费获取的 app-id / secret，保存后自动生效'"
+        />
+        <el-form class="vip-email-form" inline>
+          <el-form-item label="App ID">
+            <el-input v-model="accessForm.appId" placeholder="如 social-sdk_dep_xxx" style="width:220px" />
+          </el-form-item>
+          <el-form-item label="Secret">
+            <el-input v-model="accessForm.secret" type="password" show-password placeholder="付费获取的 secret" style="width:250px" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" :loading="accessSaving" @click="saveAccessConfig">保存密钥</el-button>
+          </el-form-item>
+        </el-form>
+
+        <!-- 邮箱绑定（密钥恢复） -->
+        <el-divider content-position="left">绑定邮箱（密钥恢复）</el-divider>
         <el-alert
           class="vip-identity-alert"
           :type="vipIdentity.emailVerified ? 'success' : 'warning'"
           :closable="false"
-          :title="vipIdentity.emailVerified ? `已验证邮箱：${vipIdentity.email}` : '购买或恢复 VIP 前，请先绑定邮箱验证码。后续重装/换机器可用该邮箱恢复 VIP。'"
+          :title="vipIdentity.emailVerified ? `已验证邮箱：${vipIdentity.email}` : '绑定邮箱后，重装/换机可凭邮箱恢复接入密钥与 VIP 身份。'"
         />
         <el-form class="vip-email-form" inline>
           <el-form-item label="邮箱">
-            <el-input v-model="vipEmailForm.email" :disabled="vipIdentity.emailVerified" placeholder="user@example.com" style="width:260px" />
+            <el-input v-model="vipEmailForm.email" :disabled="vipIdentity.emailVerified" placeholder="user@example.com" style="width:220px" />
           </el-form-item>
           <el-form-item label="验证码">
-            <el-input v-model="vipEmailForm.code" :disabled="vipIdentity.emailVerified" maxlength="6" placeholder="6 位验证码" style="width:150px" />
+            <el-input v-model="vipEmailForm.code" :disabled="vipIdentity.emailVerified" maxlength="6" placeholder="6 位验证码" style="width:130px" />
           </el-form-item>
           <el-form-item>
             <el-button :disabled="vipIdentity.emailVerified || emailCooldown > 0" :loading="emailSending" @click="sendVipCode">
               {{ emailCooldown > 0 ? `${emailCooldown}s 后重发` : '发送验证码' }}
             </el-button>
-            <el-button type="primary" :disabled="vipIdentity.emailVerified" :loading="emailVerifying" @click="verifyVipCode">验证并继续</el-button>
+            <el-button type="primary" :disabled="vipIdentity.emailVerified" :loading="emailVerifying" @click="verifyVipCode">验证并绑定</el-button>
           </el-form-item>
         </el-form>
-        <el-divider content-position="left">步骤 2：选择套餐</el-divider>
-        <div class="vip-plans" :class="{ disabled: !vipIdentity.emailVerified }">
-          <div
-            v-for="plan in vipPlans"
-            :key="plan.id"
-            class="vip-plan"
-            :class="{ selected: selectedPlan?.id === plan.id }"
-            @click="selectedPlan = plan"
-          >
-            <div class="vip-plan-title">{{ plan.name }}</div>
-            <div class="vip-plan-price">¥{{ formatCents(plan.price_cents) }}</div>
-            <div class="vip-plan-tag">{{ plan.discount_tag || `${plan.duration_days || '-'} 天` }}</div>
-          </div>
-        </div>
-        <el-divider content-position="left">支付方式</el-divider>
-        <el-radio-group v-model="selectedChannel" class="vip-channels">
-          <el-radio-button v-for="ch in availableVipChannels" :key="ch.code" :label="ch.code">
-            {{ ch.name }} · {{ ch.uid_prefix }}
-          </el-radio-button>
-        </el-radio-group>
-        <el-alert
-          v-if="selectedPlan && availableVipChannels.length === 0"
-          type="warning"
-          :closable="false"
-          title="当前套餐没有配置可用支付方式，请到 I 社区套餐配置中启用支付渠道"
-        />
-        <div v-if="currentPayInfoObj" class="pay-info-box">
-          <div class="pay-info-title">扫码支付</div>
-          <div v-if="currentPayInfoObj.provider === 'alipay' || currentPayInfoObj.provider === 'wechat'" class="pay-qr-wrap">
-            <img v-if="currentPayQr" :src="currentPayQr" class="pay-qr" :alt="currentPayInfoObj.provider === 'alipay' ? '支付宝支付二维码' : '微信支付二维码'" />
-            <div class="pay-qr-provider">{{ currentPayInfoObj.provider === 'alipay' ? '请使用支付宝扫码支付' : '请使用微信扫码支付' }}</div>
-            <div class="pay-qr-hint">订单 10 分钟内有效，支付成功后将自动解锁 VIP。</div>
-            <div v-if="vipPayRemainSeconds > 0" class="pay-countdown">剩余 {{ formatPayRemain(vipPayRemainSeconds) }}</div>
-            <div v-else class="pay-expired">订单已超时，请重新创建订单</div>
-          </div>
-          <div v-else-if="currentPayInfoObj.mode === 'crypto_transfer'" class="pay-action-row">
-            <div>{{ currentPayInfoObj.message || '请按 U 支付信息完成转账。' }}</div>
-          </div>
-          <el-button v-if="currentLocalOrderNo" :loading="vipPolling" type="primary" @click="pollVipOrder(true)">刷新支付状态</el-button>
-        </div>
+
         <template #footer>
-          <el-button @click="vipDialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="vipLoading" @click="submitVipOrder">确认支付解锁</el-button>
+          <el-button @click="vipDialogVisible = false">关闭</el-button>
+          <el-button v-if="vipHeader.configured !== false" type="primary" @click="handleCommunityCommand('enter')">进入 I 社区</el-button>
         </template>
       </el-dialog>
 
@@ -617,8 +630,7 @@ import {
 } from '@element-plus/icons-vue'
 import * as notify from '@/api/notification'
 import { getChromeConfig, detectChrome, saveChromeConfig, downloadChrome, validateChromePath } from '@/api/chrome'
-import { getVipHeaderStatus, getVipConfig, createVipOrder, getVipOrder, getVipIdentity, sendVipEmailCode, verifyVipEmail } from '@/api/vip'
-import QRCode from 'qrcode'
+import { getVipHeaderStatus, getVipIdentity, sendVipEmailCode, verifyVipEmail, getAccessConfig, saveAccessConfig } from '@/api/vip'
 
 const route = useRoute()
 const router = useRouter()
@@ -715,32 +727,16 @@ function openDataBoard() { window.open('/data-board', '_blank') }
 // ===== VIP / I 社区 =====
 const vipHeader = ref({ state: 'locked', label: '解锁 VIP', vipLevel: 'free' })
 const vipDialogVisible = ref(false)
-const vipLoading = ref(false)
-const vipPolling = ref(false)
-const vipPlans = ref([])
-const vipChannels = ref([])
-const selectedPlan = ref(null)
-const selectedChannel = ref('wechat')
-const currentLocalOrderNo = ref('')
-const currentPayInfo = ref('')
-const currentPayInfoObj = ref(null)
-const currentPayQr = ref('')
-const vipPayRemainSeconds = ref(0)
-let vipPayTimer = null
-let vipPayPollTimer = null
 const vipIdentity = ref({ email: '', emailVerified: false, hasActiveVip: false })
 const vipEmailForm = ref({ email: '', code: '' })
 const emailSending = ref(false)
 const emailVerifying = ref(false)
 const emailCooldown = ref(0)
 let emailCooldownTimer = null
-const vipBenefits = [
-  '管理更多闲鱼账号，解锁多账号托管',
-  '使用 AI 自动回复、AI 客服和高级规则',
-  '创建批量运营任务，查看高级数据看板',
-  '获得带支付渠道前缀的唯一 I 社区 ID',
-  '进入 I 社区获取公告、教程、资源和工单支持'
-]
+// 接入密钥表单（B 端：付费后填写 app-id/secret，保存后自动生效）
+const accessForm = ref({ appId: '', secret: '' })
+const accessSaving = ref(false)
+const accessAppId = ref('')
 
 async function loadVipHeader() {
   try {
@@ -751,21 +747,8 @@ async function loadVipHeader() {
 
 async function openVipDialog() {
   vipDialogVisible.value = true
-  currentPayInfo.value = ''
-  currentPayInfoObj.value = null
-  currentPayQr.value = ''
+  await loadAccessConfig()
   await loadVipIdentity()
-  try {
-    const res = await getVipConfig()
-    if (res.success && res.data) {
-      vipPlans.value = (res.data.plans || []).filter(plan => plan.product_type === 'social_sdk_vip' && plan.app_code === 'social-sdk')
-      vipChannels.value = (res.data.channels || []).filter(ch => ch.enabled !== false)
-      selectedPlan.value = vipPlans.value[0] || null
-      selectedChannel.value = availableVipChannels.value[0]?.code || ''
-    }
-  } catch (e) {
-    ElMessage.error('加载 VIP 配置失败：' + (e.message || e))
-  }
 }
 
 function handleCommunityCommand(cmd) {
@@ -774,88 +757,40 @@ function handleCommunityCommand(cmd) {
   else router.push(`/app/community/${cmd}`)
 }
 
-const availableVipChannels = computed(() => {
-  if (!selectedPlan.value) return vipChannels.value
-  const raw = selectedPlan.value.channels || selectedPlan.value.Channels || ''
-  if (!raw) return vipChannels.value
-  const allowed = String(raw).split(',').map(v => v.trim()).filter(Boolean)
-  return vipChannels.value.filter(ch => allowed.includes(ch.code))
-})
-
-watch(selectedPlan, () => {
-  stopVipPayTimers()
-  currentPayInfo.value = ''
-  currentPayInfoObj.value = null
-  currentPayQr.value = ''
-  vipPayRemainSeconds.value = 0
-  const available = availableVipChannels.value
-  if (!available.some(ch => ch.code === selectedChannel.value)) {
-    selectedChannel.value = available[0]?.code || ''
-  }
-})
-
-watch(selectedChannel, async (newVal, oldVal) => {
-  if (!oldVal || newVal === oldVal) return
-  const hadPayment = !!currentPayInfoObj.value
-  stopVipPayTimers()
-  currentLocalOrderNo.value = ''
-  currentPayInfo.value = ''
-  currentPayInfoObj.value = null
-  currentPayQr.value = ''
-  vipPayRemainSeconds.value = 0
-  if (hadPayment && selectedPlan.value && vipIdentity.value.emailVerified) {
-    await submitVipOrder()
-  }
-})
-
-function formatCents(cents) {
-  const n = Number(cents || 0)
-  return (n / 100).toFixed(2)
+// ===== 接入密钥配置（保存自动生效） =====
+async function loadAccessConfig() {
+  try {
+    const res = await getAccessConfig()
+    if (res.success && res.data) {
+      accessAppId.value = res.data.appId || ''
+      accessForm.value.appId = res.data.appId || ''
+    }
+  } catch (e) {}
 }
 
-async function setPayInfo(payInfo) {
-  stopVipPayTimers()
-  currentPayInfoObj.value = payInfo || null
-  currentPayInfo.value = ''
-  currentPayQr.value = ''
-  vipPayRemainSeconds.value = Number(payInfo?.expires_in || 600)
-  const qrText = payInfo?.code_url || payInfo?.pay_url || payInfo?.h5_url || ''
-  if (qrText) {
-    currentPayQr.value = await QRCode.toDataURL(qrText, { width: 260, margin: 1 })
-  }
-  if (payInfo?.provider === 'alipay' || payInfo?.provider === 'wechat') {
-    startVipPayTimers()
+async function saveAccessConfig() {
+  const appId = (accessForm.value.appId || '').trim()
+  const secret = (accessForm.value.secret || '').trim()
+  if (!appId || !secret) { ElMessage.warning('请输入 App ID 和 Secret'); return }
+  accessSaving.value = true
+  try {
+    const res = await saveAccessConfig({ appId, secret })
+    if (res.success) {
+      accessAppId.value = appId
+      accessForm.value.secret = ''
+      ElMessage.success('接入密钥已保存并生效')
+      await loadVipHeader()
+    } else {
+      ElMessage.error(res.message || '保存失败')
+    }
+  } catch (e) {
+    ElMessage.error('保存接入密钥失败：' + (e.message || e))
+  } finally {
+    accessSaving.value = false
   }
 }
 
-function stopVipPayTimers() {
-  if (vipPayTimer) clearInterval(vipPayTimer)
-  if (vipPayPollTimer) clearInterval(vipPayPollTimer)
-  vipPayTimer = null
-  vipPayPollTimer = null
-}
-
-function startVipPayTimers() {
-  stopVipPayTimers()
-  vipPayTimer = setInterval(() => {
-    vipPayRemainSeconds.value = Math.max(0, vipPayRemainSeconds.value - 1)
-    if (vipPayRemainSeconds.value <= 0) stopVipPayTimers()
-  }, 1000)
-  vipPayPollTimer = setInterval(() => pollVipOrder(false), 3000)
-}
-
-function formatPayRemain(seconds) {
-  const s = Math.max(0, Number(seconds || 0))
-  const m = Math.floor(s / 60)
-  const r = s % 60
-  return `${m}:${String(r).padStart(2, '0')}`
-}
-
-function openPayUrl(url) {
-  if (!url) { ElMessage.warning('支付链接为空'); return }
-  window.open(url, '_blank')
-}
-
+// ===== 邮箱绑定（密钥恢复） =====
 async function loadVipIdentity() {
   try {
     const res = await getVipIdentity()
@@ -912,12 +847,8 @@ async function verifyVipCode() {
       vipIdentity.value = res.data
       vipEmailForm.value.email = res.data.email || email
       vipEmailForm.value.code = ''
-      ElMessage.success(res.data.hasActiveVip ? '邮箱验证成功，VIP 已恢复' : '邮箱验证成功，请继续选择套餐')
-      if (res.data.hasActiveVip) {
-        vipDialogVisible.value = false
-        await loadVipHeader()
-        router.push('/app/community/home')
-      }
+      ElMessage.success('邮箱验证成功，可用于恢复接入密钥')
+      await loadVipHeader()
     } else {
       ElMessage.error(res.message || '验证失败')
     }
@@ -925,54 +856,6 @@ async function verifyVipCode() {
     ElMessage.error('验证邮箱失败：' + (e.message || e))
   } finally {
     emailVerifying.value = false
-  }
-}
-
-async function submitVipOrder() {
-  if (!vipIdentity.value.emailVerified) { ElMessage.warning('请先绑定并验证邮箱'); return }
-  if (!selectedPlan.value) { ElMessage.warning('请选择套餐'); return }
-  vipLoading.value = true
-  try {
-    if (!selectedChannel.value) { ElMessage.warning('当前套餐没有可用支付方式'); return }
-    const res = await createVipOrder({ planId: selectedPlan.value.id, channel: selectedChannel.value })
-    if (res.success && res.data) {
-      currentLocalOrderNo.value = res.data.local_order_no
-      await setPayInfo(res.data.pay_info || res.data)
-      ElMessage.success('订单已创建，请按支付信息完成付款')
-    } else {
-      ElMessage.error(res.message || '创建订单失败')
-    }
-  } catch (e) {
-    ElMessage.error('创建订单失败：' + (e.message || e))
-  } finally {
-    vipLoading.value = false
-  }
-}
-
-async function pollVipOrder(manual = false) {
-  if (!currentLocalOrderNo.value || vipPolling.value) return
-  vipPolling.value = true
-  try {
-    const res = await getVipOrder(currentLocalOrderNo.value)
-    if (res.success && res.data) {
-      if (res.data.status === 'paid' && res.data.entitlement) {
-        stopVipPayTimers()
-        ElMessage.success('VIP 解锁成功，欢迎进入 I 社区')
-        vipDialogVisible.value = false
-        await loadVipHeader()
-        router.push('/app/community/home')
-      } else if (res.data.status === 'timeout' || res.data.status === 'cancelled' || res.data.status === 'failed') {
-        stopVipPayTimers()
-        vipPayRemainSeconds.value = 0
-        if (manual) ElMessage.warning('订单已超时，请重新创建订单')
-      } else if (manual) {
-        ElMessage.info('订单尚未完成，系统会自动轮询')
-      }
-    }
-  } catch (e) {
-    if (manual) ElMessage.error('刷新订单失败：' + (e.message || e))
-  } finally {
-    vipPolling.value = false
   }
 }
 

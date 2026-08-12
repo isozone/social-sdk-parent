@@ -11,6 +11,8 @@ public class SdkDeployment extends BaseEntity {
     private String deploymentId;
     private LocalDateTime installTime;
     private String serverUrl;
+    private String appId;
+    private String appSecret;
     private String boundEmail;
     private Boolean emailVerified;
     private LocalDateTime emailVerifiedAt;
@@ -79,5 +81,21 @@ public class SdkDeployment extends BaseEntity {
 
     public void setServerUrl(String serverUrl) {
         this.serverUrl = serverUrl;
+    }
+
+    public String getAppId() {
+        return appId;
+    }
+
+    public void setAppId(String appId) {
+        this.appId = appId;
+    }
+
+    public String getAppSecret() {
+        return appSecret;
+    }
+
+    public void setAppSecret(String appSecret) {
+        this.appSecret = appSecret;
     }
 }

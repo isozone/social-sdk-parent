@@ -76,6 +76,7 @@ public class VipService {
         VipSubscription subscription = getSubscription(localUserId);
         CommunityUserBinding binding = getBinding(localUserId);
         Map<String, Object> data = new LinkedHashMap<>();
+        data.put("configured", properties.isConfigured());
         if (subscription != null && "ACTIVE".equals(subscription.getStatus()) && subscription.getExpiredAt() != null && subscription.getExpiredAt().isAfter(LocalDateTime.now())) {
             data.put("state", "active");
             data.put("label", "I 社区");
@@ -194,6 +195,41 @@ public class VipService {
         } catch (Exception e) {
             throw new IllegalStateException("发送 I 社区邮箱验证码失败：" + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 查询当前部署的接入密钥配置（B 端：不返回 secret，避免回显泄露）。
+     */
+    public Map<String, Object> accessConfig(AdminUser user) {
+        SdkDeployment deployment = ensureDeployment();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("configured", properties.isConfigured());
+        data.put("appId", properties.getAppId() == null ? "" : properties.getAppId());
+        data.put("deploymentId", deployment.getDeploymentId());
+        return data;
+    }
+
+    /**
+     * 保存接入密钥（B 端：付费后填写 app-id/secret，落库持久化并动态生效，无需改环境变量重启）。
+     * 同时把内存配置更新，立即生效；重启后从 sdk_deployment 恢复。
+     */
+    @Transactional
+    public Map<String, Object> saveAccessConfig(AdminUser user, String appId, String secret) {
+        String normalizedAppId = appId == null ? "" : appId.trim();
+        String normalizedSecret = secret == null ? "" : secret.trim();
+        if (normalizedAppId.isEmpty() || normalizedSecret.isEmpty()) {
+            throw new IllegalArgumentException("app-id 和 secret 不能为空");
+        }
+        SdkDeployment deployment = ensureDeployment();
+        deployment.setAppId(normalizedAppId);
+        deployment.setAppSecret(normalizedSecret);
+        deployment.setUpdatedAt(LocalDateTime.now());
+        deploymentMapper.updateById(deployment);
+        // 动态生效：更新内存配置，isConfigured() 立即返回 true
+        properties.setAppId(normalizedAppId);
+        properties.setSecret(normalizedSecret);
+        log.info("[I-社区] 接入密钥已保存并动态生效: deploymentId={}", deployment.getDeploymentId());
+        return accessConfig(user);
     }
 
     @Transactional
@@ -574,6 +610,14 @@ public class VipService {
     private SdkDeployment ensureDeployment() {
         SdkDeployment existing = deploymentMapper.selectOne(new LambdaQueryWrapper<SdkDeployment>().last("LIMIT 1"));
         if (existing != null) {
+            // 启动/首次使用时从库恢复持久化的接入密钥（环境变量为空时生效）
+            if (!properties.isConfigured()
+                    && existing.getAppId() != null && !existing.getAppId().isBlank()
+                    && existing.getAppSecret() != null && !existing.getAppSecret().isBlank()) {
+                properties.setAppId(existing.getAppId());
+                properties.setSecret(existing.getAppSecret());
+                log.info("[I-社区] 已从持久化配置恢复接入密钥: deploymentId={}", existing.getDeploymentId());
+            }
             return existing;
         }
         SdkDeployment deployment = new SdkDeployment();
@@ -613,6 +657,9 @@ public class VipService {
     }
 
     private HttpRequest.Builder signedRequest(String method, String path, String body) throws Exception {
+        if (!properties.isConfigured()) {
+            throw new IllegalStateException("未配置 I 社区接入密钥，请按套餐付费获取后通过环境变量 XIANYU_COMMUNITY_APP_ID / XIANYU_COMMUNITY_SECRET 配置");
+        }
         String baseUrl = properties.getBaseUrl() == null ? "" : properties.getBaseUrl().replaceAll("/+$", "");
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
         String nonce = UUID.randomUUID().toString().replace("-", "");
@@ -631,6 +678,9 @@ public class VipService {
     }
 
     private HttpRequest.Builder signedCommunityRequest(String method, String path, String body, CommunityUserBinding binding) throws Exception {
+        if (!properties.isConfigured()) {
+            throw new IllegalStateException("未配置 I 社区接入密钥，请按套餐付费获取后通过环境变量 XIANYU_COMMUNITY_APP_ID / XIANYU_COMMUNITY_SECRET 配置");
+        }
         String baseUrl = properties.getBaseUrl() == null ? "" : properties.getBaseUrl().replaceAll("/+$", "");
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
         String nonce = UUID.randomUUID().toString().replace("-", "");
@@ -710,7 +760,7 @@ public class VipService {
         map.put("community_uid", binding.getCommunityUid());
         map.put("bind_id", binding.getBindId());
         map.put("bind_status", binding.getStatus());
-        map.put("bind_token", binding.getBindToken());
+        // bind_token 不下发前端：社区代理签名只在服务端内存使用，避免每部署绑定令牌暴露给浏览器
         map.put("is_new_user", isNew);
         return map;
     }
