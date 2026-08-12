@@ -34,9 +34,13 @@ public class RiskControlProtector {
 
     private static final Logger log = LoggerFactory.getLogger(RiskControlProtector.class);
 
-    /** 风控码识别正则 */
+    /** 风控码识别正则（含真实风控与服务器过载两类） */
     private static final Pattern RISK_PATTERN = Pattern.compile(
             "FAIL_SYS_USER_VALIDATE|RGV587_ERROR|punish|x5secdata", Pattern.CASE_INSENSITIVE);
+
+    /** 服务器过载特征：闲鱼"被挤爆啦"提示，不应触发风控冻结 */
+    private static final Pattern OVERLOAD_PATTERN = Pattern.compile(
+            "挤爆|过载|限流|server.busy|too.many.request|请稍后重试", Pattern.CASE_INSENSITIVE);
 
     private final AccountMapper accountMapper;
     private final CircuitBreakerService circuitBreaker;
@@ -51,14 +55,31 @@ public class RiskControlProtector {
     }
 
     /**
-     * 判断给定错误信息/响应是否为风控触发。
+     * 判断给定错误信息/响应是否为真实风控触发（排除服务器过载误判）。
+     *
+     * <p>闲鱼服务器过载时会返回 FAIL_SYS_USER_VALIDATE + RGV587_ERROR，
+     * 但消息体含"哎哟喂,被挤爆啦,请稍后重试"等过载提示，不应触发冻结。</p>
      *
      * @param raw 错误信息/响应文本
-     * @return true=风控触发
+     * @return true=真实风控触发；false=非风控或服务器过载
      */
     public boolean isRiskControlTriggered(String raw) {
         if (raw == null || raw.isBlank()) return false;
-        return RISK_PATTERN.matcher(raw).find();
+        if (!RISK_PATTERN.matcher(raw).find()) return false;
+        // 服务器过载特征优先排除，避免误冻结
+        if (OVERLOAD_PATTERN.matcher(raw).find()) {
+            log.info("[BOT-A6] 检测到服务器过载特征，跳过风控冻结: {}", truncate(raw, 100));
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * 判断是否为服务器过载（非风控），调用方可用于不同处理策略。
+     */
+    public boolean isServerOverload(String raw) {
+        if (raw == null || raw.isBlank()) return false;
+        return OVERLOAD_PATTERN.matcher(raw).find() && RISK_PATTERN.matcher(raw).find();
     }
 
     /**
@@ -115,8 +136,15 @@ public class RiskControlProtector {
 
     /**
      * 构建中文运营摘要（含 operator_action_required 提示）。
+     * 服务器过载时不添加人工操作提示。
      */
     private String buildOperatorSummary(String scene, String riskCode, String rawError) {
+        // 服务器过载：仅需记录日志，不标记为需要人工干预
+        if (isServerOverload(rawError)) {
+            String truncated = rawError != null && rawError.length() > 200
+                    ? rawError.substring(0, 200) : (rawError != null ? rawError : "");
+            return String.format("[server_overload] 场景=%s 原始=%s", scene, truncated);
+        }
         String action;
         if ("punish".equalsIgnoreCase(riskCode) || (rawError != null && rawError.contains("punish"))) {
             action = "需要人工完成滑块验证后恢复账号";
@@ -131,5 +159,11 @@ public class RiskControlProtector {
                 ? rawError.substring(0, 200) : (rawError != null ? rawError : "");
         return String.format("[operator_action_required] 场景=%s 风控码=%s 原始=%s 提示=%s",
                 scene, riskCode, truncated, action);
+    }
+
+    /** 截断字符串，避免日志过长 */
+    private static String truncate(String s, int maxLen) {
+        if (s == null) return "";
+        return s.length() > maxLen ? s.substring(0, maxLen) : s;
     }
 }

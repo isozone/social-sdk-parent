@@ -179,3 +179,9 @@ logging:
   level:
     cn.net.rjnetwork.xianyu.manager: DEBUG
     org.mybatis: DEBUG
+
+# ======================== 日志清理配置 ========================
+log-cleanup:
+  enabled: true                          # 是否启用定时清理
+  keep-days: 7                           # 保留最近 N 天的日志记录
+  cron: "0 0 3 * * ?"                    # 每天凌晨 3 点执行清理

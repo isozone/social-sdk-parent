@@ -3,7 +3,6 @@ package cn.net.rjnetwork.xianyu.manager.vip.service;
 import cn.net.rjnetwork.xianyu.manager.auth.model.AdminUser;
 import cn.net.rjnetwork.xianyu.manager.common.ApiResponse;
 import cn.net.rjnetwork.xianyu.manager.vip.config.NewApiCommunityProperties;
-import cn.net.rjnetwork.xianyu.manager.vip.dto.VipCreateOrderRequest;
 import cn.net.rjnetwork.xianyu.manager.vip.dto.VipEmailCodeRequest;
 import cn.net.rjnetwork.xianyu.manager.vip.mapper.CommunityUserBindingMapper;
 import cn.net.rjnetwork.xianyu.manager.vip.mapper.SdkDeploymentMapper;
@@ -17,12 +16,13 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -42,6 +42,8 @@ import java.util.UUID;
 
 @Service
 public class VipService {
+
+    private static final Logger log = LoggerFactory.getLogger(VipService.class);
 
     private static final Long DEFAULT_LOCAL_USER_ID = 1L;
     private static final ZoneId ZONE = ZoneId.systemDefault();
@@ -139,24 +141,6 @@ public class VipService {
         return status(user);
     }
 
-    public Map<String, Object> config(AdminUser user) {
-        ensureBinding(user);
-        try {
-            Map<String, Object> config = externalGet("/api/community/external/social-sdk/vip/config");
-            Object plans = config.get("plans");
-            if (plans instanceof List<?> planList) {
-                config.put("plans", planList.stream()
-                        .filter(item -> item instanceof Map<?, ?>)
-                        .map(item -> (Map<?, ?>) item)
-                        .filter(plan -> "social_sdk_vip".equals(stringValue(plan.get("product_type"))) && "social-sdk".equals(stringValue(plan.get("app_code"))))
-                        .toList());
-            }
-            return config;
-        } catch (Exception e) {
-            throw new IllegalStateException("无法从 I 社区拉取真实 VIP 套餐配置：" + e.getMessage(), e);
-        }
-    }
-
     @Transactional
     public Map<String, Object> bind(AdminUser user) {
         return ensureBinding(user);
@@ -252,6 +236,21 @@ public class VipService {
             throw new IllegalStateException("验证 I 社区邮箱失败：" + e.getMessage(), e);
         }
         upsertIdentityBinding(localUserId, deployment, result);
+        // 邮箱验证成功：若 I 社区返回了该部署已激活的接入密钥，则落库并动态生效（重装/换机恢复密钥）
+        String restoredAppId = stringValue(result.get("app_id"));
+        String restoredSecret = stringValue(result.get("app_secret"));
+        if (!restoredAppId.isBlank() && !restoredSecret.isBlank()) {
+            boolean changed = !restoredAppId.equals(deployment.getAppId()) || !restoredSecret.equals(deployment.getAppSecret());
+            deployment.setAppId(restoredAppId);
+            deployment.setAppSecret(restoredSecret);
+            deployment.setUpdatedAt(LocalDateTime.now());
+            deploymentMapper.updateById(deployment);
+            properties.setAppId(restoredAppId);
+            properties.setSecret(restoredSecret);
+            if (changed) {
+                log.info("[I-社区] 已通过邮箱恢复接入密钥: deploymentId={}", deployment.getDeploymentId());
+            }
+        }
         if (result.get("entitlement") instanceof Map<?, ?> entitlement) {
             CommunityUserBinding binding = getBinding(localUserId);
             VipOrder restoreOrder = new VipOrder();
@@ -263,79 +262,6 @@ public class VipService {
             upsertSubscription(user, restoreOrder, entitlement, stringValue(result.get("community_uid")));
         }
         return identity(user);
-    }
-
-    @Transactional
-    public Map<String, Object> createOrder(AdminUser user, VipCreateOrderRequest request) {
-        if (request == null || request.getPlanId() == null || request.getPlanId() <= 0 || request.getChannel() == null || request.getChannel().isBlank()) {
-            throw new IllegalArgumentException("套餐和支付渠道不能为空");
-        }
-        Long localUserId = localUserId(user);
-        String deploymentId = ensureDeployment().getDeploymentId();
-        Map<String, Object> bind = ensureBinding(user);
-        CommunityUserBinding binding = getBinding(localUserId);
-        if (binding == null || !Boolean.TRUE.equals(binding.getEmailVerified()) || normalizeEmail(binding.getEmail()).isBlank()) {
-            throw new IllegalStateException("请先绑定并验证邮箱，再购买 VIP");
-        }
-        Long communityUserId = asLong(bind.get("community_user_id"));
-        String localOrderNo = "SDKVIP" + System.currentTimeMillis() + randomCode(6);
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("community_user_id", communityUserId);
-        body.put("deployment_id", deploymentId);
-        body.put("verified_email", normalizeEmail(binding.getEmail()));
-        body.put("plan_id", request.getPlanId());
-        body.put("channel", normalizeChannel(request.getChannel()));
-        body.put("client_order_no", localOrderNo);
-        body.put("client_origin", "");
-        body.put("return_url", "");
-        Map<String, Object> result;
-        try {
-            result = externalPost("/api/community/external/social-sdk/vip/orders", body);
-        } catch (Exception e) {
-            throw new IllegalStateException("无法通过 I 社区创建真实 VIP 支付订单：" + e.getMessage(), e);
-        }
-        VipOrder order = new VipOrder();
-        order.setLocalUserId(localUserId);
-        order.setDeploymentId(deploymentId);
-        order.setCommunityUserId(communityUserId);
-        order.setLocalOrderNo(localOrderNo);
-        order.setNewApiOrderNo(stringValue(result.get("order_no")));
-        order.setPlanId(String.valueOf(request.getPlanId()));
-        order.setPayChannel(normalizeChannel(request.getChannel()));
-        order.setPayAmount(BigDecimal.valueOf(asLong(result.getOrDefault("pay_amount", 0L))).movePointLeft(2));
-        order.setCurrency("CNY");
-        order.setEmail(normalizeEmail(binding.getEmail()));
-        order.setIdentityVerified(true);
-        order.setStatus(stringValue(result.getOrDefault("status", "pending")));
-        order.setPayInfoJson(toJson(result.get("pay_info")));
-        orderMapper.insert(order);
-        Map<String, Object> response = new LinkedHashMap<>(result);
-        response.put("local_order_no", localOrderNo);
-        return response;
-    }
-
-    @Transactional
-    public Map<String, Object> orderDetail(AdminUser user, String localOrderNo) {
-        Long localUserId = localUserId(user);
-        VipOrder order = orderMapper.selectOne(new LambdaQueryWrapper<VipOrder>()
-                .eq(VipOrder::getLocalUserId, localUserId)
-                .eq(VipOrder::getLocalOrderNo, localOrderNo)
-                .last("LIMIT 1"));
-        if (order == null) {
-            throw new IllegalArgumentException("订单不存在");
-        }
-        Map<String, Object> result = new LinkedHashMap<>();
-        if (order.getNewApiOrderNo() != null && !order.getNewApiOrderNo().isBlank()) {
-            try {
-                result = externalGet("/api/community/external/social-sdk/vip/orders/" + order.getNewApiOrderNo());
-                syncPaidOrder(user, order, result);
-            } catch (Exception ignored) {
-                result.put("order_no", order.getNewApiOrderNo());
-                result.put("status", order.getStatus());
-            }
-        }
-        result.put("local_order_no", order.getLocalOrderNo());
-        return result;
     }
 
     public void assertAccountCreateAllowed(long currentAccountCount) {

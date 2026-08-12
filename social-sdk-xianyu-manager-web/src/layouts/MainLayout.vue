@@ -225,6 +225,10 @@
           <span class="menu-icon-box"><el-icon><Warning /></el-icon></span>
           <span>熔断器管理</span>
         </el-menu-item>
+        <el-menu-item index="/app/logs">
+          <span class="menu-icon-box"><el-icon><Delete /></el-icon></span>
+          <span>日志管理</span>
+        </el-menu-item>
 
         <el-menu-item-group title="系统">
           <el-menu-item index="/app/profile">
@@ -414,7 +418,7 @@
             <el-input v-model="accessForm.secret" type="password" show-password placeholder="付费获取的 secret" style="width:250px" />
           </el-form-item>
           <el-form-item>
-            <el-button type="primary" :loading="accessSaving" @click="saveAccessConfig">保存密钥</el-button>
+            <el-button type="primary" :loading="accessSaving" @click="submitAccessConfig">保存密钥</el-button>
           </el-form-item>
         </el-form>
 
@@ -768,7 +772,7 @@ async function loadAccessConfig() {
   } catch (e) {}
 }
 
-async function saveAccessConfig() {
+async function submitAccessConfig() {
   const appId = (accessForm.value.appId || '').trim()
   const secret = (accessForm.value.secret || '').trim()
   if (!appId || !secret) { ElMessage.warning('请输入 App ID 和 Secret'); return }
@@ -931,7 +935,6 @@ let pollTimer = null
 onMounted(() => { loadScenarios(); loadUnread(); loadVipHeader(); pollTimer = setInterval(() => { loadUnread(); loadVipHeader() }, 30000) })
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
-  stopVipPayTimers()
   if (emailCooldownTimer) clearInterval(emailCooldownTimer)
 })
 
