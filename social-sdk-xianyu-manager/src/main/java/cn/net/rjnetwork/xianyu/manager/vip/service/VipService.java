@@ -177,7 +177,7 @@ public class VipService {
         body.put("email", normalizeEmail(request.getEmail()));
         body.put("scene", defaultString(request.getScene(), "vip_bind"));
         try {
-            return externalPost("/api/community/external/social-sdk/email/send-code", body);
+            return externalPostPublic("/api/community/external/social-sdk/email/send-code", body);
         } catch (Exception e) {
             throw new IllegalStateException("发送 I 社区邮箱验证码失败：" + e.getMessage(), e);
         }
@@ -202,7 +202,7 @@ public class VipService {
     public Map<String, Object> accessPlans(AdminUser user) {
         SdkDeployment deployment = ensureDeployment();
         try {
-            return externalGet("/api/community/external/access/plans?app_code=" + SOCIAL_SDK_APP_CODE + "&deployment_id=" + urlEncode(deployment.getDeploymentId()));
+            return externalGetPublic("/api/community/external/access/plans?app_code=" + SOCIAL_SDK_APP_CODE + "&deployment_id=" + urlEncode(deployment.getDeploymentId()));
         } catch (Exception e) {
             throw new IllegalStateException("拉取接入密钥套餐失败：" + e.getMessage(), e);
         }
@@ -228,7 +228,7 @@ public class VipService {
         body.put("return_url", defaultString(returnUrl, ""));
         Map<String, Object> result;
         try {
-            result = externalPost("/api/community/external/access/apply", body);
+            result = externalPostPublic("/api/community/external/access/apply", body);
         } catch (Exception e) {
             throw new IllegalStateException("创建接入密钥订单失败：" + e.getMessage(), e);
         }
@@ -255,7 +255,7 @@ public class VipService {
         SdkDeployment deployment = ensureDeployment();
         Map<String, Object> result;
         try {
-            result = externalGet("/api/community/external/access/credential?app_code=" + SOCIAL_SDK_APP_CODE
+            result = externalGetPublic("/api/community/external/access/credential?app_code=" + SOCIAL_SDK_APP_CODE
                     + "&deployment_id=" + urlEncode(deployment.getDeploymentId()) + "&order_no=" + urlEncode(orderNo));
         } catch (Exception e) {
             throw new IllegalStateException("获取接入密钥失败：" + e.getMessage(), e);
@@ -305,9 +305,18 @@ public class VipService {
         body.put("domain", deployment.getServerUrl() == null ? "" : deployment.getServerUrl());
         Map<String, Object> result;
         try {
-            result = externalPost("/api/community/external/social-sdk/email/verify", body);
+            result = externalPostPublic("/api/community/external/social-sdk/email/verify", body);
         } catch (Exception e) {
             throw new IllegalStateException("验证 I 社区邮箱失败：" + e.getMessage(), e);
+        }
+        // 重装/换机恢复：new-api 按邮箱查到原部署并回传其 deployment_id，manager 须对齐，
+        // 否则后续部署级接口（entitlement 等）会因 deployment_id 不一致而查不到原激活状态。
+        String returnedDeploymentId = stringValue(result.get("deployment_id"));
+        if (!returnedDeploymentId.isBlank() && !returnedDeploymentId.equals(deployment.getDeploymentId())) {
+            deployment.setDeploymentId(returnedDeploymentId);
+            deployment.setUpdatedAt(LocalDateTime.now());
+            deploymentMapper.updateById(deployment);
+            log.info("[I-社区] 邮箱恢复已对齐原部署 deploymentId={}", returnedDeploymentId);
         }
         upsertIdentityBinding(localUserId, deployment, result);
         // 邮箱验证成功：若 I 社区返回了该部署已激活的接入密钥，则落库并动态生效（重装/换机恢复密钥）
@@ -636,6 +645,34 @@ public class VipService {
         String json = objectMapper.writeValueAsString(body);
         HttpRequest request = signedRequest("POST", path, json).POST(HttpRequest.BodyPublishers.ofString(json)).header("Content-Type", "application/json").build();
         return send(request);
+    }
+
+    // 接入密钥的 plans/apply/credential 在 new-api 侧是公开路由（无 HMAC 中间件）。
+    // 付款前 manager 尚未持有任何凭证，因此这些调用不走 signedRequest、也不要求 isConfigured()，
+    // 仅需 baseUrl 指向正确的 new-api 实例即可；即便带签名也会被 new-api 忽略。
+    private Map<String, Object> externalGetPublic(String path) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(requireBaseUrl() + path))
+                .timeout(Duration.ofSeconds(Math.max(1, properties.getRequestTimeoutSeconds())))
+                .GET().build();
+        return send(request);
+    }
+
+    private Map<String, Object> externalPostPublic(String path, Map<String, Object> body) throws Exception {
+        String json = objectMapper.writeValueAsString(body);
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(requireBaseUrl() + path))
+                .timeout(Duration.ofSeconds(Math.max(1, properties.getRequestTimeoutSeconds())))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(json)).build();
+        return send(request);
+    }
+
+    private String requireBaseUrl() {
+        if (properties.getBaseUrl() == null || properties.getBaseUrl().isBlank()) {
+            throw new IllegalStateException("未配置 I 社区地址（vip.community.base-url），请配置后重启");
+        }
+        return properties.getBaseUrl().replaceAll("/+$", "");
     }
 
     @SuppressWarnings("unchecked")

@@ -36,10 +36,11 @@ public class AccountHealthTask {
     public void checkAccountHealth() {
         List<XianyuAccount> accounts = accountMapper.selectList(
                 new LambdaQueryWrapper<XianyuAccount>()
-                        .in(XianyuAccount::getStatus, "ACTIVE", "OFFLINE")
+                        .in(XianyuAccount::getStatus, "ACTIVE", "OFFLINE", "FROZEN")
         );
 
         for (XianyuAccount account : accounts) {
+            String prevStatus = account.getStatus();
             String cookie = account.getCookieHeader();
             // 未配置 Cookie：账号无法连接，视为离线
             if (cookie == null || cookie.isBlank()) {
@@ -58,7 +59,10 @@ public class AccountHealthTask {
                 XianyuLoginApiService.LoginStatusResult r = loginApi.checkLoginStatus(cookie);
 
                 if (r != null && r.loggedIn) {
-                    // 健康：恢复在线
+                    // 健康：恢复在线（FROZEN 误冻自愈）
+                    if ("FROZEN".equals(prevStatus)) {
+                        logger.info("[HEALTH] 账号 {} 登录态仍有效，FROZEN 自愈为 ACTIVE（解除误冻）", account.getId());
+                    }
                     account.setStatus("ACTIVE");
                     account.setLastLoginAt(LocalDateTime.now());
                     account.setLastError(null);

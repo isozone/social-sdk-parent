@@ -3,10 +3,10 @@ package cn.net.rjnetwork.xianyu.manager.circuit;
 import cn.net.rjnetwork.xianyu.manager.account.mapper.AccountMapper;
 import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
 import cn.net.rjnetwork.xianyu.manager.circuit.service.RiskControlLogService;
+import cn.net.rjnetwork.xianyu.api.XianyuLoginApiService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.regex.Pattern;
@@ -87,35 +87,29 @@ public class RiskControlProtector {
      *
      * <p>幂等：账号已 FROZEN 时仅追加 risk_log，不重复暂停。</p>
      *
+     * <p>防误冻（核心加固，解决"登录不到半小时就被冻结"）：</p>
+     * <ol>
+     *   <li>服务器过载（"被挤爆啦/限流/请稍后重试"等）即便命中风控码也不冻结；</li>
+     *   <li>命中风控码后做<strong>二次登录态复核</strong>：cookie 未过期 或 真实接口仍登录
+     *       → 视为健康账号，不冻结。闲鱼 cookie 可长达数月，健康账号不应因瞬时风控挑战
+     *       （滑块/验证码/服务器抖动）被冻结，否则会误杀刚登录的账号。</li>
+     * </ol>
+     *
      * @param accountId  账号 ID
      * @param scene      触发场景（POLISH/CLOSE_NOTICE/MESSAGE_SYNC 等）
      * @param riskCode   风控码（FAIL_SYS_USER_VALIDATE/RGV587_ERROR/punish）
      * @param rawError   原始错误信息（含 punish URL 等关键诊断信息）
-     * @return true=已暂停账号；false=风控未触发或账号已暂停
+     * @return true=已暂停账号；false=风控未触发/过载/登录态仍有效/账号已暂停
      */
-    @Transactional
     public boolean handleRiskControl(Long accountId, String scene, String riskCode, String rawError) {
-        // 服务器过载时：即使 riskCode 命中风控模式，也不应冻结账号
-        // rawError 可能包含过载特征（如"挤爆啦"），此时应跳过冻结只记日志
-        if (isServerOverload(rawError)) {
+        // 1) 服务器过载：即便命中风控模式也不冻结，仅记日志 + 熔断记 failure（防误冻）
+        if (isServerOverload(rawError) || isServerOverload(riskCode)) {
             log.info("[BOT-A6] 服务器过载特征检测到，跳过风控冻结（仅记日志）: {}", truncate(rawError, 100));
-            // 仍写 risk_log 用于审计，但不冻结账号
-            try {
-                riskLogService.log(
-                        accountId,
-                        "RISK_CONTROL",
-                        scene,
-                        riskCode,
-                        buildOperatorSummary(scene, riskCode, rawError),
-                        3600,
-                        null
-                );
-            } catch (Exception e) {
-                log.warn("[BOT-A6] 写 risk_control_log 失败（非致命）: {}", e.getMessage());
-            }
+            writeRiskLog(accountId, scene, riskCode, rawError, "RISK_CONTROL");
             circuitBreaker.recordFailure(accountId, scene, rawError);
             return false;
         }
+        // 2) 非真实风控触发 → 不冻结
         if (!isRiskControlTriggered(rawError) && !isRiskControlTriggered(riskCode)) {
             return false;
         }
@@ -124,9 +118,15 @@ public class RiskControlProtector {
             log.warn("[BOT-A6] account {} 不存在，跳过风控处理", accountId);
             return false;
         }
-        // 中文运营摘要
+        // 3) 二次复核：登录态仍有效（cookie 未过期 或 真实接口仍登录）→ 不冻结，避免误杀健康账号
+        if (isLoginStillValid(acc)) {
+            log.warn("[BOT-A6] 账号 {} 命中风控码但登录态仍有效，疑似服务器抖动/过载误判，跳过冻结（仅记日志）", accountId);
+            writeRiskLog(accountId, scene, riskCode, rawError, "RISK_CONTROL_SKIP");
+            circuitBreaker.recordFailure(accountId, scene, rawError);
+            return false;
+        }
+        // 4) 确认需冻结：中文运营摘要
         String summary = buildOperatorSummary(scene, riskCode, rawError);
-        // 暂停账号（FROZEN），防死循环刷官方接口
         boolean wasActive = !"FROZEN".equals(acc.getStatus()) && !"DISABLED".equals(acc.getStatus());
         if (wasActive) {
             acc.setStatus("FROZEN");
@@ -136,23 +136,51 @@ public class RiskControlProtector {
             log.warn("[BOT-A6] 账号 {} 因风控触发暂停（FROZEN），scene={}, riskCode={}",
                     accountId, scene, riskCode);
         }
-        // 写 risk_control_log
+        writeRiskLog(accountId, scene, riskCode, summary, "RISK_CONTROL");
+        circuitBreaker.recordFailure(accountId, scene, summary);
+        return wasActive;
+    }
+
+    /** 写 risk_control_log（封装 try/catch，写失败非致命） */
+    private void writeRiskLog(Long accountId, String scene, String riskCode, String raw, String eventType) {
         try {
-            riskLogService.log(
-                    accountId,
-                    "RISK_CONTROL",
-                    scene,
-                    riskCode,
-                    summary,
-                    3600, // cooldownSeconds 默认冷却 1 小时
-                    null  // batchJobId 由调用方传
-            );
+            riskLogService.log(accountId, eventType, scene, riskCode,
+                    buildOperatorSummary(scene, riskCode, raw), 3600, null);
         } catch (Exception e) {
             log.warn("[BOT-A6] 写 risk_control_log 失败（非致命）: {}", e.getMessage());
         }
-        // 熔断器记 failure（让后续请求在冷却期内被拦截）
-        circuitBreaker.recordFailure(accountId, scene, summary);
-        return wasActive;
+    }
+
+    /**
+     * 二次复核：判断账号登录态是否仍有效。
+     * <ul>
+     *   <li>cookie 明确设置了有效期且未过期：闲鱼 cookie 可长达数月，视为健康；</li>
+     *   <li>否则用真实接口复核：仍登录 → 有效。复核异常按"未登录"处理（宁可冻结也不误放）。</li>
+     * </ul>
+     */
+    private boolean isLoginStillValid(XianyuAccount acc) {
+        // a) cookie 有效期快速判定（无需网络调用）
+        try {
+            if (acc.getCookieExpiresAt() != null
+                    && acc.getCookieExpiresAt().isAfter(LocalDateTime.now())) {
+                return true;
+            }
+        } catch (Exception ignored) {
+            // 读取异常不阻塞，继续走接口复核
+        }
+        // b) 真实接口复核登录态
+        String cookie = acc.getCookieHeader();
+        if (cookie == null || cookie.isBlank()) {
+            return false;
+        }
+        try {
+            XianyuLoginApiService.LoginStatusResult r =
+                    new XianyuLoginApiService(cookie).checkLoginStatus(cookie);
+            return r != null && r.loggedIn;
+        } catch (Exception e) {
+            log.warn("[BOT-A6] isLoginStillValid 复核异常，按未登录处理: {}", e.getMessage());
+            return false;
+        }
     }
 
     /**

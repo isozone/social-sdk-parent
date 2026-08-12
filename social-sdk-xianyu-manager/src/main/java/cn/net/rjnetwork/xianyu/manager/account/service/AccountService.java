@@ -66,6 +66,9 @@ public class AccountService {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    /** 登录 cookie 预估有效期（天）。闲鱼 cookie 可长达数月，此处取保守值用于"免冻结"快速判定。 */
+    private static final int COOKIE_VALID_DAYS = 90;
+
     /**
      * 与账号强关联、删除账号时必须级联清理的数据表（均含 account_id 列）。
      * 新功能若新增按 accountId 存储的实体，请同步补充到此处。
@@ -110,6 +113,7 @@ public class AccountService {
         account.setStatus("ACTIVE");
         account.setRemark(request.getRemark());
         account.setLastLoginAt(LocalDateTime.now());
+        account.setCookieExpiresAt(LocalDateTime.now().plusDays(COOKIE_VALID_DAYS));
         account.setCreatedAt(LocalDateTime.now());
         account.setUpdatedAt(LocalDateTime.now());
 
@@ -221,6 +225,7 @@ public class AccountService {
         account.setStatus("ACTIVE");
         account.setLastError(null);
         account.setLastLoginAt(LocalDateTime.now());
+        account.setCookieExpiresAt(LocalDateTime.now().plusDays(COOKIE_VALID_DAYS));
         account.setUpdatedAt(LocalDateTime.now());
 
         // 尝试拉取最新 profile（失败不阻断登录）
@@ -272,6 +277,7 @@ public class AccountService {
         account.setStatus("ACTIVE");
         account.setRemark(createReq != null ? createReq.getRemark() : null);
         account.setLastLoginAt(LocalDateTime.now());
+        account.setCookieExpiresAt(LocalDateTime.now().plusDays(COOKIE_VALID_DAYS));
         account.setCreatedAt(LocalDateTime.now());
         account.setUpdatedAt(LocalDateTime.now());
 
@@ -427,6 +433,7 @@ public class AccountService {
         if (request.getCookieHeader() != null && !request.getCookieHeader().isBlank()) {
             account.setCookieHeader(request.getCookieHeader());
             account.setLastLoginAt(LocalDateTime.now());
+            account.setCookieExpiresAt(LocalDateTime.now().plusDays(COOKIE_VALID_DAYS));
             if (account.getStatus() == null || "COOKIE_EXPIRED".equals(account.getStatus())) {
                 account.setStatus("ACTIVE");
             }
