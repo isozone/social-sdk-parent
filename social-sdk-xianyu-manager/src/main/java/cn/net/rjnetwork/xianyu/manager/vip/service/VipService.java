@@ -202,7 +202,7 @@ public class VipService {
     public Map<String, Object> accessPlans(AdminUser user) {
         SdkDeployment deployment = ensureDeployment();
         try {
-            return externalGet("/api/community/external/social-sdk/app-access/plans?app_code=" + SOCIAL_SDK_APP_CODE + "&deployment_id=" + urlEncode(deployment.getDeploymentId()));
+            return externalGet("/api/community/external/access/plans?app_code=" + SOCIAL_SDK_APP_CODE + "&deployment_id=" + urlEncode(deployment.getDeploymentId()));
         } catch (Exception e) {
             throw new IllegalStateException("拉取接入密钥套餐失败：" + e.getMessage(), e);
         }
@@ -228,7 +228,7 @@ public class VipService {
         body.put("return_url", defaultString(returnUrl, ""));
         Map<String, Object> result;
         try {
-            result = externalPost("/api/community/external/social-sdk/app-access/apply", body);
+            result = externalPost("/api/community/external/access/apply", body);
         } catch (Exception e) {
             throw new IllegalStateException("创建接入密钥订单失败：" + e.getMessage(), e);
         }
@@ -255,7 +255,7 @@ public class VipService {
         SdkDeployment deployment = ensureDeployment();
         Map<String, Object> result;
         try {
-            result = externalGet("/api/community/external/social-sdk/app-access/credential?app_code=" + SOCIAL_SDK_APP_CODE
+            result = externalGet("/api/community/external/access/credential?app_code=" + SOCIAL_SDK_APP_CODE
                     + "&deployment_id=" + urlEncode(deployment.getDeploymentId()) + "&order_no=" + urlEncode(orderNo));
         } catch (Exception e) {
             throw new IllegalStateException("获取接入密钥失败：" + e.getMessage(), e);
