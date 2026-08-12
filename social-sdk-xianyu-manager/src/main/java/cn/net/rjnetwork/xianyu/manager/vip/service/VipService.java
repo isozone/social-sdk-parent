@@ -47,6 +47,8 @@ public class VipService {
 
     private static final Long DEFAULT_LOCAL_USER_ID = 1L;
     private static final ZoneId ZONE = ZoneId.systemDefault();
+    // 与 new-api CommunityAppSocialSDK 保持一致：接入密钥(app_access)流程的客户端标识
+    private static final String SOCIAL_SDK_APP_CODE = "social-sdk";
 
     private final NewApiCommunityProperties properties;
     private final SdkDeploymentMapper deploymentMapper;
@@ -194,15 +196,88 @@ public class VipService {
     }
 
     /**
-     * 保存接入密钥（B 端：付费后填写 app-id/secret，落库持久化并动态生效，无需改环境变量重启）。
-     * 同时把内存配置更新，立即生效；重启后从 sdk_deployment 恢复。
+     * 拉取接入密钥套餐（app_access 类型，由 new-api 托管，公开无需密钥）。
+     * 与用户手填 app-id/secret 无关：套餐只是"付费获取部署专属密钥"的入口。
+     */
+    public Map<String, Object> accessPlans(AdminUser user) {
+        SdkDeployment deployment = ensureDeployment();
+        try {
+            return externalGet("/api/community/external/social-sdk/app-access/plans?app_code=" + SOCIAL_SDK_APP_CODE + "&deployment_id=" + urlEncode(deployment.getDeploymentId()));
+        } catch (Exception e) {
+            throw new IllegalStateException("拉取接入密钥套餐失败：" + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 创建接入密钥订单并发起支付（new-api 托管）。
+     * 同一部署若已激活则直接返回已激活密钥并落地，无需重复付费。
+     */
+    public Map<String, Object> accessApply(AdminUser user, Integer planId, String channel, String returnUrl) {
+        if (planId == null || planId <= 0) {
+            throw new IllegalArgumentException("请选择接入密钥套餐");
+        }
+        if (channel == null || channel.isBlank()) {
+            throw new IllegalArgumentException("请选择支付渠道");
+        }
+        SdkDeployment deployment = ensureDeployment();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("app_code", SOCIAL_SDK_APP_CODE);
+        body.put("deployment_id", deployment.getDeploymentId());
+        body.put("plan_id", planId);
+        body.put("channel", channel);
+        body.put("return_url", defaultString(returnUrl, ""));
+        Map<String, Object> result;
+        try {
+            result = externalPost("/api/community/external/social-sdk/app-access/apply", body);
+        } catch (Exception e) {
+            throw new IllegalStateException("创建接入密钥订单失败：" + e.getMessage(), e);
+        }
+        // 已激活（幂等）：直接落地密钥，无需走支付
+        if (Boolean.TRUE.equals(result.get("activated"))) {
+            String appId = stringValue(result.get("app_id"));
+            String secret = stringValue(result.get("app_secret"));
+            if (!appId.isBlank() && !secret.isBlank()) {
+                saveKeysToDeployment(appId, secret);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 凭订单号获取已付费生成的接入密钥（app_id/app_secret）。
+     * 仅当订单已支付、密钥已激活时返回；否则 new-api 报错"订单未支付"，前端据此继续轮询。
+     * 取到后落库并动态生效（等价于放环境变量，且重启可从 DB 恢复）。
+     */
+    public Map<String, Object> accessCredential(AdminUser user, String orderNo) {
+        if (orderNo == null || orderNo.isBlank()) {
+            throw new IllegalArgumentException("订单号不能为空");
+        }
+        SdkDeployment deployment = ensureDeployment();
+        Map<String, Object> result;
+        try {
+            result = externalGet("/api/community/external/social-sdk/app-access/credential?app_code=" + SOCIAL_SDK_APP_CODE
+                    + "&deployment_id=" + urlEncode(deployment.getDeploymentId()) + "&order_no=" + urlEncode(orderNo));
+        } catch (Exception e) {
+            throw new IllegalStateException("获取接入密钥失败：" + e.getMessage(), e);
+        }
+        String appId = stringValue(result.get("app_id"));
+        String secret = stringValue(result.get("app_secret"));
+        if (!appId.isBlank() && !secret.isBlank()) {
+            saveKeysToDeployment(appId, secret);
+        }
+        return accessConfig(user);
+    }
+
+    /**
+     * 落地接入密钥：写入 sdk_deployment（DB 持久化）+ 更新内存配置动态生效。
+     * 替代原先"让客户手填 app-id/secret"的反模式——密钥一律由 new-api 付费后生成并下发。
      */
     @Transactional
-    public Map<String, Object> saveAccessConfig(AdminUser user, String appId, String secret) {
+    public void saveKeysToDeployment(String appId, String secret) {
         String normalizedAppId = appId == null ? "" : appId.trim();
         String normalizedSecret = secret == null ? "" : secret.trim();
         if (normalizedAppId.isEmpty() || normalizedSecret.isEmpty()) {
-            throw new IllegalArgumentException("app-id 和 secret 不能为空");
+            throw new IllegalArgumentException("接入密钥不完整");
         }
         SdkDeployment deployment = ensureDeployment();
         deployment.setAppId(normalizedAppId);
@@ -212,8 +287,7 @@ public class VipService {
         // 动态生效：更新内存配置，isConfigured() 立即返回 true
         properties.setAppId(normalizedAppId);
         properties.setSecret(normalizedSecret);
-        log.info("[I-社区] 接入密钥已保存并动态生效: deploymentId={}", deployment.getDeploymentId());
-        return accessConfig(user);
+        log.info("[I-社区] 接入密钥已自动落地并动态生效: deploymentId={}", deployment.getDeploymentId());
     }
 
     @Transactional

@@ -402,25 +402,58 @@
           </el-descriptions>
         </template>
 
-        <!-- 接入密钥配置（保存自动生效） -->
+        <!-- 接入密钥（付费自动下发，无需手填 app-id/secret） -->
         <el-divider content-position="left">接入密钥</el-divider>
         <el-alert
           class="vip-identity-alert"
-          :type="vipHeader.configured !== false ? 'success' : 'info'"
+          :type="accessConfigured ? 'success' : 'info'"
           :closable="false"
-          :title="vipHeader.configured !== false ? `已配置密钥：${accessAppId}` : '填写在 I 社区付费获取的 app-id / secret，保存后自动生效'"
+          :title="accessConfigured ? `已配置密钥：${accessAppId}` : '选择套餐付费后，接入密钥由 I 社区自动下发并生效'"
         />
-        <el-form class="vip-email-form" inline>
-          <el-form-item label="App ID">
-            <el-input v-model="accessForm.appId" placeholder="如 social-sdk_dep_xxx" style="width:220px" />
-          </el-form-item>
-          <el-form-item label="Secret">
-            <el-input v-model="accessForm.secret" type="password" show-password placeholder="付费获取的 secret" style="width:250px" />
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" :loading="accessSaving" @click="submitAccessConfig">保存密钥</el-button>
-          </el-form-item>
-        </el-form>
+
+        <!-- 未配置：展示套餐并引导支付 -->
+        <template v-if="!accessConfigured">
+          <div v-loading="plansLoading" class="access-plans">
+            <el-card v-for="plan in accessPlans" :key="plan.id" shadow="hover" class="access-plan" :class="{ active: applyPlanId === plan.id }">
+              <div class="access-plan-name">{{ plan.name }}</div>
+              <div class="access-plan-price">¥{{ formatCents(plan.price_cents) }}</div>
+              <div class="access-plan-meta">有效期 {{ plan.duration_days || '-' }} 天</div>
+              <el-radio v-model="applyPlanId" :value="plan.id" class="access-plan-radio">选择</el-radio>
+            </el-card>
+          </div>
+          <el-form class="vip-email-form" inline v-if="accessPlans.length">
+            <el-form-item label="支付渠道">
+              <el-radio-group v-model="applyChannel">
+                <el-radio-button label="wechat">微信</el-radio-button>
+                <el-radio-button label="alipay">支付宝</el-radio-button>
+              </el-radio-group>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" :disabled="!applyPlanId" :loading="applyLoading" @click="submitAccessApply">创建订单并支付</el-button>
+            </el-form-item>
+          </el-form>
+          <el-empty v-if="!plansLoading && accessPlans.length === 0" description="暂无可用套餐，请联系管理员在 new-api 后台配置 app_access 套餐" />
+        </template>
+
+        <!-- 支付中：展示二维码并轮询取密钥 -->
+        <el-dialog
+          v-model="payVisible"
+          title="扫码支付接入密钥"
+          width="420px"
+          :close-on-click-modal="false"
+          append-to-body
+          @closed="stopAccessPoll"
+        >
+          <div class="access-pay">
+            <div v-if="payQr" class="access-pay-qr"><img :src="payQr" alt="pay qr" /></div>
+            <div v-else class="access-pay-hint">{{ payHint || '正在生成支付二维码…' }}</div>
+            <div class="access-pay-tip">支付成功后密钥将自动下发并生效，无需手动填写。</div>
+          </div>
+          <template #footer>
+            <el-button @click="payVisible = false">关闭</el-button>
+            <el-button type="primary" :loading="credentialLoading" @click="fetchAccessCredential">我已支付，获取密钥</el-button>
+          </template>
+        </el-dialog>
 
         <!-- 邮箱绑定（密钥恢复） -->
         <el-divider content-position="left">绑定邮箱（密钥恢复）</el-divider>
@@ -447,7 +480,7 @@
 
         <template #footer>
           <el-button @click="vipDialogVisible = false">关闭</el-button>
-          <el-button v-if="vipHeader.configured !== false" type="primary" @click="handleCommunityCommand('enter')">进入 I 社区</el-button>
+          <el-button v-if="accessConfigured" type="primary" @click="handleCommunityCommand('enter')">进入 I 社区</el-button>
         </template>
       </el-dialog>
 
@@ -634,7 +667,8 @@ import {
 } from '@element-plus/icons-vue'
 import * as notify from '@/api/notification'
 import { getChromeConfig, detectChrome, saveChromeConfig, downloadChrome, validateChromePath } from '@/api/chrome'
-import { getVipHeaderStatus, getVipIdentity, sendVipEmailCode, verifyVipEmail, getAccessConfig, saveAccessConfig } from '@/api/vip'
+import { getVipHeaderStatus, getVipIdentity, sendVipEmailCode, verifyVipEmail, getAccessConfig, getAccessPlans, applyAccessPlan, getAccessCredential } from '@/api/vip'
+import QRCode from 'qrcode'
 
 const route = useRoute()
 const router = useRouter()
@@ -737,10 +771,20 @@ const emailSending = ref(false)
 const emailVerifying = ref(false)
 const emailCooldown = ref(0)
 let emailCooldownTimer = null
-// 接入密钥表单（B 端：付费后填写 app-id/secret，保存后自动生效）
-const accessForm = ref({ appId: '', secret: '' })
-const accessSaving = ref(false)
+// 接入密钥：付费后由 I 社区自动下发，不再手填 app-id/secret
 const accessAppId = ref('')
+const accessConfigured = ref(false)
+const accessPlans = ref([])
+const plansLoading = ref(false)
+const applyPlanId = ref(null)
+const applyChannel = ref('wechat')
+const applyLoading = ref(false)
+const payVisible = ref(false)
+const payQr = ref('')
+const payHint = ref('')
+const payOrderNo = ref('')
+const credentialLoading = ref(false)
+let accessPollTimer = null
 
 async function loadVipHeader() {
   try {
@@ -752,6 +796,7 @@ async function loadVipHeader() {
 async function openVipDialog() {
   vipDialogVisible.value = true
   await loadAccessConfig()
+  if (!accessConfigured.value) await loadAccessPlans()
   await loadVipIdentity()
 }
 
@@ -761,36 +806,102 @@ function handleCommunityCommand(cmd) {
   else router.push(`/app/community/${cmd}`)
 }
 
-// ===== 接入密钥配置（保存自动生效） =====
+// ===== 接入密钥配置（只读展示；密钥由 new-api 付费后自动下发并落地） =====
 async function loadAccessConfig() {
   try {
     const res = await getAccessConfig()
     if (res.success && res.data) {
       accessAppId.value = res.data.appId || ''
-      accessForm.value.appId = res.data.appId || ''
+      accessConfigured.value = res.data.configured === true
     }
   } catch (e) {}
 }
 
-async function submitAccessConfig() {
-  const appId = (accessForm.value.appId || '').trim()
-  const secret = (accessForm.value.secret || '').trim()
-  if (!appId || !secret) { ElMessage.warning('请输入 App ID 和 Secret'); return }
-  accessSaving.value = true
+function formatCents(cents) {
+  return (Number(cents || 0) / 100).toFixed(2)
+}
+
+// 拉取 app_access 套餐（new-api 托管）
+async function loadAccessPlans() {
+  plansLoading.value = true
   try {
-    const res = await saveAccessConfig({ appId, secret })
-    if (res.success) {
-      accessAppId.value = appId
-      accessForm.value.secret = ''
-      ElMessage.success('接入密钥已保存并生效')
-      await loadVipHeader()
+    const res = await getAccessPlans()
+    if (res.success && res.data) {
+      accessPlans.value = res.data.plans || []
     } else {
-      ElMessage.error(res.message || '保存失败')
+      accessPlans.value = []
     }
   } catch (e) {
-    ElMessage.error('保存接入密钥失败：' + (e.message || e))
+    accessPlans.value = []
   } finally {
-    accessSaving.value = false
+    plansLoading.value = false
+  }
+}
+
+// 创建接入密钥订单并发起支付
+async function submitAccessApply() {
+  if (!applyPlanId.value) { ElMessage.warning('请选择套餐'); return }
+  applyLoading.value = true
+  try {
+    const res = await applyAccessPlan({ planId: applyPlanId.value, channel: applyChannel.value })
+    if (res.success && res.data) {
+      // 已激活（幂等）：密钥已落地，无需支付
+      if (res.data.activated) {
+        ElMessage.success('接入密钥已生效')
+        await loadAccessConfig()
+        await loadVipHeader()
+        return
+      }
+      payOrderNo.value = res.data.order_no || ''
+      const info = res.data.pay_info || {}
+      const qrText = info.code_url || info.pay_url || info.h5_url || ''
+      payHint.value = info.message || ''
+      if (qrText) {
+        try { payQr.value = await QRCode.toDataURL(qrText, { width: 240, margin: 1 }) } catch (e) { payQr.value = '' }
+      } else {
+        payQr.value = ''
+      }
+      payVisible.value = true
+      startAccessPoll()
+    } else {
+      ElMessage.error(res.message || '创建订单失败')
+    }
+  } catch (e) {
+    ElMessage.error('创建接入密钥订单失败：' + (e.message || e))
+  } finally {
+    applyLoading.value = false
+  }
+}
+
+function startAccessPoll() {
+  stopAccessPoll()
+  accessPollTimer = setInterval(() => { fetchAccessCredential(true) }, 4000)
+}
+function stopAccessPoll() {
+  if (accessPollTimer) { clearInterval(accessPollTimer); accessPollTimer = null }
+}
+
+// 凭订单号取密钥：后端校验已支付后落地并动态生效；未支付时静默继续轮询
+async function fetchAccessCredential(silent = false) {
+  if (!payOrderNo.value) return
+  credentialLoading.value = true
+  try {
+    const res = await getAccessCredential(payOrderNo.value)
+    if (res.success) {
+      stopAccessPoll()
+      payVisible.value = false
+      payQr.value = ''
+      accessConfigured.value = true
+      ElMessage.success('接入密钥已获取并生效')
+      await loadAccessConfig()
+      await loadVipHeader()
+    } else if (!silent) {
+      ElMessage.warning(res.message || '尚未支付，请完成支付后重试')
+    }
+  } catch (e) {
+    if (!silent) ElMessage.error('获取接入密钥失败：' + (e.message || e))
+  } finally {
+    credentialLoading.value = false
   }
 }
 
@@ -936,6 +1047,7 @@ onMounted(() => { loadScenarios(); loadUnread(); loadVipHeader(); pollTimer = se
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
   if (emailCooldownTimer) clearInterval(emailCooldownTimer)
+  if (accessPollTimer) clearInterval(accessPollTimer)
 })
 
 // ===== 浏览器配置 =====
@@ -1161,6 +1273,23 @@ async function handleBrowserReset() {
   .vip-email-form { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
   .vip-email-form .el-form-item { margin-bottom: 0; }
 }
+
+/* 接入密钥套餐 + 支付 */
+.access-plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+.access-plan {
+  position: relative; text-align: center; cursor: pointer;
+  border: 1px solid var(--border-color, #e5e7eb); transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.access-plan.active { border-color: var(--brand, #4f46e5); box-shadow: 0 0 0 2px rgba(79,70,229,0.15); }
+.access-plan-name { font-weight: 600; color: var(--text-1); }
+.access-plan-price { font-size: 20px; font-weight: 700; color: #ef4444; margin: 6px 0 2px; }
+.access-plan-meta { color: var(--text-3); font-size: 12px; }
+.access-plan-radio { margin-top: 8px; }
+.access-pay { text-align: center; }
+.access-pay-qr { display: flex; justify-content: center; }
+.access-pay-qr img { width: 240px; height: 240px; }
+.access-pay-hint { color: var(--text-2); padding: 24px 0; }
+.access-pay-tip { color: var(--text-3); font-size: 12px; margin-top: 12px; }
 
 /* 用户头像下拉 */
 .user-info {

@@ -95,6 +95,27 @@ public class RiskControlProtector {
      */
     @Transactional
     public boolean handleRiskControl(Long accountId, String scene, String riskCode, String rawError) {
+        // 服务器过载时：即使 riskCode 命中风控模式，也不应冻结账号
+        // rawError 可能包含过载特征（如"挤爆啦"），此时应跳过冻结只记日志
+        if (isServerOverload(rawError)) {
+            log.info("[BOT-A6] 服务器过载特征检测到，跳过风控冻结（仅记日志）: {}", truncate(rawError, 100));
+            // 仍写 risk_log 用于审计，但不冻结账号
+            try {
+                riskLogService.log(
+                        accountId,
+                        "RISK_CONTROL",
+                        scene,
+                        riskCode,
+                        buildOperatorSummary(scene, riskCode, rawError),
+                        3600,
+                        null
+                );
+            } catch (Exception e) {
+                log.warn("[BOT-A6] 写 risk_control_log 失败（非致命）: {}", e.getMessage());
+            }
+            circuitBreaker.recordFailure(accountId, scene, rawError);
+            return false;
+        }
         if (!isRiskControlTriggered(rawError) && !isRiskControlTriggered(riskCode)) {
             return false;
         }

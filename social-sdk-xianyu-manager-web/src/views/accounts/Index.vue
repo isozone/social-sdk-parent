@@ -47,7 +47,7 @@
             <el-button size="small" type="primary" text @click="viewDetail(row)">详情</el-button>
             <el-button size="small" type="warning" text @click="editAccount(row)">编辑</el-button>
             <el-button
-              v-if="['COOKIE_EXPIRED','OFFLINE'].includes(row.status)"
+              v-if="['COOKIE_EXPIRED','OFFLINE','FROZEN'].includes(row.status)"
               size="small" type="danger" text
               @click="reloginAccount(row)"
             >重新登录</el-button>
