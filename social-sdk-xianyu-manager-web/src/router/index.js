@@ -195,6 +195,12 @@ const routes = [
         meta: { title: '熔断器管理' }
       },
       {
+        path: 'logs',
+        name: 'LogCleanup',
+        component: () => import('@/views/logs/Index.vue'),
+        meta: { title: '日志管理' }
+      },
+      {
         path: 'profile',
         name: 'Profile',
         component: () => import('@/views/profile/Index.vue'),
