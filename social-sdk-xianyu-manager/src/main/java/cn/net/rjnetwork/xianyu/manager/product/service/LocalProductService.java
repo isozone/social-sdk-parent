@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 
 /**
  * 本地商品服务：自建商品（未上架闲鱼的草稿/待发布池）。
- * 发布成功后按业务要求物理删除本地记录。
+ * 发布成功后保留本地记录并标记 PUBLISHED，不物理删除。
  */
 @Service
 public class LocalProductService {
@@ -44,6 +44,8 @@ public class LocalProductService {
     private static final String STATUS_PENDING = "PENDING";
     private static final String STATUS_PUBLISHING = "PUBLISHING";
     private static final String STATUS_FAILED = "FAILED";
+    /** 已发布：发布成功后本地记录保留，不物理删除 */
+    private static final String STATUS_PUBLISHED = "PUBLISHED";
 
     private final LocalProductMapper localProductMapper;
     private final ProductService productService;
@@ -116,7 +118,7 @@ public class LocalProductService {
     }
 
     /**
-     * 单条发布：立即真调闲鱼 publishItem，成功后删除本地记录。
+     * 单条发布：立即真调闲鱼 publishItem，成功后保留本地记录并标记 PUBLISHED。
      */
     @Transactional
     public LocalProduct publishOne(Long id) {
@@ -126,7 +128,7 @@ public class LocalProductService {
     }
 
     /**
-     * 批量发布：并发调闲鱼发布。成功的从本地表物理删除；失败的保留并写入 publishError。
+     * 批量发布：并发调闲鱼发布。成功的保留本地记录并标记 PUBLISHED；失败的保留并写入 publishError。
      */
     public BatchPublishResult batchPublish(LocalProductBatchPublishRequest req) {
         List<LocalProduct> items;
@@ -280,7 +282,7 @@ public class LocalProductService {
     }
 
     /**
-     * 真正发布：走 ProductService.create 的发布链路，成功后删除本地记录。
+     * 真正发布：走 ProductService.create 的发布链路，成功后保留本地记录并标记 PUBLISHED。
      * 虚拟商品发布成功后自动建卡密池/账号池（库存联动）。
      */
     private synchronized LocalProduct doPublish(LocalProduct item) {
@@ -332,9 +334,12 @@ public class LocalProductService {
                     published.getId(), item.getDeliverType(), imported);
         }
 
-        // 全部成功 → 物理删除本地记录
-        localProductMapper.deleteById(item.getId());
-        log.info("[LOCAL-PUBLISH] 发布成功并清理本地商品: id={}", item.getId());
+        // 全部成功 → 保留本地记录并标记已发布（不再物理删除）
+        item.setStatus(STATUS_PUBLISHED);
+        item.setPublishError(null);
+        item.setUpdatedAt(LocalDateTime.now());
+        localProductMapper.updateById(item);
+        log.info("[LOCAL-PUBLISH] 发布成功，本地记录保留: id={}", item.getId());
         return item;
     }
 

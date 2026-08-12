@@ -86,7 +86,11 @@
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const goLogin = () => router.push('/login')
+// 已登录直接进控制台，未登录才去登录页（避免已登录用户被强制重新登录）
+const goLogin = () => {
+  if (localStorage.getItem('token')) router.push('/app/dashboard')
+  else router.push('/login')
+}
 
 /* ==================== Feature Icons ==================== */
 const featureIcons = {

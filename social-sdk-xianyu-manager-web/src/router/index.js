@@ -253,7 +253,10 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
-  if (to.meta.requiresAuth && !token) {
+  if (to.path === '/login' && token) {
+    // 已登录访问登录页 → 直接进控制台，避免重复登录
+    next('/app/dashboard')
+  } else if (to.meta.requiresAuth && !token) {
     next('/login')
   } else {
     next()

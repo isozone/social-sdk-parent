@@ -967,7 +967,7 @@ CREATE INDEX idx_circuit_event_breaker ON circuit_breaker_event(breaker_id);
 CREATE INDEX idx_circuit_event_time ON circuit_breaker_event(created_at);
 
 
--- ===== local_product：本地商品草稿（与 SQLite 对齐） =====
+-- ===== local_product：本地商品草稿（发布成功后保留记录，标记 PUBLISHED，不物理删除） =====
 CREATE TABLE IF NOT EXISTS local_product (
     id          SERIAL PRIMARY KEY,
     account_id  INTEGER,
