@@ -18,6 +18,7 @@ public class SdkDeployment extends BaseEntity {
     private LocalDateTime emailVerifiedAt;
     private String communityUid;
     private LocalDateTime lastIdentitySyncAt;
+    private Long accessExpiredAt; // 部署接入密钥有效期（Unix 秒，0=未设置/永久）；new-api 按套餐 duration_days 下发
 
     public String getDeploymentId() {
         return deploymentId;
@@ -97,5 +98,13 @@ public class SdkDeployment extends BaseEntity {
 
     public void setAppSecret(String appSecret) {
         this.appSecret = appSecret;
+    }
+
+    public Long getAccessExpiredAt() {
+        return accessExpiredAt;
+    }
+
+    public void setAccessExpiredAt(Long accessExpiredAt) {
+        this.accessExpiredAt = accessExpiredAt;
     }
 }

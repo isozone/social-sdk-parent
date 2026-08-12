@@ -18,6 +18,8 @@ public class NewApiCommunityProperties {
     private String secret = "";
     private int connectTimeoutSeconds = 5;
     private int requestTimeoutSeconds = 15;
+    // 部署接入密钥有效期（Unix 秒，0=未设置/永久）。由 new-api 按套餐 duration_days 下发，用于前端判断“已过期”。
+    private long accessExpiredAt = 0;
 
     /**
      * 接入密钥未配置时给出醒目提示，社区/VIP 功能自动降级不可用。
@@ -76,5 +78,13 @@ public class NewApiCommunityProperties {
 
     public void setRequestTimeoutSeconds(int requestTimeoutSeconds) {
         this.requestTimeoutSeconds = requestTimeoutSeconds;
+    }
+
+    public long getAccessExpiredAt() {
+        return accessExpiredAt;
+    }
+
+    public void setAccessExpiredAt(long accessExpiredAt) {
+        this.accessExpiredAt = accessExpiredAt;
     }
 }

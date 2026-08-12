@@ -666,7 +666,7 @@ public class DatabaseInitializer {
             st.execute("CREATE TABLE IF NOT EXISTS sdk_deployment ("
                     + "id " + idPk + ", deployment_id VARCHAR(128) NOT NULL UNIQUE, install_time " + timeDdl + ", server_url VARCHAR(512), "
                     + "app_id VARCHAR(128), app_secret VARCHAR(512), "
-                    + "bound_email VARCHAR(191), email_verified " + boolDdl + " DEFAULT FALSE, email_verified_at " + timeDdl + ", community_uid VARCHAR(64), last_identity_sync_at " + timeDdl + ", "
+                    + "bound_email VARCHAR(191), email_verified " + boolDdl + " DEFAULT FALSE, email_verified_at " + timeDdl + ", community_uid VARCHAR(64), last_identity_sync_at " + timeDdl + ", access_expired_at BIGINT DEFAULT 0, "
                     + "created_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, updated_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, deleted INTEGER DEFAULT 0)");
             st.execute("CREATE TABLE IF NOT EXISTS community_user_binding ("
                     + "id " + idPk + ", local_user_id BIGINT NOT NULL, deployment_id VARCHAR(128) NOT NULL, community_user_id BIGINT, community_uid VARCHAR(64), "
@@ -697,6 +697,7 @@ public class DatabaseInitializer {
         ensureColumn("sdk_deployment", "email_verified_at", timeDdl);
         ensureColumn("sdk_deployment", "community_uid", "VARCHAR(64)");
         ensureColumn("sdk_deployment", "last_identity_sync_at", timeDdl);
+        ensureColumn("sdk_deployment", "access_expired_at", "BIGINT DEFAULT 0");
         ensureColumn("sdk_deployment", "app_id", "VARCHAR(128)");
         ensureColumn("sdk_deployment", "app_secret", "VARCHAR(512)");
         ensureColumn("community_user_binding", "email", "VARCHAR(191)");

@@ -90,6 +90,17 @@ public class VipService {
             data.put("daysLeft", Math.max(0, Duration.between(LocalDateTime.now(), subscription.getExpiredAt()).toDays()));
             return data;
         }
+        // 接入密钥已落地（已付费 / 已通过邮箱恢复）即视为 I 社区已接通并解锁，
+        // 避免“已配置密钥但无 VIP 订阅记录”的部署在头部被误标为“已到期”。
+        if (properties.isConfigured()) {
+            data.put("state", "active");
+            data.put("label", "I 社区");
+            data.put("communityUid", binding != null ? stringValue(binding.getCommunityUid()) : "");
+            data.put("vipLevel", subscription != null ? subscription.getVipLevel() : "pro");
+            data.put("expiredAt", subscription != null ? subscription.getExpiredAt() : null);
+            data.put("daysLeft", 0);
+            return data;
+        }
         if (binding != null && binding.getCommunityUid() != null && !binding.getCommunityUid().isBlank()) {
             data.put("state", "expired");
             data.put("label", "I 社区 · 已到期");
@@ -192,6 +203,8 @@ public class VipService {
         data.put("configured", properties.isConfigured());
         data.put("appId", properties.getAppId() == null ? "" : properties.getAppId());
         data.put("deploymentId", deployment.getDeploymentId());
+        // 接入密钥有效期（Unix 秒，0=未设置/永久）；前端据此判断“已过期”并提示续费
+        data.put("expiredAt", properties.getAccessExpiredAt());
         return data;
     }
 
@@ -237,7 +250,7 @@ public class VipService {
             String appId = stringValue(result.get("app_id"));
             String secret = stringValue(result.get("app_secret"));
             if (!appId.isBlank() && !secret.isBlank()) {
-                saveKeysToDeployment(appId, secret);
+                saveKeysToDeployment(appId, secret, asLong(result.get("expired_at")));
             }
         }
         return result;
@@ -263,7 +276,7 @@ public class VipService {
         String appId = stringValue(result.get("app_id"));
         String secret = stringValue(result.get("app_secret"));
         if (!appId.isBlank() && !secret.isBlank()) {
-            saveKeysToDeployment(appId, secret);
+            saveKeysToDeployment(appId, secret, asLong(result.get("expired_at")));
         }
         return accessConfig(user);
     }
@@ -273,7 +286,7 @@ public class VipService {
      * 替代原先"让客户手填 app-id/secret"的反模式——密钥一律由 new-api 付费后生成并下发。
      */
     @Transactional
-    public void saveKeysToDeployment(String appId, String secret) {
+    public void saveKeysToDeployment(String appId, String secret, long expiredAt) {
         String normalizedAppId = appId == null ? "" : appId.trim();
         String normalizedSecret = secret == null ? "" : secret.trim();
         if (normalizedAppId.isEmpty() || normalizedSecret.isEmpty()) {
@@ -282,12 +295,18 @@ public class VipService {
         SdkDeployment deployment = ensureDeployment();
         deployment.setAppId(normalizedAppId);
         deployment.setAppSecret(normalizedSecret);
+        if (expiredAt > 0) {
+            deployment.setAccessExpiredAt(expiredAt);
+        }
         deployment.setUpdatedAt(LocalDateTime.now());
         deploymentMapper.updateById(deployment);
         // 动态生效：更新内存配置，isConfigured() 立即返回 true
         properties.setAppId(normalizedAppId);
         properties.setSecret(normalizedSecret);
-        log.info("[I-社区] 接入密钥已自动落地并动态生效: deploymentId={}", deployment.getDeploymentId());
+        if (expiredAt > 0) {
+            properties.setAccessExpiredAt(expiredAt);
+        }
+        log.info("[I-社区] 接入密钥已自动落地并动态生效: deploymentId={}, expiredAt={}", deployment.getDeploymentId(), expiredAt);
     }
 
     @Transactional
@@ -319,17 +338,32 @@ public class VipService {
             log.info("[I-社区] 邮箱恢复已对齐原部署 deploymentId={}", returnedDeploymentId);
         }
         upsertIdentityBinding(localUserId, deployment, result);
-        // 邮箱验证成功：若 I 社区返回了该部署已激活的接入密钥，则落库并动态生效（重装/换机恢复密钥）
+        // 邮箱验证成功：若 I 社区返回了该部署已激活的接入密钥，则落库并动态生效（重装/换机恢复密钥）；
+        // 若密钥已过期，则清除陈旧密钥（等同于未配置）并保留邮箱绑定，引导用户续费后重新获取。
+        boolean accessExpired = Boolean.TRUE.equals(result.get("access_expired"));
         String restoredAppId = stringValue(result.get("app_id"));
         String restoredSecret = stringValue(result.get("app_secret"));
-        if (!restoredAppId.isBlank() && !restoredSecret.isBlank()) {
+        long restoredExpiredAt = asLong(result.get("access_expired_at"));
+        if (accessExpired) {
+            deployment.setAppId("");
+            deployment.setAppSecret("");
+            deployment.setAccessExpiredAt(restoredExpiredAt > 0 ? restoredExpiredAt : deployment.getAccessExpiredAt());
+            deployment.setUpdatedAt(LocalDateTime.now());
+            deploymentMapper.updateById(deployment);
+            properties.setAppId("");
+            properties.setSecret("");
+            properties.setAccessExpiredAt(deployment.getAccessExpiredAt());
+            log.info("[I-社区] 接入密钥已过期，已清除陈旧密钥: deploymentId={}, expiredAt={}", deployment.getDeploymentId(), deployment.getAccessExpiredAt());
+        } else if (!restoredAppId.isBlank() && !restoredSecret.isBlank()) {
             boolean changed = !restoredAppId.equals(deployment.getAppId()) || !restoredSecret.equals(deployment.getAppSecret());
             deployment.setAppId(restoredAppId);
             deployment.setAppSecret(restoredSecret);
+            deployment.setAccessExpiredAt(restoredExpiredAt);
             deployment.setUpdatedAt(LocalDateTime.now());
             deploymentMapper.updateById(deployment);
             properties.setAppId(restoredAppId);
             properties.setSecret(restoredSecret);
+            properties.setAccessExpiredAt(restoredExpiredAt);
             if (changed) {
                 log.info("[I-社区] 已通过邮箱恢复接入密钥: deploymentId={}", deployment.getDeploymentId());
             }
@@ -620,14 +654,18 @@ public class VipService {
         SdkDeployment existing = deploymentMapper.selectOne(new LambdaQueryWrapper<SdkDeployment>().last("LIMIT 1"));
         if (existing != null) {
             // 启动/首次使用时从库恢复持久化的接入密钥（环境变量为空时生效）
-            if (!properties.isConfigured()
-                    && existing.getAppId() != null && !existing.getAppId().isBlank()
-                    && existing.getAppSecret() != null && !existing.getAppSecret().isBlank()) {
-                properties.setAppId(existing.getAppId());
-                properties.setSecret(existing.getAppSecret());
-                log.info("[I-社区] 已从持久化配置恢复接入密钥: deploymentId={}", existing.getDeploymentId());
-            }
-            return existing;
+        if (!properties.isConfigured()
+                && existing.getAppId() != null && !existing.getAppId().isBlank()
+                && existing.getAppSecret() != null && !existing.getAppSecret().isBlank()) {
+            properties.setAppId(existing.getAppId());
+            properties.setSecret(existing.getAppSecret());
+            log.info("[I-社区] 已从持久化配置恢复接入密钥: deploymentId={}", existing.getDeploymentId());
+        }
+        // 恢复接入密钥有效期（用于前端判断“已过期”）
+        if (existing.getAccessExpiredAt() != null && existing.getAccessExpiredAt() > 0) {
+            properties.setAccessExpiredAt(existing.getAccessExpiredAt());
+        }
+        return existing;
         }
         SdkDeployment deployment = new SdkDeployment();
         deployment.setDeploymentId("sdk_dep_" + UUID.randomUUID().toString().replace("-", ""));

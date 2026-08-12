@@ -361,78 +361,89 @@
 
       <!-- I 社区接入弹窗 -->
       <el-dialog v-model="vipDialogVisible" title="I 社区接入" width="680px" class="vip-dialog">
-        <!-- 未接入：引导付费获取密钥 -->
-        <template v-if="vipHeader.configured === false">
-          <div class="vip-hero">
-            <div>
-              <h3>本部署尚未接入 I 社区</h3>
-              <p>在 I 社区按套餐付费获取接入密钥（app-id / secret），保存后自动生效，无需手动配置环境变量。</p>
-            </div>
-            <el-tag type="warning" size="large">未接入</el-tag>
-          </div>
-          <el-alert type="warning" :closable="false" class="vip-guide-alert">
-            <template #title>接入步骤</template>
-            <ol style="margin:0; padding-left:20px; line-height:1.9;">
-              <li>在 I 社区选择「客户端接入密钥」套餐（月付 / 年付）并完成付费；</li>
-              <li>付费后获取本部署专属的 <code>app-id</code> 与 <code>secret</code>；</li>
-              <li>将密钥填入下方表单并保存，后端自动持久化生效，无需修改环境变量；</li>
-              <li>绑定邮箱用于重装/换机时恢复密钥与 VIP 身份。</li>
-            </ol>
+        <el-steps :active="vipStep" align-center finish-status="success" class="vip-steps">
+          <el-step title="绑定邮箱" :description="vipIdentity.emailVerified ? vipIdentity.email : '用于查询与恢复'" />
+          <el-step title="校验权益" description="查询付费与有效期" />
+          <el-step title="解锁 VIP" description="下发密钥并接入" />
+        </el-steps>
+
+        <!-- 阶段一：绑定邮箱（入口） -->
+        <template v-if="!vipIdentity.emailVerified">
+          <el-alert type="info" :closable="false" class="vip-stage-guide">
+            <template #title>第一步：绑定邮箱</template>
+            绑定邮箱后即可查询该账户的 I 社区付费状态与套餐有效期；重装 / 换机时也能凭此邮箱恢复接入密钥与 VIP 身份。
           </el-alert>
-        </template>
-
-        <!-- 已接入：展示状态 -->
-        <template v-else>
-          <div class="vip-hero">
-            <div>
-              <h3>已接入 I 社区</h3>
-              <p>部署密钥有效，可正常使用 VIP 与社区全部功能。</p>
-            </div>
-            <el-tag :type="vipHeader.state === 'expired' ? 'warning' : 'success'" size="large">
-              {{ vipHeader.state === 'expired' ? '已到期' : '已接入' }}
-            </el-tag>
-          </div>
-          <el-descriptions :column="2" border class="vip-identity-alert">
-            <el-descriptions-item label="接入状态">
-              {{ vipHeader.state === 'active' ? '生效中' : (vipHeader.state === 'expired' ? '已到期' : (vipHeader.label || '-')) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="社区身份">{{ vipHeader.communityUid || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="VIP 等级">{{ vipHeader.vipLevel || 'pro' }}</el-descriptions-item>
-            <el-descriptions-item label="到期时间">{{ vipHeader.expiredAt || '-' }}</el-descriptions-item>
-          </el-descriptions>
-        </template>
-
-        <!-- 接入密钥（付费自动下发，无需手填 app-id/secret） -->
-        <el-divider content-position="left">接入密钥</el-divider>
-        <el-alert
-          class="vip-identity-alert"
-          :type="accessConfigured ? 'success' : 'info'"
-          :closable="false"
-          :title="accessConfigured ? `已配置密钥：${accessAppId}` : '选择套餐付费后，接入密钥由 I 社区自动下发并生效'"
-        />
-
-        <!-- 未配置：展示套餐并引导支付 -->
-        <template v-if="!accessConfigured">
-          <div v-loading="plansLoading" class="access-plans">
-            <el-card v-for="plan in accessPlans" :key="plan.id" shadow="hover" class="access-plan" :class="{ active: applyPlanId === plan.id }">
-              <div class="access-plan-name">{{ plan.name }}</div>
-              <div class="access-plan-price">¥{{ formatCents(plan.price_cents) }}</div>
-              <div class="access-plan-meta">有效期 {{ plan.duration_days || '-' }} 天</div>
-              <el-radio v-model="applyPlanId" :value="plan.id" class="access-plan-radio">选择</el-radio>
-            </el-card>
-          </div>
-          <el-form class="vip-email-form" inline v-if="accessPlans.length">
-            <el-form-item label="支付渠道">
-              <el-radio-group v-model="applyChannel">
-                <el-radio-button label="wechat">微信</el-radio-button>
-                <el-radio-button label="alipay">支付宝</el-radio-button>
-              </el-radio-group>
+          <el-form class="vip-email-form" inline>
+            <el-form-item label="邮箱">
+              <el-input v-model="vipEmailForm.email" placeholder="user@example.com" style="width:240px" />
+            </el-form-item>
+            <el-form-item label="验证码">
+              <el-input v-model="vipEmailForm.code" maxlength="6" placeholder="6 位验证码" style="width:140px" />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" :disabled="!applyPlanId" :loading="applyLoading" @click="submitAccessApply">创建订单并支付</el-button>
+              <el-button :disabled="emailCooldown > 0" :loading="emailSending" @click="sendVipCode">
+                {{ emailCooldown > 0 ? emailCooldown + 's 后重发' : '发送验证码' }}
+              </el-button>
+              <el-button type="primary" :loading="emailVerifying" @click="verifyVipCode">验证并绑定</el-button>
             </el-form-item>
           </el-form>
-          <el-empty v-if="!plansLoading && accessPlans.length === 0" description="暂无可用套餐，请联系管理员在 new-api 后台配置 app_access 套餐" />
+        </template>
+
+        <!-- 阶段二/三：已绑邮箱，按权益状态分支 -->
+        <template v-else>
+          <!-- 已激活 / 已恢复：返回密钥并解锁 -->
+          <template v-if="vipUnlocked">
+            <div class="vip-hero">
+              <div>
+                <h3>{{ vipRecovered ? '已通过邮箱恢复 I 社区接入' : 'I 社区已接入' }}</h3>
+                <p>接入密钥有效，VIP 与社区全部功能已解锁。</p>
+              </div>
+              <el-tag type="success" size="large">已激活</el-tag>
+            </div>
+            <el-descriptions :column="2" border class="vip-identity-alert">
+              <el-descriptions-item label="接入状态">生效中</el-descriptions-item>
+              <el-descriptions-item label="社区身份">{{ vipIdentity.communityUid || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="接入 AppId">{{ accessAppId || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="接入有效期">{{ formatExpiry(accessExpiredAt) }}</el-descriptions-item>
+              <el-descriptions-item label="VIP 等级">{{ vipIdentity.vipLevel || 'pro' }}</el-descriptions-item>
+            </el-descriptions>
+            <el-alert class="vip-identity-alert" type="success" :closable="false" :title="vipRecovered ? '已凭邮箱恢复本部署接入密钥' : '接入密钥已由 I 社区下发并自动生效'" />
+          </template>
+
+          <!-- 未付费 / 已过期：展示套餐 + 原因 -->
+          <template v-else>
+            <el-alert :type="vipPayReason === 'expired' ? 'warning' : 'info'" :closable="false" class="vip-stage-guide">
+              <template #title>{{ vipPayReason === 'expired' ? '接入已过期' : '尚未购买 I 社区接入' }}</template>
+              <template v-if="vipPayReason === 'expired'">
+                <span v-if="accessConfigured && !accessKeyValid()">本部署的接入密钥已于 {{ formatExpiry(accessExpiredAt) }} 到期，请续费以继续使用 VIP 功能。</span>
+                <span v-else>该邮箱账户（{{ vipIdentity.email }}）的 I 社区套餐已到期，请续费以继续使用 VIP 功能。</span>
+              </template>
+              <template v-else>
+                该邮箱账户（{{ vipIdentity.email }}）尚未付费，请选择下方套餐完成支付，支付成功后接入密钥将自动下发。
+              </template>
+            </el-alert>
+
+            <div v-loading="plansLoading" class="access-plans">
+              <el-card v-for="plan in accessPlans" :key="plan.id" shadow="hover" class="access-plan" :class="{ active: applyPlanId === plan.id }">
+                <div class="access-plan-name">{{ plan.name }}</div>
+                <div class="access-plan-price">¥{{ formatCents(plan.price_cents) }}</div>
+                <div class="access-plan-meta">有效期 {{ plan.duration_days || '-' }} 天</div>
+                <el-radio v-model="applyPlanId" :value="plan.id" class="access-plan-radio">选择</el-radio>
+              </el-card>
+            </div>
+            <el-form class="vip-email-form" inline v-if="accessPlans.length">
+              <el-form-item label="支付渠道">
+                <el-radio-group v-model="applyChannel">
+                  <el-radio-button label="wechat">微信</el-radio-button>
+                  <el-radio-button label="alipay">支付宝</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+              <el-form-item>
+                <el-button type="primary" :disabled="!applyPlanId" :loading="applyLoading" @click="submitAccessApply">创建订单并支付</el-button>
+              </el-form-item>
+            </el-form>
+            <el-empty v-if="!plansLoading && accessPlans.length === 0" description="暂无可用套餐，请联系管理员在 new-api 后台配置 app_access 套餐" />
+          </template>
         </template>
 
         <!-- 支付中：展示二维码并轮询取密钥 -->
@@ -455,32 +466,9 @@
           </template>
         </el-dialog>
 
-        <!-- 邮箱绑定（密钥恢复） -->
-        <el-divider content-position="left">绑定邮箱（密钥恢复）</el-divider>
-        <el-alert
-          class="vip-identity-alert"
-          :type="vipIdentity.emailVerified ? 'success' : 'warning'"
-          :closable="false"
-          :title="vipIdentity.emailVerified ? `已验证邮箱：${vipIdentity.email}` : '绑定邮箱后，重装/换机可凭邮箱恢复接入密钥与 VIP 身份。'"
-        />
-        <el-form class="vip-email-form" inline>
-          <el-form-item label="邮箱">
-            <el-input v-model="vipEmailForm.email" :disabled="vipIdentity.emailVerified" placeholder="user@example.com" style="width:220px" />
-          </el-form-item>
-          <el-form-item label="验证码">
-            <el-input v-model="vipEmailForm.code" :disabled="vipIdentity.emailVerified" maxlength="6" placeholder="6 位验证码" style="width:130px" />
-          </el-form-item>
-          <el-form-item>
-            <el-button :disabled="vipIdentity.emailVerified || emailCooldown > 0" :loading="emailSending" @click="sendVipCode">
-              {{ emailCooldown > 0 ? `${emailCooldown}s 后重发` : '发送验证码' }}
-            </el-button>
-            <el-button type="primary" :disabled="vipIdentity.emailVerified" :loading="emailVerifying" @click="verifyVipCode">验证并绑定</el-button>
-          </el-form-item>
-        </el-form>
-
         <template #footer>
           <el-button @click="vipDialogVisible = false">关闭</el-button>
-          <el-button v-if="accessConfigured" type="primary" @click="handleCommunityCommand('enter')">进入 I 社区</el-button>
+          <el-button v-if="vipUnlocked" type="primary" @click="handleCommunityCommand('enter')">进入 I 社区</el-button>
         </template>
       </el-dialog>
 
@@ -774,6 +762,8 @@ let emailCooldownTimer = null
 // 接入密钥：付费后由 I 社区自动下发，不再手填 app-id/secret
 const accessAppId = ref('')
 const accessConfigured = ref(false)
+// 接入密钥有效期（Unix 秒，0 表示无有效期限制）；用于强制到期锁定，不影响其他 tentacle 业务
+const accessExpiredAt = ref(0)
 const accessPlans = ref([])
 const plansLoading = ref(false)
 const applyPlanId = ref(null)
@@ -785,6 +775,39 @@ const payHint = ref('')
 const payOrderNo = ref('')
 const credentialLoading = ref(false)
 let accessPollTimer = null
+// 本次验证是否“凭邮箱恢复了已付费部署的接入密钥”（重装/换机场景）
+const vipRecovered = ref(false)
+
+// 接入密钥是否仍在有效期内（无有效期限制或尚未到期）
+function accessKeyValid() {
+  const e = accessExpiredAt.value
+  if (!e || e <= 0) return true
+  return e > Math.floor(Date.now() / 1000)
+}
+// 已解锁：接入密钥已落地且未过期（已付费或已恢复）或 VIP 权益有效
+const vipUnlocked = computed(() => (accessConfigured.value && accessKeyValid()) || vipIdentity.value.hasActiveVip)
+// 步骤指示：0 绑定邮箱 → 1 校验权益（未解锁）→ 2 解锁完成
+const vipStep = computed(() => {
+  if (!vipIdentity.value.emailVerified) return 0
+  if (vipUnlocked.value) return 2
+  return 1
+})
+// 未解锁时的原因：unpaid（从未付费）/ expired（曾付费但已到期）
+// 接入密钥到期 或 社区 VIP 订阅到期 均归为 expired
+const vipPayReason = computed(() => {
+  if (vipIdentity.value.emailVerified && !vipUnlocked.value) {
+    const accessExpired = accessConfigured.value && !accessKeyValid()
+    return (vipIdentity.value.expiredAt || accessExpired) ? 'expired' : 'unpaid'
+  }
+  return ''
+})
+// 格式化 Unix 秒为日期文本（接入密钥有效期展示）
+function formatExpiry(ts) {
+  if (!ts || ts <= 0) return '长期有效'
+  const d = new Date(ts * 1000)
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
 
 async function loadVipHeader() {
   try {
@@ -795,9 +818,12 @@ async function loadVipHeader() {
 
 async function openVipDialog() {
   vipDialogVisible.value = true
-  await loadAccessConfig()
-  if (!accessConfigured.value) await loadAccessPlans()
+  vipRecovered.value = false
+  // 邮箱优先：先确认邮箱是否已验证、是否已有活跃权益
   await loadVipIdentity()
+  await loadAccessConfig()
+  // 仅当尚未解锁时才需要拉套餐让用户付费
+  if (!vipUnlocked.value) await loadAccessPlans()
 }
 
 function handleCommunityCommand(cmd) {
@@ -813,6 +839,7 @@ async function loadAccessConfig() {
     if (res.success && res.data) {
       accessAppId.value = res.data.appId || ''
       accessConfigured.value = res.data.configured === true
+      accessExpiredAt.value = Number(res.data.expiredAt) || 0
     }
   } catch (e) {}
 }
@@ -895,6 +922,8 @@ async function fetchAccessCredential(silent = false) {
       ElMessage.success('接入密钥已获取并生效')
       await loadAccessConfig()
       await loadVipHeader()
+      await loadVipIdentity()
+      vipRecovered.value = false
     } else if (!silent) {
       ElMessage.warning(res.message || '尚未支付，请完成支付后重试')
     }
@@ -959,11 +988,18 @@ async function verifyVipCode() {
   try {
     const res = await verifyVipEmail({ email, code, scene: 'vip_bind' })
     if (res.success && res.data) {
+      // 验证前是否已有密钥：验证后若密钥落地，说明本次为“邮箱恢复重装/换机”
+      const wasConfigured = accessConfigured.value
       vipIdentity.value = res.data
       vipEmailForm.value.email = res.data.email || email
       vipEmailForm.value.code = ''
       ElMessage.success('邮箱验证成功，可用于恢复接入密钥')
+      // 重新拉取接入密钥落地状态（恢复场景会变为已配置）与头部 VIP 状态（解锁）
+      await loadAccessConfig()
       await loadVipHeader()
+      vipRecovered.value = !wasConfigured && accessConfigured.value
+      // 仍未解锁（未付费 / 已过期）→ 拉套餐引导支付
+      if (!vipUnlocked.value) await loadAccessPlans()
     } else {
       ElMessage.error(res.message || '验证失败')
     }
@@ -1252,6 +1288,9 @@ async function handleBrowserReset() {
 }
 .vip-hero h3 { margin: 0 0 8px; font-size: 20px; color: var(--text-1); }
 .vip-hero p { margin: 0; color: var(--text-3); line-height: 1.6; }
+.vip-steps { margin-bottom: 18px; }
+.vip-stage-guide { margin-bottom: 14px; line-height: 1.7; }
+.vip-stage-guide :deep(.el-alert__content) { line-height: 1.7; }
 .vip-benefits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
 .vip-benefit { padding: 10px 12px; border-radius: var(--radius-md); background: var(--bg-soft); color: var(--text-2); font-size: 13px; }
 .vip-plans { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
