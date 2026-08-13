@@ -65,14 +65,25 @@ ARG CHROME_VERSION=146.0.7658.0
 RUN sed -i 's|//archive.ubuntu.com|//mirrors.aliyun.com|g; s|//security.ubuntu.com|//mirrors.aliyun.com|g' \
         /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list 2>/dev/null || true \
     && apt-get update \
+    # 兼容 t64 迁移:Ubuntu 24.04(noble)使用 *t64 后缀包;26.04(resolute)已移除后缀、回归原名。
+    # 逐个探测存在性,避免 apt 因找不到包整体失败。
+    && P_LIBPANGO=$(apt-cache show libpango-1.0-0t64 >/dev/null 2>&1 && echo libpango-1.0-0t64 || echo libpango-1.0-0) \
+    && P_PANGOCAIRO=$(apt-cache show libpangocairo-1.0-0t64 >/dev/null 2>&1 && echo libpangocairo-1.0-0t64 || echo libpangocairo-1.0-0) \
+    && P_GTK3=$(apt-cache show libgtk-3-0t64 >/dev/null 2>&1 && echo libgtk-3-0t64 || echo libgtk-3-0) \
+    && P_ATK1=$(apt-cache show libatk1.0-0t64 >/dev/null 2>&1 && echo libatk1.0-0t64 || echo libatk1.0-0) \
+    && P_ATKBRIDGE=$(apt-cache show libatk-bridge2.0-0t64 >/dev/null 2>&1 && echo libatk-bridge2.0-0t64 || echo libatk-bridge2.0-0) \
+    && P_ATSPI2=$(apt-cache show libatspi2.0-0t64 >/dev/null 2>&1 && echo libatspi2.0-0t64 || echo libatspi2.0-0) \
+    && P_CUPS2=$(apt-cache show libcups2t64 >/dev/null 2>&1 && echo libcups2t64 || echo libcups2) \
+    && P_ASOUND2=$(apt-cache show libasound2t64 >/dev/null 2>&1 && echo libasound2t64 || echo libasound2) \
+    && P_GLIB2=$(apt-cache show libglib2.0-0t64 >/dev/null 2>&1 && echo libglib2.0-0t64 || echo libglib2.0-0) \
     && apt-get install -y --no-install-recommends \
         curl ca-certificates unzip \
         fonts-liberation fonts-noto-cjk \
-        libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 libatspi2.0-0t64 \
-        libcups2t64 libdrm2 libgbm1 libasound2t64 libxkbcommon0 \
+        libnss3 libnspr4 ${P_ATK1} ${P_ATKBRIDGE} ${P_ATSPI2} \
+        ${P_CUPS2} libdrm2 libgbm1 ${P_ASOUND2} libxkbcommon0 \
         libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libxshmfence1 \
-        libcairo2 libpango-1.0-0t64 libpangocairo-1.0-0t64 libgtk-3-0t64 \
-        libglib2.0-0t64 libdbus-1-3 libx11-6 libxcb1 \
+        libcairo2 ${P_LIBPANGO} ${P_PANGOCAIRO} ${P_GTK3} \
+        ${P_GLIB2} libdbus-1-3 libx11-6 libxcb1 \
     && curl -fsSL -o /tmp/chrome-linux64.zip \
         https://registry.npmmirror.com/-/binary/chrome-for-testing/${CHROME_VERSION}/linux64/chrome-linux64.zip \
     && unzip -q /tmp/chrome-linux64.zip -d /opt \
