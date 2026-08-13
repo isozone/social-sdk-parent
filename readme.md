@@ -26,16 +26,12 @@
 
 ### 当前版本
 
-+ 注意 由于操作失误 远端 0.0.4版本是残缺版本 不要引用 0.0.5版本和 0.0.6版本是相同版本。
 ```
 <dependency>
 <groupId>cn.net.rjnetwork</groupId>
 <artifactId>social-sdk-parent</artifactId>
-<version>0.0.5</version>
+<version>0.0.6</version>
 </dependency>
-
-
-
 ```
 
 
@@ -85,6 +81,16 @@ social-sdk-parent/                          # 父 POM
 │   ├── core/                               # Profile管理/Session/健康检查/端口池
 │   ├── config/                             # Chrome 配置属性
 │   └── model/                              # 浏览器指纹配置
+├── social-sdk-riskbird/                    # 企查猫（RiskBird）企业信息平台 SDK
+│   ├── config/RiskbirdConfig.java          # 企业配置（apikey / 域名 / 超时）
+│   ├── service/RiskbirdSdk.java            # SDK 入口：登录（密码/二维码/Cookie）+ 搜索 + 查询
+│   ├── model/                              # 搜索结果、企业查询结果模型
+│   └── api/                                # 区域探测 / 站点探测 / IP 探测 / 搜索等接口封装
+├── social-sdk-xianyu-miniprogram/          # 闲鱼微信小程序（UniApp + Vue3 + TS）
+│   ├── pages/                              # 多页面（首页、商品、消息、订单等）
+│   ├── api/                                # 闲鱼 API 调用封装
+│   ├── store/                              # Pinia 状态管理
+│   └── views/                              # 业务视图组件
 ├── social-sdk-spring-boot-starter/         # Spring Boot 自动装配
 │   ├── config/                             # 核心自动配置
 │   ├── platform/xianyu/                    # 闲鱼控制台配置 + Controller + Service + Repository
@@ -702,6 +708,8 @@ docker run -e SPRING_PROFILES_ACTIVE=mysql ...
 - [x] OpenList 集成
 - [x] OpenAPI 开放平台（18+ 域名接口）
 - [x] 多数据库支持（SQLite / MySQL / PostgreSQL）
+- [x] RiskBird 企业信息查询 SDK（企查猫：登录/搜索/企业查询 + Chrome 容器隔离）
+- [x] 闲鱼微信小程序（UniApp + Vue3 + TypeScript）
 
 **部署与分发**
 - [x] Docker 容器化（多阶段构建 + 非 root + 健康检查）
