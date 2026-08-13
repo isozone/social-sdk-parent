@@ -6,7 +6,7 @@
 
     <groupId>cn.net.rjnetwork</groupId>
     <artifactId>social-sdk-parent</artifactId>
-    <version>0.0.3-SNAPSHOT</version>
+    <version>0.0.4</version>
     <packaging>pom</packaging>
 
     <name>Social SDK Parent</name>

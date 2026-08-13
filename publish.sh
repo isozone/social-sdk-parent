@@ -109,7 +109,7 @@ echo "================================================"
 
 # ===== 设置本次发布版本号（更新 parent pom + 各模块 pom 的 <version>）=====
 # 用 versions:set 自动改所有模块的版本，再 commit 消除 -SNAPSHOT 后缀
-mvn "${MAVEN_SETTINGS_ARG[@]}" -q versions:set -DnewVersion="$NEW_VERSION" -DprocessAllModules=true -DgenerateBackupPoms=false
+mvn "${MAVEN_SETTINGS_ARG[@]+"${MAVEN_SETTINGS_ARG[@]}"}" -q versions:set -DnewVersion="$NEW_VERSION" -DprocessAllModules=true -DgenerateBackupPoms=false
 echo "已设置本次发布版本: $NEW_VERSION"
 
 # ===== 构建 + 发布到 Maven Central（含 source/javadoc/gpg 签名）=====
@@ -138,7 +138,7 @@ else
 fi
 
 echo "正在构建并发布到 Maven Central..."
-mvn "${MAVEN_SETTINGS_ARG[@]}" $MVN_GOALS -P $MVN_PROFILES $MVN_ARGS
+mvn "${MAVEN_SETTINGS_ARG[@]+"${MAVEN_SETTINGS_ARG[@]}"}" $MVN_GOALS -P $MVN_PROFILES $MVN_ARGS
 
 # ===== Central 发布完成 =====
 echo "Maven Central 发布流程已执行完成"
@@ -153,5 +153,5 @@ echo " 下次执行本脚本将自动递增到 $MAJOR.$MINOR.$((PATCH + 1))"
 echo "================================================"
 
 # ===== 回滚 pom 版本为 -SNAPSHOT（保持开发态）=====
-mvn "${MAVEN_SETTINGS_ARG[@]}" -q versions:set -DnewVersion="${NEW_VERSION}-SNAPSHOT" -DprocessAllModules=true -DgenerateBackupPoms=false
+mvn "${MAVEN_SETTINGS_ARG[@]+"${MAVEN_SETTINGS_ARG[@]}"}" -q versions:set -DnewVersion="${NEW_VERSION}-SNAPSHOT" -DprocessAllModules=true -DgenerateBackupPoms=false
 echo "pom 已回滚到 ${NEW_VERSION}-SNAPSHOT 开发态"

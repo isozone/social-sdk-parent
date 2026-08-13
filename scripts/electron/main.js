@@ -46,10 +46,33 @@ function ensureDataDirs() {
 function findJar() {
   if (!fs.existsSync(JAR_DIR)) return null;
   const files = fs.readdirSync(JAR_DIR).filter(f => f.endsWith('.jar'));
-  const fat = files.find(f => /^server\.jar$/.test(f)) ||
-    files.find(f => /social-sdk-xianyu-manager.*\.jar$/.test(f)) ||
-    files.find(f => /xianyu-manager.*\.jar$/.test(f));
-  return fat ? path.join(JAR_DIR, fat) : (files[0] ? path.join(JAR_DIR, files[0]) : null);
+
+  // 策略1: 找固定命名的 fat jar（如 fix8.jar）
+  const fixedFat = files.find(f => /fix\d+\.jar$/i.test(f));
+  if (fixedFat && /BOOT-INF\//.test(fs.readFileSync(path.join(JAR_DIR, fixedFat)).toString('binary'))) return path.join(JAR_DIR, fixedFat);
+
+  // 策略2: 找所有候选 jar，按 BOOT-INF 内容校验
+  const candidates = files.filter(f => !/^(server|.*-sources|.*-javadoc|.*\.original)\.jar$/i.test(f));
+  for (const f of candidates) {
+    try {
+      const content = fs.readFileSync(path.join(JAR_DIR, f)).toString('binary');
+      if (/BOOT-INF\/classes\/META-INF\/MANIFEST\.MF/.test(content) || /BOOT-INF\/pom.properties/.test(content)) {
+        return path.join(JAR_DIR, f);
+      }
+    } catch {}
+  }
+
+  // 策略3: 按大小排序，选最大的（通常 fat jar 最大）
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => {
+      const sa = fs.statSync(path.join(JAR_DIR, a)).size;
+      const sb = fs.statSync(path.join(JAR_DIR, b)).size;
+      return sb - sa;
+    });
+    return path.join(JAR_DIR, candidates[0]);
+  }
+
+  return files[0] ? path.join(JAR_DIR, files[0]) : null;
 }
 
 function javaExecutable() {

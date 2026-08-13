@@ -25,11 +25,13 @@
 
 
 ### 当前版本
+
++ 注意 由于操作失误 远端 0.0.4版本是残缺版本 不要引用 0.0.5版本和 0.0.6版本是相同版本。
 ```
 <dependency>
 <groupId>cn.net.rjnetwork</groupId>
 <artifactId>social-sdk-parent</artifactId>
-<version>0.0.3</version>
+<version>0.0.5</version>
 </dependency>
 
 
@@ -397,9 +399,9 @@ Docker 相关文件在 `scripts/docker/`，详细说明见 [`scripts/docker/READ
 当前已发布镜像：
 
 ```text
-registry.cn-hangzhou.aliyuncs.com/eqadmin/xianyu-manager:sqlite-0.0.3
-registry.cn-hangzhou.aliyuncs.com/eqadmin/xianyu-manager:mysql-0.0.3
-registry.cn-hangzhou.aliyuncs.com/eqadmin/xianyu-manager:postgres-0.0.3
+registry.cn-hangzhou.aliyuncs.com/eqadmin/xianyu-manager:sqlite-0.0.4
+registry.cn-hangzhou.aliyuncs.com/eqadmin/xianyu-manager:mysql-0.0.4
+registry.cn-hangzhou.aliyuncs.com/eqadmin/xianyu-manager:postgres-0.0.4
 ```
 
 SQLite 单容器启动（最简单）：
@@ -420,7 +422,7 @@ copy .env.example .env
 set ACR_REGISTRY=registry.cn-hangzhou.aliyuncs.com
 set ACR_NAMESPACE=eqadmin
 set IMAGE_NAME=xianyu-manager
-set TAG=0.0.3
+set TAG=0.0.4
 
 docker compose --env-file .env -f docker-compose.yml up -d
 ```

@@ -3,10 +3,13 @@
 # common.sh — 所有打包脚本共享的工具函数与常量
 # ============================================================================
 
-# 脚本所在目录 → scripts/ → 项目根目录
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPTS_DIR="$(dirname "$SCRIPT_DIR")"
-PROJECT_ROOT="$(dirname "$SCRIPTS_DIR")"
+# ⚠️ 注意：不要在这里重新定义 SCRIPT_DIR / PROJECT_ROOT。
+# 因为本文件会被 scripts/electron/build.sh、scripts/docker/build.sh 等不同层级脚本 source，
+# 每个脚本已在 source 前自行定义了 SCRIPT_DIR / PROJECT_ROOT。此处复用外层值即可。
+# 若外层未设置（直接调用 common.sh 的场景），才给出兜底默认值。
+SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+SCRIPTS_DIR="${SCRIPTS_DIR:-$(dirname "$SCRIPT_DIR")}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(dirname "$SCRIPTS_DIR")}"
 
 # 颜色输出
 RED='\033[0;31m'
@@ -23,12 +26,40 @@ log_step()  { echo -e "${CYAN}[STEP]${NC}  $*"; }
 log_debug() { [[ "${DEBUG:-0}" == "1" ]] && echo -e "${BLUE}[DEBUG]${NC} $*" || true; }
 
 # ── 项目元信息 ──────────────────────────────────────────────────────────────
-PROJECT_VERSION="0.0.1"
 PROJECT_GROUP="cn.net.rjnetwork"
 PROJECT_NAME="social-sdk-xianyu-manager"
-JAR_NAME="${PROJECT_NAME}-${PROJECT_VERSION}.jar"
-JAR_PATH="${PROJECT_ROOT}/${PROJECT_NAME}/target/${JAR_NAME}"
-FRONTEND_DIR="${PROJECT_ROOT}/${PROJECT_NAME}-web"
+# 自动从 pom.xml 读取版本号（不再硬编码），兼容 SNAPSHOT 与正式版本号
+PROJECT_VERSION="$(mvn -f "${PROJECT_ROOT}/pom.xml" help:evaluate -Dexpression=project.version -q -DforceStdout 2>/dev/null || echo '0.0.1')"
+# 查找 Spring Boot fat jar：优先找含 BOOT-INF/ 的 jar（Spring Boot 打包标志），
+# 排除 *-sources.jar / *-javadoc.jar / *.original 等非可执行 jar。
+# 若多个候选，选最大体积的（通常 fix8.jar / 带修复的 jar 较大）。
+JAR_PATH=""
+_potential_jars=()
+while IFS= read -r -d '' _j; do
+  _potential_jars+=("$_j")
+done < <(find "${PROJECT_ROOT}/${PROJECT_NAME}/target" -maxdepth 1 \
+    \( -name "${PROJECT_NAME}-*.jar" -o -name "*fix8.jar" \) \
+    ! -name "*-sources.jar" ! -name "*-javadoc.jar" ! -name "*.original" \
+    -type f -print0 2>/dev/null)
+
+for _j in "${_potential_jars[@]}"; do
+  # 优先选含 BOOT-INF/ 的 fat jar（Spring Boot 打包产物标志）
+  if jar tf "$_j" 2>/dev/null | grep -q "^BOOT-INF/"; then
+    JAR_PATH="$_j"
+    break
+  fi
+done
+
+# 兜底：若无 fat jar，取最大体积 jar
+if [[ -z "$JAR_PATH" && ${#_potential_jars[@]} -gt 0 ]]; then
+  JAR_PATH="$(printf '%s\n' "${_potential_jars[@]}" | xargs ls -lS 2>/dev/null | awk 'NR==2{print $NF}')"
+fi
+
+# 最终兜底：默认路径
+if [[ -z "$JAR_PATH" || ! -f "$JAR_PATH" ]]; then
+  JAR_PATH="${PROJECT_ROOT}/${PROJECT_NAME}/target/${PROJECT_NAME}-${PROJECT_VERSION}.jar"
+fi
+FRONTEND_DIR="${PROJECT_ROOT}/social-sdk-xianyu-manager-web"
 FRONTEND_DIST="${FRONTEND_DIR}/dist"
 
 # ── 工具检查 ───────────────────────────────────────────────────────────────
