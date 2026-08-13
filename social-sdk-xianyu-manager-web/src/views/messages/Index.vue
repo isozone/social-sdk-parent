@@ -126,15 +126,21 @@
           <!-- 输入框 -->
           <div class="chat-input">
             <div class="quick-reply-bar">
+              <span class="quick-reply-label">
+                <el-icon><ChatDotRound /></el-icon>快捷话术
+              </span>
               <el-select
                 v-model="quickReplyPlaceholder"
-                placeholder="快捷话术"
+                placeholder="选择常用话术，选中即填入输入框"
                 size="small"
-                style="width: 160px;"
+                clearable
+                popper-class="quick-reply-popper"
                 :disabled="!selectedSession"
                 @change="applyQuickReply"
               >
-                <el-option v-for="s in QUICK_REPLIES" :key="s" :label="s.length > 18 ? s.slice(0, 18) + '…' : s" :value="s" />
+                <el-option v-for="s in QUICK_REPLIES" :key="s" :label="s" :value="s">
+                  <span class="quick-reply-opt">{{ s }}</span>
+                </el-option>
               </el-select>
               <span class="quick-reply-tip">选中即填入输入框，可再编辑后发送</span>
             </div>
@@ -890,6 +896,47 @@ onUnmounted(() => {
   border-top: 1px solid var(--line-2);
   background: var(--surface-0);
 }
+/* 快捷话术栏 */
+.quick-reply-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+}
+.quick-reply-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.quick-reply-label .el-icon {
+  color: var(--brand, #7c3aed);
+}
+.quick-reply-bar .el-select {
+  width: 260px;
+  flex-shrink: 0;
+}
+.quick-reply-tip {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quick-reply-opt {
+  display: inline-block;
+  width: 100%;
+  white-space: normal;
+  line-height: 1.5;
+}
 .input-footer {
   display: flex;
   justify-content: space-between;
@@ -899,5 +946,29 @@ onUnmounted(() => {
 .input-footer .tip {
   font-size: 11px;
   color: var(--text-3);
+}
+</style>
+
+<style>
+/* 快捷话术下拉面板（el-select popper 挂载在 body，需全局样式） */
+.quick-reply-popper {
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.quick-reply-popper .el-select-dropdown__item {
+  height: auto;
+  min-height: 32px;
+  padding: 6px 12px;
+  line-height: 1.5;
+  white-space: normal;
+  border-radius: 6px;
+  margin: 0 4px;
+}
+.quick-reply-popper .el-select-dropdown__item:hover {
+  background: var(--surface-1, #f5f5f7);
+}
+.quick-reply-popper .el-select-dropdown__item.is-selected {
+  color: var(--brand, #7c3aed);
+  font-weight: 600;
 }
 </style>

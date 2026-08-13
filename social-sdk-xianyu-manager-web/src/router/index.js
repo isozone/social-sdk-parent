@@ -195,6 +195,12 @@ const routes = [
         meta: { title: '熔断器管理' }
       },
       {
+        path: 'logs',
+        name: 'LogCleanup',
+        component: () => import('@/views/logs/Index.vue'),
+        meta: { title: '日志管理' }
+      },
+      {
         path: 'profile',
         name: 'Profile',
         component: () => import('@/views/profile/Index.vue'),
@@ -253,7 +259,10 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('token')
-  if (to.meta.requiresAuth && !token) {
+  if (to.path === '/login' && token) {
+    // 已登录访问登录页 → 直接进控制台，避免重复登录
+    next('/app/dashboard')
+  } else if (to.meta.requiresAuth && !token) {
     next('/login')
   } else {
     next()

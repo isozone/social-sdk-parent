@@ -23,7 +23,7 @@
           <el-tag type="info" size="small" style="margin-bottom: 12px;">从闲鱼同步的在线商品，可编辑 / 改价 / 上下架</el-tag>
         </el-tab-pane>
         <el-tab-pane label="本地商品" name="local">
-          <el-tag type="warning" size="small" style="margin-bottom: 12px;">自建商品（草稿 / 待发布），发布成功后自动清理</el-tag>
+          <el-tag type="warning" size="small" style="margin-bottom: 12px;">自建商品（草稿 / 待发布 / 已发布），发布成功后保留本地记录</el-tag>
         </el-tab-pane>
       </el-tabs>
 
@@ -43,6 +43,7 @@
               <el-option label="草稿" value="DRAFT" />
               <el-option label="待发布" value="PENDING" />
               <el-option label="发布中" value="PUBLISHING" />
+              <el-option label="已发布" value="PUBLISHED" />
               <el-option label="失败" value="FAILED" />
             </template>
           </el-select>
@@ -873,8 +874,8 @@ const categoryTreeLoadedAccountId = ref(null)
 const aiForm = ref({ modelId: null, productTitle: '', keywordsRaw: '', condition: '九成新' })
 const aiResult = ref({ title: '', description: '', keywords: [] })
 
-const localStatusType = (s) => ({ DRAFT: 'info', PENDING: 'primary', PUBLISHING: 'warning', FAILED: 'danger' }[s] || 'info')
-const localStatusLabel = (s) => ({ DRAFT: '草稿', PENDING: '待发布', PUBLISHING: '发布中', FAILED: '失败' }[s] || s)
+const localStatusType = (s) => ({ DRAFT: 'info', PENDING: 'primary', PUBLISHING: 'warning', PUBLISHED: 'success', FAILED: 'danger' }[s] || 'info')
+const localStatusLabel = (s) => ({ DRAFT: '草稿', PENDING: '待发布', PUBLISHING: '发布中', PUBLISHED: '已发布', FAILED: '失败' }[s] || s)
 const accountName = (id) => accounts.value.find(a => a.id === id)?.accountName || (id ? `#${id}` : '-')
 const poolCount = (row) => {
   if (!row.deliverContentTemplate) return 0
@@ -1009,13 +1010,13 @@ function editLocalProduct(row) {
 async function publishLocalProduct(row) {
   if (!row.accountId) return ElMessage.warning('请先编辑并指定发布账号')
   try {
-    await ElMessageBox.confirm(`确认发布「${row.title || ('#' + row.id)}」？发布成功后本地记录将自动清理。`, '发布确认', { type: 'info' })
+    await ElMessageBox.confirm(`确认发布「${row.title || ('#' + row.id)}」？发布成功后本地记录将保留。`, '发布确认', { type: 'info' })
   } catch { return }
   row._publishing = true
   try {
     const res = await localProductApi.publishLocalProduct(row.id)
     if (res.success) {
-      ElMessage.success('发布成功，本地记录已清理')
+      ElMessage.success('发布成功，本地记录已保留')
       selectedLocalProducts.value = selectedLocalProducts.value.filter(s => s.id !== row.id)
       await loadLocalProducts()
     } else {
@@ -1031,7 +1032,7 @@ async function handleRetryPublish(row) {
   try {
     const res = await localProductApi.publishLocalProduct(row.id)
     if (res.success) {
-      ElMessage.success('重试发布成功，本地记录已清理')
+      ElMessage.success('重试发布成功，本地记录已保留')
       detail.value = null
       showDetailDrawer.value = false
       await loadLocalProducts()
@@ -1072,7 +1073,7 @@ async function handleBatchPublish() {
     await ElMessageBox.confirm(
       `确认批量发布选中的 ${selected.length} 个商品？\n\n` +
       `并发数：${batchForm.maxConcurrency}，账号间隔：${batchForm.delayMs}ms\n` +
-      `${batchForm.partialSuccess ? '部分成功的将删除本地记录，失败的保留。' : '全部成功才算部分停止。'}`,
+      `${batchForm.partialSuccess ? '成功的保留本地记录并标记已发布，失败的保留。' : '全部成功才算部分停止。'}`,
       '批量发布', { type: 'warning' }
     )
   } catch { return }

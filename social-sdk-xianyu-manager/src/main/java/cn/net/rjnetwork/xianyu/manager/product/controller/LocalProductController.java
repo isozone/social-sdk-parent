@@ -14,7 +14,7 @@ import java.util.Map;
 
 /**
  * 本地商品 API：自建商品（待上架闲鱼）。
- * 发布成功后从本地表物理删除。
+ * 发布成功后保留本地记录并标记 PUBLISHED，不物理删除。
  */
 @RestController
 @RequestMapping("/api/local-products")
@@ -79,7 +79,7 @@ public class LocalProductController {
             Map<String, Object> data = new HashMap<>();
             data.put("id", id);
             data.put("published", true);
-            data.put("message", "发布成功，本地商品已清理");
+            data.put("message", "发布成功，本地记录已保留");
             return ApiResponse.ok(data);
         } catch (IllegalArgumentException | IllegalStateException e) {
             return ApiResponse.fail("PUBLISH_FAILED", e.getMessage());

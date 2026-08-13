@@ -472,14 +472,19 @@ public class MessageService {
         } catch (Exception e) {
             log.warn("[MESSAGE] full history pull failed for account {}: {}", acc.getId(), e.getMessage());
             
-            // 检测风控并自动解决
+            // 检测风控并自动解决（统一复用 RiskControlProtector 的风控/过载判定，避免重复正则）
             String errorMessage = e.getMessage();
-            if (errorMessage != null && (errorMessage.contains("FAIL_SYS_USER_VALIDATE") ||
-                errorMessage.contains("punish") || errorMessage.contains("captcha") ||
-                errorMessage.contains("FAIL_SYS_TOKEN_EXOIRED") ||
-                errorMessage.contains("FAIL_SYS_TOKEN_EMPTY") ||
-                errorMessage.contains("FAIL_SYS_ILLEGAL_REQUEST"))) {
-                // BOT-A6 风控暂停保护：识别风控码后暂停账号 + 写 risk_log，防死循环刷官方接口
+            boolean isRisk = riskControlProtector != null
+                    && riskControlProtector.isRiskControlTriggered(errorMessage);
+            boolean isOverload = riskControlProtector != null
+                    && riskControlProtector.isServerOverload(errorMessage);
+            boolean captchaOrToken = errorMessage != null && (errorMessage.contains("captcha")
+                    || errorMessage.contains("FAIL_SYS_TOKEN_EXPIRED")
+                    || errorMessage.contains("FAIL_SYS_TOKEN_EMPTY")
+                    || errorMessage.contains("FAIL_SYS_ILLEGAL_REQUEST"));
+            if (isRisk || isOverload || captchaOrToken) {
+                // BOT-A6 风控暂停保护：识别风控码后暂停账号 + 写 risk_log
+                // （内部已做过载短路 + 登录态二次复核，健康账号不会被误冻）
                 if (riskControlProtector != null) {
                     try {
                         riskControlProtector.handleRiskControl(acc.getId(), "MESSAGE_SYNC",
@@ -866,7 +871,7 @@ public class MessageService {
         if (raw.contains("FAIL_SYS_USER_VALIDATE")) return "FAIL_SYS_USER_VALIDATE";
         if (raw.contains("RGV587")) return "RGV587_ERROR";
         if (raw.contains("punish")) return "punish";
-        if (raw.contains("FAIL_SYS_TOKEN_EXOIRED") || raw.contains("FAIL_SYS_TOKEN_EMPTY"))
+        if (raw.contains("FAIL_SYS_TOKEN_EXPIRED") || raw.contains("FAIL_SYS_TOKEN_EMPTY"))
             return "FAIL_SYS_TOKEN";
         if (raw.contains("FAIL_SYS_ILLEGAL_REQUEST")) return "FAIL_SYS_ILLEGAL_REQUEST";
         if (raw.contains("captcha")) return "CAPTCHA";

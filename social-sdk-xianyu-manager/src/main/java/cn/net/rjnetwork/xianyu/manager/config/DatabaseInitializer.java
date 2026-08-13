@@ -665,7 +665,8 @@ public class DatabaseInitializer {
             String boolDdl = "mysql".equals(d) ? "TINYINT(1)" : "BOOLEAN";
             st.execute("CREATE TABLE IF NOT EXISTS sdk_deployment ("
                     + "id " + idPk + ", deployment_id VARCHAR(128) NOT NULL UNIQUE, install_time " + timeDdl + ", server_url VARCHAR(512), "
-                    + "bound_email VARCHAR(191), email_verified " + boolDdl + " DEFAULT FALSE, email_verified_at " + timeDdl + ", community_uid VARCHAR(64), last_identity_sync_at " + timeDdl + ", "
+                    + "app_id VARCHAR(128), app_secret VARCHAR(512), "
+                    + "bound_email VARCHAR(191), email_verified " + boolDdl + " DEFAULT FALSE, email_verified_at " + timeDdl + ", community_uid VARCHAR(64), last_identity_sync_at " + timeDdl + ", access_expired_at BIGINT DEFAULT 0, "
                     + "created_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, updated_at " + timeDdl + " DEFAULT CURRENT_TIMESTAMP, deleted INTEGER DEFAULT 0)");
             st.execute("CREATE TABLE IF NOT EXISTS community_user_binding ("
                     + "id " + idPk + ", local_user_id BIGINT NOT NULL, deployment_id VARCHAR(128) NOT NULL, community_user_id BIGINT, community_uid VARCHAR(64), "
@@ -696,6 +697,9 @@ public class DatabaseInitializer {
         ensureColumn("sdk_deployment", "email_verified_at", timeDdl);
         ensureColumn("sdk_deployment", "community_uid", "VARCHAR(64)");
         ensureColumn("sdk_deployment", "last_identity_sync_at", timeDdl);
+        ensureColumn("sdk_deployment", "access_expired_at", "BIGINT DEFAULT 0");
+        ensureColumn("sdk_deployment", "app_id", "VARCHAR(128)");
+        ensureColumn("sdk_deployment", "app_secret", "VARCHAR(512)");
         ensureColumn("community_user_binding", "email", "VARCHAR(191)");
         ensureColumn("community_user_binding", "email_verified", boolDdl + " DEFAULT FALSE");
         ensureColumn("community_user_binding", "email_verified_at", timeDdl);
@@ -787,6 +791,8 @@ public class DatabaseInitializer {
     private void ensureMarketColumns() {
         // market_snapshot 表补齐（继承 BaseEntity，旧库/当前 schema 可能缺 updated_at/deleted）
         ensureColumn("market_snapshot", "raw_data", "TEXT");
+        // 扩容 raw_data：MySQL TEXT 上限 65KB，改为 MEDIUMTEXT（16MB）避免大数据截断
+        tryExpandColumnType("market_snapshot", "raw_data", "MEDIUMTEXT");
         ensureColumn("market_snapshot", "total_results", "INTEGER DEFAULT 0");
         ensureColumn("market_snapshot", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
         ensureColumn("market_snapshot", "deleted", "INTEGER DEFAULT 0");
@@ -952,6 +958,24 @@ public class DatabaseInitializer {
             }
         } catch (Exception e) {
             logger.debug("ensureColumn {} on {}: {}", column, table, e.getMessage());
+        }
+    }
+
+    /**
+     * 扩容已有列的类型（仅对 MySQL 生效，其他数据库跳过）。
+     * 用于把 TEXT 升级到 MEDIUMTEXT，避免大数据截断。
+     */
+    private void tryExpandColumnType(String table, String column, String newType) {
+        try (java.sql.Connection conn = dataSource.getConnection()) {
+            if (!tableExists(conn, table) || !columnExists(conn, table, column)) return;
+            String dialect = dialect();
+            if (!"mysql".equals(dialect)) return;
+            try (java.sql.Statement st = conn.createStatement()) {
+                st.execute("ALTER TABLE " + table + " MODIFY COLUMN " + column + " " + newType);
+                logger.info("Expanded column {}.{}` to {}", table, column, newType);
+            }
+        } catch (Exception e) {
+            logger.debug("tryExpandColumnType {}.{}` to {}: {}", table, column, newType, e.getMessage());
         }
     }
 

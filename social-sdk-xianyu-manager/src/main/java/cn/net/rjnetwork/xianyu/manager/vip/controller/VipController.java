@@ -3,7 +3,6 @@ package cn.net.rjnetwork.xianyu.manager.vip.controller;
 import cn.net.rjnetwork.xianyu.manager.auth.model.AdminUser;
 import cn.net.rjnetwork.xianyu.manager.auth.service.AuthService;
 import cn.net.rjnetwork.xianyu.manager.common.ApiResponse;
-import cn.net.rjnetwork.xianyu.manager.vip.dto.VipCreateOrderRequest;
 import cn.net.rjnetwork.xianyu.manager.vip.dto.VipEmailCodeRequest;
 import cn.net.rjnetwork.xianyu.manager.vip.service.VipService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -40,11 +39,6 @@ public class VipController {
         return ApiResponse.ok(vipService.verify(currentUser(authentication)));
     }
 
-    @GetMapping("/vip/config")
-    public ApiResponse<Map<String, Object>> config(Authentication authentication) {
-        return ApiResponse.ok(vipService.config(currentUser(authentication)));
-    }
-
     @PostMapping("/vip/community/bind")
     public ApiResponse<Map<String, Object>> bind(Authentication authentication) {
         return ApiResponse.ok(vipService.bind(currentUser(authentication)));
@@ -65,19 +59,44 @@ public class VipController {
         return ApiResponse.ok(vipService.verifyEmail(currentUser(authentication), request));
     }
 
-    @PostMapping("/vip/orders")
-    public ApiResponse<Map<String, Object>> createOrder(Authentication authentication, @RequestBody VipCreateOrderRequest request) {
-        return ApiResponse.ok(vipService.createOrder(currentUser(authentication), request));
-    }
-
-    @GetMapping("/vip/orders/{localOrderNo}")
-    public ApiResponse<Map<String, Object>> orderDetail(Authentication authentication, @PathVariable String localOrderNo) {
-        return ApiResponse.ok(vipService.orderDetail(currentUser(authentication), localOrderNo));
-    }
-
     @GetMapping("/community/menu")
     public ApiResponse<Map<String, Object>> communityMenu(Authentication authentication) {
         return ApiResponse.ok(vipService.communityMenu(currentUser(authentication)));
+    }
+
+    /** 查询当前部署接入密钥配置（B 端，只读，不返回 secret） */
+    @GetMapping("/vip/access/config")
+    public ApiResponse<Map<String, Object>> accessConfig(Authentication authentication) {
+        return ApiResponse.ok(vipService.accessConfig(currentUser(authentication)));
+    }
+
+    /** 拉取接入密钥套餐（app_access，由 new-api 托管，替代手填 app-id/secret） */
+    @GetMapping("/vip/access/plans")
+    public ApiResponse<Map<String, Object>> accessPlans(Authentication authentication) {
+        return ApiResponse.ok(vipService.accessPlans(currentUser(authentication)));
+    }
+
+    /** 创建接入密钥订单并发起支付（new-api 托管，付费后自动生成部署专属密钥） */
+    @PostMapping("/vip/access/apply")
+    public ApiResponse<Map<String, Object>> accessApply(Authentication authentication, @RequestBody Map<String, Object> body) {
+        try {
+            Integer planId = body.get("planId") != null ? Integer.valueOf(String.valueOf(body.get("planId"))) : null;
+            String channel = body.get("channel") != null ? String.valueOf(body.get("channel")) : "";
+            String returnUrl = body.get("returnUrl") != null ? String.valueOf(body.get("returnUrl")) : "";
+            return ApiResponse.ok(vipService.accessApply(currentUser(authentication), planId, channel, returnUrl));
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.fail("BAD_REQUEST", e.getMessage());
+        }
+    }
+
+    /** 凭订单号获取已付费生成的接入密钥并落地（new-api 托管；订单未支付时返回错误，前端继续轮询） */
+    @GetMapping("/vip/access/credential")
+    public ApiResponse<Map<String, Object>> accessCredential(Authentication authentication, @RequestParam("orderNo") String orderNo) {
+        try {
+            return ApiResponse.ok(vipService.accessCredential(currentUser(authentication), orderNo));
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.fail("BAD_REQUEST", e.getMessage());
+        }
     }
 
     @RequestMapping(value = "/community/client/**", method = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE})

@@ -87,6 +87,11 @@ public class CircuitBreakerService {
      * 记录失败
      */
     public void recordFailure(Long accountId, String serviceName, String message) {
+        // 服务器过载（闲鱼"被挤爆啦"提示）不是真实风控，不应累加熔断器失败计数
+        if (isServerOverload(message)) {
+            logger.debug("Circuit breaker skip overload for account={} service={}: {}", accountId, serviceName, truncate(message, 80));
+            return;
+        }
         CircuitBreaker cb = getOrCreate(accountId, serviceName);
         cb.recordFailure(message);
         persist(cb);
@@ -101,6 +106,17 @@ public class CircuitBreakerService {
             riskControlLogService.log(accountId, triggerType, serviceName, riskCode,
                     message, cooldown, null);
         }
+    }
+
+    /** 判断是否为服务器过载（闲鱼"被挤爆啦"等提示），非真实风控 */
+    private boolean isServerOverload(String message) {
+        if (message == null || message.isBlank()) return false;
+        return message.matches("(?i).*挤爆|过载|限流|server\\.busy|too\\.many\\.request|请稍后重试.*");
+    }
+
+    private static String truncate(String s, int maxLen) {
+        if (s == null) return "";
+        return s.length() > maxLen ? s.substring(0, maxLen) : s;
     }
 
     /** 按 serviceName 推断触发类型。 */

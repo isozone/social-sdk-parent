@@ -3,7 +3,6 @@ package cn.net.rjnetwork.xianyu.manager.vip.service;
 import cn.net.rjnetwork.xianyu.manager.auth.model.AdminUser;
 import cn.net.rjnetwork.xianyu.manager.common.ApiResponse;
 import cn.net.rjnetwork.xianyu.manager.vip.config.NewApiCommunityProperties;
-import cn.net.rjnetwork.xianyu.manager.vip.dto.VipCreateOrderRequest;
 import cn.net.rjnetwork.xianyu.manager.vip.dto.VipEmailCodeRequest;
 import cn.net.rjnetwork.xianyu.manager.vip.mapper.CommunityUserBindingMapper;
 import cn.net.rjnetwork.xianyu.manager.vip.mapper.SdkDeploymentMapper;
@@ -17,12 +16,13 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -43,8 +43,12 @@ import java.util.UUID;
 @Service
 public class VipService {
 
+    private static final Logger log = LoggerFactory.getLogger(VipService.class);
+
     private static final Long DEFAULT_LOCAL_USER_ID = 1L;
     private static final ZoneId ZONE = ZoneId.systemDefault();
+    // 与 new-api CommunityAppSocialSDK 保持一致：接入密钥(app_access)流程的客户端标识
+    private static final String SOCIAL_SDK_APP_CODE = "social-sdk";
 
     private final NewApiCommunityProperties properties;
     private final SdkDeploymentMapper deploymentMapper;
@@ -76,6 +80,7 @@ public class VipService {
         VipSubscription subscription = getSubscription(localUserId);
         CommunityUserBinding binding = getBinding(localUserId);
         Map<String, Object> data = new LinkedHashMap<>();
+        data.put("configured", properties.isConfigured());
         if (subscription != null && "ACTIVE".equals(subscription.getStatus()) && subscription.getExpiredAt() != null && subscription.getExpiredAt().isAfter(LocalDateTime.now())) {
             data.put("state", "active");
             data.put("label", "I 社区");
@@ -83,6 +88,17 @@ public class VipService {
             data.put("vipLevel", subscription.getVipLevel());
             data.put("expiredAt", subscription.getExpiredAt());
             data.put("daysLeft", Math.max(0, Duration.between(LocalDateTime.now(), subscription.getExpiredAt()).toDays()));
+            return data;
+        }
+        // 接入密钥已落地（已付费 / 已通过邮箱恢复）即视为 I 社区已接通并解锁，
+        // 避免“已配置密钥但无 VIP 订阅记录”的部署在头部被误标为“已到期”。
+        if (properties.isConfigured()) {
+            data.put("state", "active");
+            data.put("label", "I 社区");
+            data.put("communityUid", binding != null ? stringValue(binding.getCommunityUid()) : "");
+            data.put("vipLevel", subscription != null ? subscription.getVipLevel() : "pro");
+            data.put("expiredAt", subscription != null ? subscription.getExpiredAt() : null);
+            data.put("daysLeft", 0);
             return data;
         }
         if (binding != null && binding.getCommunityUid() != null && !binding.getCommunityUid().isBlank()) {
@@ -138,24 +154,6 @@ public class VipService {
         return status(user);
     }
 
-    public Map<String, Object> config(AdminUser user) {
-        ensureBinding(user);
-        try {
-            Map<String, Object> config = externalGet("/api/community/external/social-sdk/vip/config");
-            Object plans = config.get("plans");
-            if (plans instanceof List<?> planList) {
-                config.put("plans", planList.stream()
-                        .filter(item -> item instanceof Map<?, ?>)
-                        .map(item -> (Map<?, ?>) item)
-                        .filter(plan -> "social_sdk_vip".equals(stringValue(plan.get("product_type"))) && "social-sdk".equals(stringValue(plan.get("app_code"))))
-                        .toList());
-            }
-            return config;
-        } catch (Exception e) {
-            throw new IllegalStateException("无法从 I 社区拉取真实 VIP 套餐配置：" + e.getMessage(), e);
-        }
-    }
-
     @Transactional
     public Map<String, Object> bind(AdminUser user) {
         return ensureBinding(user);
@@ -190,10 +188,125 @@ public class VipService {
         body.put("email", normalizeEmail(request.getEmail()));
         body.put("scene", defaultString(request.getScene(), "vip_bind"));
         try {
-            return externalPost("/api/community/external/social-sdk/email/send-code", body);
+            return externalPostPublic("/api/community/external/social-sdk/email/send-code", body);
         } catch (Exception e) {
             throw new IllegalStateException("发送 I 社区邮箱验证码失败：" + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 查询当前部署的接入密钥配置（B 端：不返回 secret，避免回显泄露）。
+     */
+    public Map<String, Object> accessConfig(AdminUser user) {
+        SdkDeployment deployment = ensureDeployment();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("configured", properties.isConfigured());
+        data.put("appId", properties.getAppId() == null ? "" : properties.getAppId());
+        data.put("deploymentId", deployment.getDeploymentId());
+        // 接入密钥有效期（Unix 秒，0=未设置/永久）；前端据此判断“已过期”并提示续费
+        data.put("expiredAt", properties.getAccessExpiredAt());
+        return data;
+    }
+
+    /**
+     * 拉取接入密钥套餐（app_access 类型，由 new-api 托管，公开无需密钥）。
+     * 与用户手填 app-id/secret 无关：套餐只是"付费获取部署专属密钥"的入口。
+     */
+    public Map<String, Object> accessPlans(AdminUser user) {
+        SdkDeployment deployment = ensureDeployment();
+        try {
+            return externalGetPublic("/api/community/external/access/plans?app_code=" + SOCIAL_SDK_APP_CODE + "&deployment_id=" + urlEncode(deployment.getDeploymentId()));
+        } catch (Exception e) {
+            throw new IllegalStateException("拉取接入密钥套餐失败：" + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * 创建接入密钥订单并发起支付（new-api 托管）。
+     * 同一部署若已激活则直接返回已激活密钥并落地，无需重复付费。
+     */
+    public Map<String, Object> accessApply(AdminUser user, Integer planId, String channel, String returnUrl) {
+        if (planId == null || planId <= 0) {
+            throw new IllegalArgumentException("请选择接入密钥套餐");
+        }
+        if (channel == null || channel.isBlank()) {
+            throw new IllegalArgumentException("请选择支付渠道");
+        }
+        SdkDeployment deployment = ensureDeployment();
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("app_code", SOCIAL_SDK_APP_CODE);
+        body.put("deployment_id", deployment.getDeploymentId());
+        body.put("plan_id", planId);
+        body.put("channel", channel);
+        body.put("return_url", defaultString(returnUrl, ""));
+        Map<String, Object> result;
+        try {
+            result = externalPostPublic("/api/community/external/access/apply", body);
+        } catch (Exception e) {
+            throw new IllegalStateException("创建接入密钥订单失败：" + e.getMessage(), e);
+        }
+        // 已激活（幂等）：直接落地密钥，无需走支付
+        if (Boolean.TRUE.equals(result.get("activated"))) {
+            String appId = stringValue(result.get("app_id"));
+            String secret = stringValue(result.get("app_secret"));
+            if (!appId.isBlank() && !secret.isBlank()) {
+                saveKeysToDeployment(appId, secret, asLong(result.get("expired_at")));
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 凭订单号获取已付费生成的接入密钥（app_id/app_secret）。
+     * 仅当订单已支付、密钥已激活时返回；否则 new-api 报错"订单未支付"，前端据此继续轮询。
+     * 取到后落库并动态生效（等价于放环境变量，且重启可从 DB 恢复）。
+     */
+    public Map<String, Object> accessCredential(AdminUser user, String orderNo) {
+        if (orderNo == null || orderNo.isBlank()) {
+            throw new IllegalArgumentException("订单号不能为空");
+        }
+        SdkDeployment deployment = ensureDeployment();
+        Map<String, Object> result;
+        try {
+            result = externalGetPublic("/api/community/external/access/credential?app_code=" + SOCIAL_SDK_APP_CODE
+                    + "&deployment_id=" + urlEncode(deployment.getDeploymentId()) + "&order_no=" + urlEncode(orderNo));
+        } catch (Exception e) {
+            throw new IllegalStateException("获取接入密钥失败：" + e.getMessage(), e);
+        }
+        String appId = stringValue(result.get("app_id"));
+        String secret = stringValue(result.get("app_secret"));
+        if (!appId.isBlank() && !secret.isBlank()) {
+            saveKeysToDeployment(appId, secret, asLong(result.get("expired_at")));
+        }
+        return accessConfig(user);
+    }
+
+    /**
+     * 落地接入密钥：写入 sdk_deployment（DB 持久化）+ 更新内存配置动态生效。
+     * 替代原先"让客户手填 app-id/secret"的反模式——密钥一律由 new-api 付费后生成并下发。
+     */
+    @Transactional
+    public void saveKeysToDeployment(String appId, String secret, long expiredAt) {
+        String normalizedAppId = appId == null ? "" : appId.trim();
+        String normalizedSecret = secret == null ? "" : secret.trim();
+        if (normalizedAppId.isEmpty() || normalizedSecret.isEmpty()) {
+            throw new IllegalArgumentException("接入密钥不完整");
+        }
+        SdkDeployment deployment = ensureDeployment();
+        deployment.setAppId(normalizedAppId);
+        deployment.setAppSecret(normalizedSecret);
+        if (expiredAt > 0) {
+            deployment.setAccessExpiredAt(expiredAt);
+        }
+        deployment.setUpdatedAt(LocalDateTime.now());
+        deploymentMapper.updateById(deployment);
+        // 动态生效：更新内存配置，isConfigured() 立即返回 true
+        properties.setAppId(normalizedAppId);
+        properties.setSecret(normalizedSecret);
+        if (expiredAt > 0) {
+            properties.setAccessExpiredAt(expiredAt);
+        }
+        log.info("[I-社区] 接入密钥已自动落地并动态生效: deploymentId={}, expiredAt={}", deployment.getDeploymentId(), expiredAt);
     }
 
     @Transactional
@@ -211,11 +324,50 @@ public class VipService {
         body.put("domain", deployment.getServerUrl() == null ? "" : deployment.getServerUrl());
         Map<String, Object> result;
         try {
-            result = externalPost("/api/community/external/social-sdk/email/verify", body);
+            result = externalPostPublic("/api/community/external/social-sdk/email/verify", body);
         } catch (Exception e) {
             throw new IllegalStateException("验证 I 社区邮箱失败：" + e.getMessage(), e);
         }
+        // 重装/换机恢复：new-api 按邮箱查到原部署并回传其 deployment_id，manager 须对齐，
+        // 否则后续部署级接口（entitlement 等）会因 deployment_id 不一致而查不到原激活状态。
+        String returnedDeploymentId = stringValue(result.get("deployment_id"));
+        if (!returnedDeploymentId.isBlank() && !returnedDeploymentId.equals(deployment.getDeploymentId())) {
+            deployment.setDeploymentId(returnedDeploymentId);
+            deployment.setUpdatedAt(LocalDateTime.now());
+            deploymentMapper.updateById(deployment);
+            log.info("[I-社区] 邮箱恢复已对齐原部署 deploymentId={}", returnedDeploymentId);
+        }
         upsertIdentityBinding(localUserId, deployment, result);
+        // 邮箱验证成功：若 I 社区返回了该部署已激活的接入密钥，则落库并动态生效（重装/换机恢复密钥）；
+        // 若密钥已过期，则清除陈旧密钥（等同于未配置）并保留邮箱绑定，引导用户续费后重新获取。
+        boolean accessExpired = Boolean.TRUE.equals(result.get("access_expired"));
+        String restoredAppId = stringValue(result.get("app_id"));
+        String restoredSecret = stringValue(result.get("app_secret"));
+        long restoredExpiredAt = asLong(result.get("access_expired_at"));
+        if (accessExpired) {
+            deployment.setAppId("");
+            deployment.setAppSecret("");
+            deployment.setAccessExpiredAt(restoredExpiredAt > 0 ? restoredExpiredAt : deployment.getAccessExpiredAt());
+            deployment.setUpdatedAt(LocalDateTime.now());
+            deploymentMapper.updateById(deployment);
+            properties.setAppId("");
+            properties.setSecret("");
+            properties.setAccessExpiredAt(deployment.getAccessExpiredAt());
+            log.info("[I-社区] 接入密钥已过期，已清除陈旧密钥: deploymentId={}, expiredAt={}", deployment.getDeploymentId(), deployment.getAccessExpiredAt());
+        } else if (!restoredAppId.isBlank() && !restoredSecret.isBlank()) {
+            boolean changed = !restoredAppId.equals(deployment.getAppId()) || !restoredSecret.equals(deployment.getAppSecret());
+            deployment.setAppId(restoredAppId);
+            deployment.setAppSecret(restoredSecret);
+            deployment.setAccessExpiredAt(restoredExpiredAt);
+            deployment.setUpdatedAt(LocalDateTime.now());
+            deploymentMapper.updateById(deployment);
+            properties.setAppId(restoredAppId);
+            properties.setSecret(restoredSecret);
+            properties.setAccessExpiredAt(restoredExpiredAt);
+            if (changed) {
+                log.info("[I-社区] 已通过邮箱恢复接入密钥: deploymentId={}", deployment.getDeploymentId());
+            }
+        }
         if (result.get("entitlement") instanceof Map<?, ?> entitlement) {
             CommunityUserBinding binding = getBinding(localUserId);
             VipOrder restoreOrder = new VipOrder();
@@ -227,79 +379,6 @@ public class VipService {
             upsertSubscription(user, restoreOrder, entitlement, stringValue(result.get("community_uid")));
         }
         return identity(user);
-    }
-
-    @Transactional
-    public Map<String, Object> createOrder(AdminUser user, VipCreateOrderRequest request) {
-        if (request == null || request.getPlanId() == null || request.getPlanId() <= 0 || request.getChannel() == null || request.getChannel().isBlank()) {
-            throw new IllegalArgumentException("套餐和支付渠道不能为空");
-        }
-        Long localUserId = localUserId(user);
-        String deploymentId = ensureDeployment().getDeploymentId();
-        Map<String, Object> bind = ensureBinding(user);
-        CommunityUserBinding binding = getBinding(localUserId);
-        if (binding == null || !Boolean.TRUE.equals(binding.getEmailVerified()) || normalizeEmail(binding.getEmail()).isBlank()) {
-            throw new IllegalStateException("请先绑定并验证邮箱，再购买 VIP");
-        }
-        Long communityUserId = asLong(bind.get("community_user_id"));
-        String localOrderNo = "SDKVIP" + System.currentTimeMillis() + randomCode(6);
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("community_user_id", communityUserId);
-        body.put("deployment_id", deploymentId);
-        body.put("verified_email", normalizeEmail(binding.getEmail()));
-        body.put("plan_id", request.getPlanId());
-        body.put("channel", normalizeChannel(request.getChannel()));
-        body.put("client_order_no", localOrderNo);
-        body.put("client_origin", "");
-        body.put("return_url", "");
-        Map<String, Object> result;
-        try {
-            result = externalPost("/api/community/external/social-sdk/vip/orders", body);
-        } catch (Exception e) {
-            throw new IllegalStateException("无法通过 I 社区创建真实 VIP 支付订单：" + e.getMessage(), e);
-        }
-        VipOrder order = new VipOrder();
-        order.setLocalUserId(localUserId);
-        order.setDeploymentId(deploymentId);
-        order.setCommunityUserId(communityUserId);
-        order.setLocalOrderNo(localOrderNo);
-        order.setNewApiOrderNo(stringValue(result.get("order_no")));
-        order.setPlanId(String.valueOf(request.getPlanId()));
-        order.setPayChannel(normalizeChannel(request.getChannel()));
-        order.setPayAmount(BigDecimal.valueOf(asLong(result.getOrDefault("pay_amount", 0L))).movePointLeft(2));
-        order.setCurrency("CNY");
-        order.setEmail(normalizeEmail(binding.getEmail()));
-        order.setIdentityVerified(true);
-        order.setStatus(stringValue(result.getOrDefault("status", "pending")));
-        order.setPayInfoJson(toJson(result.get("pay_info")));
-        orderMapper.insert(order);
-        Map<String, Object> response = new LinkedHashMap<>(result);
-        response.put("local_order_no", localOrderNo);
-        return response;
-    }
-
-    @Transactional
-    public Map<String, Object> orderDetail(AdminUser user, String localOrderNo) {
-        Long localUserId = localUserId(user);
-        VipOrder order = orderMapper.selectOne(new LambdaQueryWrapper<VipOrder>()
-                .eq(VipOrder::getLocalUserId, localUserId)
-                .eq(VipOrder::getLocalOrderNo, localOrderNo)
-                .last("LIMIT 1"));
-        if (order == null) {
-            throw new IllegalArgumentException("订单不存在");
-        }
-        Map<String, Object> result = new LinkedHashMap<>();
-        if (order.getNewApiOrderNo() != null && !order.getNewApiOrderNo().isBlank()) {
-            try {
-                result = externalGet("/api/community/external/social-sdk/vip/orders/" + order.getNewApiOrderNo());
-                syncPaidOrder(user, order, result);
-            } catch (Exception ignored) {
-                result.put("order_no", order.getNewApiOrderNo());
-                result.put("status", order.getStatus());
-            }
-        }
-        result.put("local_order_no", order.getLocalOrderNo());
-        return result;
     }
 
     public void assertAccountCreateAllowed(long currentAccountCount) {
@@ -574,7 +653,19 @@ public class VipService {
     private SdkDeployment ensureDeployment() {
         SdkDeployment existing = deploymentMapper.selectOne(new LambdaQueryWrapper<SdkDeployment>().last("LIMIT 1"));
         if (existing != null) {
-            return existing;
+            // 启动/首次使用时从库恢复持久化的接入密钥（环境变量为空时生效）
+        if (!properties.isConfigured()
+                && existing.getAppId() != null && !existing.getAppId().isBlank()
+                && existing.getAppSecret() != null && !existing.getAppSecret().isBlank()) {
+            properties.setAppId(existing.getAppId());
+            properties.setSecret(existing.getAppSecret());
+            log.info("[I-社区] 已从持久化配置恢复接入密钥: deploymentId={}", existing.getDeploymentId());
+        }
+        // 恢复接入密钥有效期（用于前端判断“已过期”）
+        if (existing.getAccessExpiredAt() != null && existing.getAccessExpiredAt() > 0) {
+            properties.setAccessExpiredAt(existing.getAccessExpiredAt());
+        }
+        return existing;
         }
         SdkDeployment deployment = new SdkDeployment();
         deployment.setDeploymentId("sdk_dep_" + UUID.randomUUID().toString().replace("-", ""));
@@ -592,6 +683,34 @@ public class VipService {
         String json = objectMapper.writeValueAsString(body);
         HttpRequest request = signedRequest("POST", path, json).POST(HttpRequest.BodyPublishers.ofString(json)).header("Content-Type", "application/json").build();
         return send(request);
+    }
+
+    // 接入密钥的 plans/apply/credential 在 new-api 侧是公开路由（无 HMAC 中间件）。
+    // 付款前 manager 尚未持有任何凭证，因此这些调用不走 signedRequest、也不要求 isConfigured()，
+    // 仅需 baseUrl 指向正确的 new-api 实例即可；即便带签名也会被 new-api 忽略。
+    private Map<String, Object> externalGetPublic(String path) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(requireBaseUrl() + path))
+                .timeout(Duration.ofSeconds(Math.max(1, properties.getRequestTimeoutSeconds())))
+                .GET().build();
+        return send(request);
+    }
+
+    private Map<String, Object> externalPostPublic(String path, Map<String, Object> body) throws Exception {
+        String json = objectMapper.writeValueAsString(body);
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(requireBaseUrl() + path))
+                .timeout(Duration.ofSeconds(Math.max(1, properties.getRequestTimeoutSeconds())))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(json)).build();
+        return send(request);
+    }
+
+    private String requireBaseUrl() {
+        if (properties.getBaseUrl() == null || properties.getBaseUrl().isBlank()) {
+            throw new IllegalStateException("未配置 I 社区地址（vip.community.base-url），请配置后重启");
+        }
+        return properties.getBaseUrl().replaceAll("/+$", "");
     }
 
     @SuppressWarnings("unchecked")
@@ -613,6 +732,9 @@ public class VipService {
     }
 
     private HttpRequest.Builder signedRequest(String method, String path, String body) throws Exception {
+        if (!properties.isConfigured()) {
+            throw new IllegalStateException("未配置 I 社区接入密钥，请按套餐付费获取后通过环境变量 XIANYU_COMMUNITY_APP_ID / XIANYU_COMMUNITY_SECRET 配置");
+        }
         String baseUrl = properties.getBaseUrl() == null ? "" : properties.getBaseUrl().replaceAll("/+$", "");
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
         String nonce = UUID.randomUUID().toString().replace("-", "");
@@ -631,6 +753,9 @@ public class VipService {
     }
 
     private HttpRequest.Builder signedCommunityRequest(String method, String path, String body, CommunityUserBinding binding) throws Exception {
+        if (!properties.isConfigured()) {
+            throw new IllegalStateException("未配置 I 社区接入密钥，请按套餐付费获取后通过环境变量 XIANYU_COMMUNITY_APP_ID / XIANYU_COMMUNITY_SECRET 配置");
+        }
         String baseUrl = properties.getBaseUrl() == null ? "" : properties.getBaseUrl().replaceAll("/+$", "");
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
         String nonce = UUID.randomUUID().toString().replace("-", "");
@@ -710,7 +835,7 @@ public class VipService {
         map.put("community_uid", binding.getCommunityUid());
         map.put("bind_id", binding.getBindId());
         map.put("bind_status", binding.getStatus());
-        map.put("bind_token", binding.getBindToken());
+        // bind_token 不下发前端：社区代理签名只在服务端内存使用，避免每部署绑定令牌暴露给浏览器
         map.put("is_new_user", isNew);
         return map;
     }

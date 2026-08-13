@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 
 /**
  * 本地商品：自建商品，尚未上架闲鱼。
- * 发布成功后物理删除；不长期滞留。
+ * 发布成功后保留记录并标记 PUBLISHED，不物理删除。
  */
 @Data
 @EqualsAndHashCode(callSuper = true)

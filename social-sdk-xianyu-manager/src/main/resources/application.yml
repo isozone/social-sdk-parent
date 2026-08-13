@@ -113,11 +113,12 @@ jwt:
   expiration: 86400000 # 24 hours in milliseconds
 
 # VIP / I 社区客户端配置
+# 接入密钥按套餐付费获取，部署后通过环境变量注入（不内置任何真实密钥）
 vip:
   community:
-    base-url: https://ai.aius.autos
-    app-id: social-10001
-    secret: RumL1Wfl5CMmfPc1NPADeo4mrhUGGQI3U0V3BRvvuaBqJqZV
+    base-url: ${XIANYU_COMMUNITY_BASE_URL:https://ai.aius.autos}
+    app-id: ${XIANYU_COMMUNITY_APP_ID:}
+    secret: ${XIANYU_COMMUNITY_SECRET:}
     connect-timeout-seconds: 5
     request-timeout-seconds: 15
 
@@ -178,3 +179,9 @@ logging:
   level:
     cn.net.rjnetwork.xianyu.manager: DEBUG
     org.mybatis: DEBUG
+
+# ======================== 日志清理配置 ========================
+log-cleanup:
+  enabled: true                          # 是否启用定时清理
+  keep-days: 7                           # 保留最近 N 天的日志记录
+  cron: "0 0 3 * * ?"                    # 每天凌晨 3 点执行清理

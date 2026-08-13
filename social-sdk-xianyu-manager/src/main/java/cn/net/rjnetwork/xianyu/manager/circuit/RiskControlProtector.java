@@ -3,10 +3,10 @@ package cn.net.rjnetwork.xianyu.manager.circuit;
 import cn.net.rjnetwork.xianyu.manager.account.mapper.AccountMapper;
 import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
 import cn.net.rjnetwork.xianyu.manager.circuit.service.RiskControlLogService;
+import cn.net.rjnetwork.xianyu.api.XianyuLoginApiService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.regex.Pattern;
@@ -34,9 +34,13 @@ public class RiskControlProtector {
 
     private static final Logger log = LoggerFactory.getLogger(RiskControlProtector.class);
 
-    /** 风控码识别正则 */
+    /** 风控码识别正则（含真实风控与服务器过载两类） */
     private static final Pattern RISK_PATTERN = Pattern.compile(
             "FAIL_SYS_USER_VALIDATE|RGV587_ERROR|punish|x5secdata", Pattern.CASE_INSENSITIVE);
+
+    /** 服务器过载特征：闲鱼"被挤爆啦"提示，不应触发风控冻结 */
+    private static final Pattern OVERLOAD_PATTERN = Pattern.compile(
+            "挤爆|过载|限流|server.busy|too.many.request|请稍后重试", Pattern.CASE_INSENSITIVE);
 
     private final AccountMapper accountMapper;
     private final CircuitBreakerService circuitBreaker;
@@ -51,14 +55,31 @@ public class RiskControlProtector {
     }
 
     /**
-     * 判断给定错误信息/响应是否为风控触发。
+     * 判断给定错误信息/响应是否为真实风控触发（排除服务器过载误判）。
+     *
+     * <p>闲鱼服务器过载时会返回 FAIL_SYS_USER_VALIDATE + RGV587_ERROR，
+     * 但消息体含"哎哟喂,被挤爆啦,请稍后重试"等过载提示，不应触发冻结。</p>
      *
      * @param raw 错误信息/响应文本
-     * @return true=风控触发
+     * @return true=真实风控触发；false=非风控或服务器过载
      */
     public boolean isRiskControlTriggered(String raw) {
         if (raw == null || raw.isBlank()) return false;
-        return RISK_PATTERN.matcher(raw).find();
+        if (!RISK_PATTERN.matcher(raw).find()) return false;
+        // 服务器过载特征优先排除，避免误冻结
+        if (OVERLOAD_PATTERN.matcher(raw).find()) {
+            log.info("[BOT-A6] 检测到服务器过载特征，跳过风控冻结: {}", truncate(raw, 100));
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * 判断是否为服务器过载（非风控），调用方可用于不同处理策略。
+     */
+    public boolean isServerOverload(String raw) {
+        if (raw == null || raw.isBlank()) return false;
+        return OVERLOAD_PATTERN.matcher(raw).find() && RISK_PATTERN.matcher(raw).find();
     }
 
     /**
@@ -66,14 +87,29 @@ public class RiskControlProtector {
      *
      * <p>幂等：账号已 FROZEN 时仅追加 risk_log，不重复暂停。</p>
      *
+     * <p>防误冻（核心加固，解决"登录不到半小时就被冻结"）：</p>
+     * <ol>
+     *   <li>服务器过载（"被挤爆啦/限流/请稍后重试"等）即便命中风控码也不冻结；</li>
+     *   <li>命中风控码后做<strong>二次登录态复核</strong>：cookie 未过期 或 真实接口仍登录
+     *       → 视为健康账号，不冻结。闲鱼 cookie 可长达数月，健康账号不应因瞬时风控挑战
+     *       （滑块/验证码/服务器抖动）被冻结，否则会误杀刚登录的账号。</li>
+     * </ol>
+     *
      * @param accountId  账号 ID
      * @param scene      触发场景（POLISH/CLOSE_NOTICE/MESSAGE_SYNC 等）
      * @param riskCode   风控码（FAIL_SYS_USER_VALIDATE/RGV587_ERROR/punish）
      * @param rawError   原始错误信息（含 punish URL 等关键诊断信息）
-     * @return true=已暂停账号；false=风控未触发或账号已暂停
+     * @return true=已暂停账号；false=风控未触发/过载/登录态仍有效/账号已暂停
      */
-    @Transactional
     public boolean handleRiskControl(Long accountId, String scene, String riskCode, String rawError) {
+        // 1) 服务器过载：即便命中风控模式也不冻结，仅记日志 + 熔断记 failure（防误冻）
+        if (isServerOverload(rawError) || isServerOverload(riskCode)) {
+            log.info("[BOT-A6] 服务器过载特征检测到，跳过风控冻结（仅记日志）: {}", truncate(rawError, 100));
+            writeRiskLog(accountId, scene, riskCode, rawError, "RISK_CONTROL");
+            circuitBreaker.recordFailure(accountId, scene, rawError);
+            return false;
+        }
+        // 2) 非真实风控触发 → 不冻结
         if (!isRiskControlTriggered(rawError) && !isRiskControlTriggered(riskCode)) {
             return false;
         }
@@ -82,9 +118,15 @@ public class RiskControlProtector {
             log.warn("[BOT-A6] account {} 不存在，跳过风控处理", accountId);
             return false;
         }
-        // 中文运营摘要
+        // 3) 二次复核：登录态仍有效（cookie 未过期 或 真实接口仍登录）→ 不冻结，避免误杀健康账号
+        if (isLoginStillValid(acc)) {
+            log.warn("[BOT-A6] 账号 {} 命中风控码但登录态仍有效，疑似服务器抖动/过载误判，跳过冻结（仅记日志）", accountId);
+            writeRiskLog(accountId, scene, riskCode, rawError, "RISK_CONTROL_SKIP");
+            circuitBreaker.recordFailure(accountId, scene, rawError);
+            return false;
+        }
+        // 4) 确认需冻结：中文运营摘要
         String summary = buildOperatorSummary(scene, riskCode, rawError);
-        // 暂停账号（FROZEN），防死循环刷官方接口
         boolean wasActive = !"FROZEN".equals(acc.getStatus()) && !"DISABLED".equals(acc.getStatus());
         if (wasActive) {
             acc.setStatus("FROZEN");
@@ -94,29 +136,64 @@ public class RiskControlProtector {
             log.warn("[BOT-A6] 账号 {} 因风控触发暂停（FROZEN），scene={}, riskCode={}",
                     accountId, scene, riskCode);
         }
-        // 写 risk_control_log
-        try {
-            riskLogService.log(
-                    accountId,
-                    "RISK_CONTROL",
-                    scene,
-                    riskCode,
-                    summary,
-                    3600, // cooldownSeconds 默认冷却 1 小时
-                    null  // batchJobId 由调用方传
-            );
-        } catch (Exception e) {
-            log.warn("[BOT-A6] 写 risk_control_log 失败（非致命）: {}", e.getMessage());
-        }
-        // 熔断器记 failure（让后续请求在冷却期内被拦截）
+        writeRiskLog(accountId, scene, riskCode, summary, "RISK_CONTROL");
         circuitBreaker.recordFailure(accountId, scene, summary);
         return wasActive;
     }
 
+    /** 写 risk_control_log（封装 try/catch，写失败非致命） */
+    private void writeRiskLog(Long accountId, String scene, String riskCode, String raw, String eventType) {
+        try {
+            riskLogService.log(accountId, eventType, scene, riskCode,
+                    buildOperatorSummary(scene, riskCode, raw), 3600, null);
+        } catch (Exception e) {
+            log.warn("[BOT-A6] 写 risk_control_log 失败（非致命）: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 二次复核：判断账号登录态是否仍有效。
+     * <ul>
+     *   <li>cookie 明确设置了有效期且未过期：闲鱼 cookie 可长达数月，视为健康；</li>
+     *   <li>否则用真实接口复核：仍登录 → 有效。复核异常按"未登录"处理（宁可冻结也不误放）。</li>
+     * </ul>
+     */
+    private boolean isLoginStillValid(XianyuAccount acc) {
+        // a) cookie 有效期快速判定（无需网络调用）
+        try {
+            if (acc.getCookieExpiresAt() != null
+                    && acc.getCookieExpiresAt().isAfter(LocalDateTime.now())) {
+                return true;
+            }
+        } catch (Exception ignored) {
+            // 读取异常不阻塞，继续走接口复核
+        }
+        // b) 真实接口复核登录态
+        String cookie = acc.getCookieHeader();
+        if (cookie == null || cookie.isBlank()) {
+            return false;
+        }
+        try {
+            XianyuLoginApiService.LoginStatusResult r =
+                    new XianyuLoginApiService(cookie).checkLoginStatus(cookie);
+            return r != null && r.loggedIn;
+        } catch (Exception e) {
+            log.warn("[BOT-A6] isLoginStillValid 复核异常，按未登录处理: {}", e.getMessage());
+            return false;
+        }
+    }
+
     /**
      * 构建中文运营摘要（含 operator_action_required 提示）。
+     * 服务器过载时不添加人工操作提示。
      */
     private String buildOperatorSummary(String scene, String riskCode, String rawError) {
+        // 服务器过载：仅需记录日志，不标记为需要人工干预
+        if (isServerOverload(rawError)) {
+            String truncated = rawError != null && rawError.length() > 200
+                    ? rawError.substring(0, 200) : (rawError != null ? rawError : "");
+            return String.format("[server_overload] 场景=%s 原始=%s", scene, truncated);
+        }
         String action;
         if ("punish".equalsIgnoreCase(riskCode) || (rawError != null && rawError.contains("punish"))) {
             action = "需要人工完成滑块验证后恢复账号";
@@ -131,5 +208,11 @@ public class RiskControlProtector {
                 ? rawError.substring(0, 200) : (rawError != null ? rawError : "");
         return String.format("[operator_action_required] 场景=%s 风控码=%s 原始=%s 提示=%s",
                 scene, riskCode, truncated, action);
+    }
+
+    /** 截断字符串，避免日志过长 */
+    private static String truncate(String s, int maxLen) {
+        if (s == null) return "";
+        return s.length() > maxLen ? s.substring(0, maxLen) : s;
     }
 }

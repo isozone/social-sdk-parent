@@ -52,6 +52,7 @@ RUN sed -i 's|//archive.ubuntu.com|//mirrors.aliyun.com|g; s|//security.ubuntu.c
     unzip \
     fonts-liberation \
     fonts-noto-cjk \
+    libcairo2 \
     libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 \
     libcups2t64 libdrm2 libgbm1 libasound2t64 libxkbcommon0 \
     libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libxshmfence1 \

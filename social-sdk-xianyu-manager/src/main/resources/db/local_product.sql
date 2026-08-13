@@ -1,5 +1,5 @@
 -- 本地商品表（待上架闲鱼）
--- 发布成功后物理删除，不长期滞留
+-- 发布成功后保留记录并标记 PUBLISHED，不物理删除
 CREATE TABLE IF NOT EXISTS local_product (
     id            BIGINT AUTO_INCREMENT PRIMARY KEY,
     account_id    BIGINT      NULL COMMENT '发布时关联的闲鱼账号',
