@@ -796,6 +796,9 @@ public class DatabaseInitializer {
         ensureColumn("market_snapshot", "total_results", "INTEGER DEFAULT 0");
         ensureColumn("market_snapshot", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
         ensureColumn("market_snapshot", "deleted", "INTEGER DEFAULT 0");
+        // task_id 允许为 NULL：市场情报抓取不关联监控任务，旧库 NOT NULL 会导致插入报
+        // "Field 'task_id' doesn't have a default value"（MySQL 严格模式），启动时幂等迁移。
+        makeColumnNullable("market_snapshot", "task_id");
         // price_history 表补齐（继承 BaseEntity，旧库/当前 schema 可能缺 updated_at/deleted）
         ensureColumn("price_history", "currency", "VARCHAR(8) DEFAULT 'CNY'");
         ensureColumn("price_history", "item_condition", "VARCHAR(32)");
@@ -976,6 +979,30 @@ public class DatabaseInitializer {
             }
         } catch (Exception e) {
             logger.debug("tryExpandColumnType {}.{}` to {}: {}", table, column, newType, e.getMessage());
+        }
+    }
+
+    /**
+     * 去掉列上的 NOT NULL 约束（方言感知：mysql/postgres 支持 ALTER；sqlite 旧库无法 ALTER，
+     * 跳过——新库由 schema*.sql 建表时已不声明 NOT NULL）。
+     */
+    private void makeColumnNullable(String table, String column) {
+        try (java.sql.Connection conn = dataSource.getConnection()) {
+            if (!tableExists(conn, table) || !columnExists(conn, table, column)) return;
+            String d = dialect();
+            try (java.sql.Statement st = conn.createStatement()) {
+                if ("mysql".equals(d)) {
+                    st.execute("ALTER TABLE " + table + " MODIFY COLUMN " + column + " BIGINT NULL");
+                    logger.info("Made column {}.{} nullable (mysql)", table, column);
+                } else if ("postgres".equals(d)) {
+                    st.execute("ALTER TABLE " + table + " ALTER COLUMN " + column + " DROP NOT NULL");
+                    logger.info("Made column {}.{} nullable (postgres)", table, column);
+                } else {
+                    logger.debug("makeColumnNullable {}: sqlite 不支持 ALTER 去 NOT NULL，跳过", table);
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("makeColumnNullable {}.{}: {}", table, column, e.getMessage());
         }
     }
 

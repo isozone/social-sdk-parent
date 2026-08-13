@@ -213,6 +213,12 @@ const routes = [
         meta: { title: 'I 社区' }
       },
       {
+        path: 'community/topic/:id',
+        name: 'CommunityTopicDetail',
+        component: () => import('@/views/community/TopicDetail.vue'),
+        meta: { title: '帖子详情' }
+      },
+      {
         path: 'logs/cookies-refresh',
         name: 'CookiesRefreshLogs',
         component: () => import('@/views/logs/cookiesRefresh/Index.vue'),

@@ -58,6 +58,7 @@ FROM eclipse-temurin:17-jre
 # （报错 "requires the chromium snap to be installed"）；PPA 也不支持 Ubuntu 26.04。
 # 改用 Chrome for Testing 官方 zip（国内走 npmmirror 镜像），解压后软链到 /usr/bin/chromium-browser。
 # 版本可用 --build-arg CHROME_VERSION=x.y.z 覆盖，或直接改下面的默认值。
+# Chromium 运行时依赖必须装全：缺 libcairo2 会报 libcairo.so.2 无法加载(退出码 127)。
 ARG CHROME_VERSION=146.0.7658.0
 # 宿主机代理 fake-ip DNS 会污染 archive.ubuntu.com 解析(198.18.x.x 连不上)，
 # 构建前先把 apt 源切换到阿里云镜像，保证 apt-get 可用。
@@ -67,9 +68,11 @@ RUN sed -i 's|//archive.ubuntu.com|//mirrors.aliyun.com|g; s|//security.ubuntu.c
     && apt-get install -y --no-install-recommends \
         curl ca-certificates unzip \
         fonts-liberation fonts-noto-cjk \
-        libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 \
+        libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 libatspi2.0-0t64 \
         libcups2t64 libdrm2 libgbm1 libasound2t64 libxkbcommon0 \
         libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libxshmfence1 \
+        libcairo2 libpango-1.0-0t64 libpangocairo-1.0-0t64 libgtk-3-0t64 \
+        libglib2.0-0t64 libdbus-1-3 libx11-6 libxcb1 \
     && curl -fsSL -o /tmp/chrome-linux64.zip \
         https://registry.npmmirror.com/-/binary/chrome-for-testing/${CHROME_VERSION}/linux64/chrome-linux64.zip \
     && unzip -q /tmp/chrome-linux64.zip -d /opt \

@@ -91,12 +91,7 @@ public class MonitorTaskRunner {
             snapshot.setTaskId(task.getId());
             snapshot.setKeyword(task.getKeyword());
             snapshot.setAccountId(task.getAccountId());
-            // 写入原始数据，截断到 1MB 防止 TEXT 字段溢出
-            String rawJson = searchResult != null ? searchResult.toString() : "";
-            if (rawJson.length() > 1_000_000) {
-                rawJson = rawJson.substring(0, 1_000_000) + "...[truncated]";
-            }
-            snapshot.setRawData(rawJson);
+            // 不再存储搜索接口的原始 JSON 响应（无用且体积巨大）
 
             int totalResults = 0;
 

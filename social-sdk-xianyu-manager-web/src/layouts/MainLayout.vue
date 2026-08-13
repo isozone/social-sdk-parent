@@ -55,10 +55,6 @@
             <span class="menu-icon-box"><el-icon><Bell /></el-icon></span>
             <span>社区公告</span>
           </el-menu-item>
-          <el-menu-item index="/app/community/resources">
-            <span class="menu-icon-box"><el-icon><Document /></el-icon></span>
-            <span>资源中心</span>
-          </el-menu-item>
           <el-menu-item index="/app/community/circles">
             <span class="menu-icon-box"><el-icon><Compass /></el-icon></span>
             <span>社区圈子</span>
@@ -75,14 +71,6 @@
             <span class="menu-icon-box"><el-icon><EditPen /></el-icon></span>
             <span>草稿箱</span>
           </el-menu-item>
-          <el-menu-item index="/app/community/purchases">
-            <span class="menu-icon-box"><el-icon><ShoppingBag /></el-icon></span>
-            <span>我的购买</span>
-          </el-menu-item>
-          <el-menu-item index="/app/community/exchange">
-            <span class="menu-icon-box"><el-icon><Present /></el-icon></span>
-            <span>兑换商城</span>
-          </el-menu-item>
           <el-menu-item index="/app/community/notifications">
             <span class="menu-icon-box"><el-icon><Message /></el-icon></span>
             <span>社区通知</span>
@@ -90,10 +78,6 @@
           <el-menu-item index="/app/community/leaderboard">
             <span class="menu-icon-box"><el-icon><Trophy /></el-icon></span>
             <span>排行榜</span>
-          </el-menu-item>
-          <el-menu-item index="/app/community/support">
-            <span class="menu-icon-box"><el-icon><Service /></el-icon></span>
-            <span>工单支持</span>
           </el-menu-item>
           <el-menu-item index="/app/dashboard">
             <span class="menu-icon-box"><el-icon><Back /></el-icon></span>
@@ -651,7 +635,7 @@ import {
   Medal, Connection, Service, Sunrise, Switch, Timer, Setting, Compass,
   Search, Download, Check, InfoFilled, Warning, Lock, SwitchButton,
   Refresh, Avatar, ChatLineSquare, Link, Back, Edit, Wallet,
-  EditPen, ShoppingBag, Present, Message, Trophy
+  EditPen, Message, Trophy
 } from '@element-plus/icons-vue'
 import * as notify from '@/api/notification'
 import { getChromeConfig, detectChrome, saveChromeConfig, downloadChrome, validateChromePath } from '@/api/chrome'

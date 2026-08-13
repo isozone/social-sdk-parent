@@ -760,7 +760,7 @@ CREATE INDEX idx_market_keyword_deleted ON market_keyword(deleted);
 -- 市场搜索快照（定时抓取指定关键词的商品列表，用于价格趋势分析）
 CREATE TABLE IF NOT EXISTS market_snapshot (
     id INTEGER PRIMARY KEY,
-    task_id INTEGER NOT NULL,                        -- 关联 monitor_task.id
+    task_id INTEGER,                                -- 关联 monitor_task.id（可空：市场情报抓取无任务）
     keyword VARCHAR(256) NOT NULL,                   -- 搜索关键词
     account_id INTEGER,                              -- 抓取所用账号（可空=未绑定）
     total_results INTEGER DEFAULT 0,                 -- 本次抓取到的商品总数
