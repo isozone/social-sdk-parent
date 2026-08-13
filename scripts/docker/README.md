@@ -20,9 +20,9 @@
 三种镜像地址：
 
 ```text
-registry.cn-hangzhou.aliyuncs.com/eqadmin/xianyu-manager:sqlite-0.0.2
-registry.cn-hangzhou.aliyuncs.com/eqadmin/xianyu-manager:mysql-0.0.2
-registry.cn-hangzhou.aliyuncs.com/eqadmin/xianyu-manager:postgres-0.0.2
+registry.cn-hangzhou.aliyuncs.com/eqadmin/xianyu-manager:sqlite-0.0.7
+registry.cn-hangzhou.aliyuncs.com/eqadmin/xianyu-manager:mysql-0.0.7
+registry.cn-hangzhou.aliyuncs.com/eqadmin/xianyu-manager:postgres-0.0.7
 ```
 
 ## 目录结构
@@ -76,7 +76,7 @@ Windows：
 set ACR_REGISTRY=registry.cn-hangzhou.aliyuncs.com
 set ACR_NAMESPACE=eqadmin
 set IMAGE_NAME=xianyu-manager
-set TAG=0.0.2
+set TAG=0.0.7
 
 docker compose --env-file .env -f docker-compose.yml up -d
 ```
@@ -87,7 +87,7 @@ Linux / macOS：
 export ACR_REGISTRY=registry.cn-hangzhou.aliyuncs.com
 export ACR_NAMESPACE=eqadmin
 export IMAGE_NAME=xianyu-manager
-export TAG=0.0.2
+export TAG=0.0.7
 
 docker compose --env-file .env -f docker-compose.yml up -d
 ```
@@ -112,7 +112,7 @@ Windows：
 set ACR_REGISTRY=registry.cn-hangzhou.aliyuncs.com
 set ACR_NAMESPACE=eqadmin
 set IMAGE_NAME=xianyu-manager
-set TAG=0.0.2
+set TAG=0.0.7
 
 docker compose --env-file .env -f docker-compose.yml -f docker-compose.mysql.yml up -d
 ```
@@ -123,7 +123,7 @@ Linux / macOS：
 export ACR_REGISTRY=registry.cn-hangzhou.aliyuncs.com
 export ACR_NAMESPACE=eqadmin
 export IMAGE_NAME=xianyu-manager
-export TAG=0.0.2
+export TAG=0.0.7
 
 docker compose --env-file .env -f docker-compose.yml -f docker-compose.mysql.yml up -d
 ```
@@ -136,7 +136,7 @@ Windows：
 set ACR_REGISTRY=registry.cn-hangzhou.aliyuncs.com
 set ACR_NAMESPACE=eqadmin
 set IMAGE_NAME=xianyu-manager
-set TAG=0.0.2
+set TAG=0.0.7
 
 docker compose --env-file .env -f docker-compose.yml -f docker-compose.postgres.yml up -d
 ```
@@ -147,7 +147,7 @@ Linux / macOS：
 export ACR_REGISTRY=registry.cn-hangzhou.aliyuncs.com
 export ACR_NAMESPACE=eqadmin
 export IMAGE_NAME=xianyu-manager
-export TAG=0.0.2
+export TAG=0.0.7
 
 docker compose --env-file .env -f docker-compose.yml -f docker-compose.postgres.yml up -d
 ```
@@ -211,7 +211,7 @@ docker compose --env-file .env -f docker-compose.yml up -d --force-recreate
 ```bat
 set ACR_REGISTRY=registry.cn-hangzhou.aliyuncs.com
 set ACR_NAMESPACE=eqadmin
-set TAG=0.0.2
+set TAG=0.0.7
 set IMAGE_NAME=xianyu-manager
 
 scripts\docker\publish-acr.bat
@@ -222,7 +222,7 @@ scripts\docker\publish-acr.bat
 ```bat
 set ACR_REGISTRY=registry.cn-hangzhou.aliyuncs.com
 set ACR_NAMESPACE=eqadmin
-set TAG=0.0.2
+set TAG=0.0.7
 set IMAGE_NAME=xianyu-manager
 set ACR_USERNAME=你的阿里云ACR用户名
 set ACR_PASSWORD=你的阿里云ACR密码或访问凭证
@@ -249,7 +249,7 @@ scripts\docker\publish-acr.bat --mode postgres
 ```bash
 ACR_REGISTRY=registry.cn-hangzhou.aliyuncs.com \
 ACR_NAMESPACE=eqadmin \
-TAG=0.0.2 \
+TAG=0.0.7 \
 IMAGE_NAME=xianyu-manager \
 bash scripts/docker/publish-acr.sh
 ```
@@ -259,7 +259,7 @@ bash scripts/docker/publish-acr.sh
 ```bash
 ACR_REGISTRY=registry.cn-hangzhou.aliyuncs.com \
 ACR_NAMESPACE=eqadmin \
-TAG=0.0.2 \
+TAG=0.0.7 \
 IMAGE_NAME=xianyu-manager \
 ACR_USERNAME=你的阿里云ACR用户名 \
 ACR_PASSWORD=你的阿里云ACR密码或访问凭证 \

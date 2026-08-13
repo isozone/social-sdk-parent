@@ -12,7 +12,7 @@
 services:
   # ── 覆盖 xianyu-manager 配置（PostgreSQL 版） ───────────────────────────────
   xianyu-manager:
-    image: ${ACR_REGISTRY:-registry.cn-hangzhou.aliyuncs.com}/${ACR_NAMESPACE:-eqadmin}/${IMAGE_NAME:-xianyu-manager}:postgres-${TAG:-0.0.2}
+    image: ${ACR_REGISTRY:-registry.cn-hangzhou.aliyuncs.com}/${ACR_NAMESPACE:-eqadmin}/${IMAGE_NAME:-xianyu-manager}:postgres-${TAG:-0.0.7}
     environment:
       - SPRING_PROFILES_ACTIVE=postgres
       - TZ=Asia/Shanghai

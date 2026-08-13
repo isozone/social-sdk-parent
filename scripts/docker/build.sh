@@ -74,7 +74,7 @@ preflight_check() {
 
 # ── 优先构建 JAR ────────────────────────────────────────────────────────────
 build_jar_if_needed() {
-    local jar_path="$PROJECT_ROOT/social-sdk-xianyu-manager/target/social-sdk-xianyu-manager-0.0.1.jar"
+    local jar_path="$PROJECT_ROOT/social-sdk-xianyu-manager/target/social-sdk-xianyu-manager-0.0.7.jar"
 
     if [[ ! -f "$jar_path" ]]; then
         log_step "JAR 文件不存在，开始构建..."
@@ -99,7 +99,7 @@ build_image() {
     # 构建参数
     local build_args=(
         "--build-arg" "DB_MODE=$DB_MODE"
-        "--build-arg" "JAR_PATH=social-sdk-xianyu-manager/target/social-sdk-xianyu-manager-0.0.1.jar"
+        "--build-arg" "JAR_PATH=social-sdk-xianyu-manager/target/social-sdk-xianyu-manager-0.0.7.jar"
         "-t" "$image_tag"
         "-f" "$SCRIPT_DIR/Dockerfile"
     )
