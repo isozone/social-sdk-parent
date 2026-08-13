@@ -1047,20 +1047,30 @@ public class ChromeRiskbirdDriver implements RiskbirdPageDriver {
 
     /**
      * 兜底注入账号登录态 cookie（prepareQrLogin 清掉 Chrome profile cookie 后恢复登录态）。
-     * 通过 document.cookie 逐个写入 accountCookieHeader 解析出的键值对。
+     * 关键：用 CDP Network.setCookies（CdpCookieStore.setCookie）注入，能写 httpOnly+secure 的
+     * token/userinfo 登录态关键 cookie；旧实现用 document.cookie 只能写普通 cookie，漏了登录态
+     * → 风鸟按未登录搜命中 0 条。
      * 仅在 accountCookieHeader 非空时注入，避免空注入打断未登录态。
      */
     private void injectCookiesIfNeeded(ChromePage pg) throws IOException, TimeoutException {
         if (accountCookieHeader == null || accountCookieHeader.isBlank()) {
             return;
         }
-        try {
-            StringBuilder js = new StringBuilder("(function(){var pairs=");
-            // 用 JSON.stringify 把 cookie header 转成 JS 字符串字面量，避免引号转义陷阱
-            js.append(pg.evalString("JSON.stringify('" + accountCookieHeader.replace("'", "\\'") + "')"));
-            js.append(".split(';');var ok=0;for(var i=0;i<pairs.length;i++){var p=pairs[i].trim();var idx=p.indexOf('=');if(idx>0){var n=p.substring(0,idx).trim();var v=p.substring(idx+1).trim();if(n){document.cookie=n+'='+v+';path=/;max-age=86400';ok++;}}}return 'injected='+ok;})()");
-            String result = pg.evalString(js.toString());
-            log.info("[RISKBIRD] injectCookiesIfNeeded: {}, accountId={}", result, accountId);
+        try (CdpSession cdp = chromeBrowser.connectToAccount(accountId)) {
+            CdpCookieStore store = new CdpCookieStore(cdp);
+            int ok = 0;
+            for (String pair : accountCookieHeader.split(";")) {
+                int idx = pair.indexOf('=');
+                if (idx > 0) {
+                    String name = pair.substring(0, idx).trim();
+                    String value = pair.substring(idx + 1).trim();
+                    if (!name.isEmpty()) {
+                        store.setCookie(name, value, config.getBaseUrl());
+                        ok++;
+                    }
+                }
+            }
+            log.info("[RISKBIRD] injectCookiesIfNeeded(CDP): injected={}, accountId={}", ok, accountId);
         } catch (Exception e) {
             log.warn("[RISKBIRD] injectCookiesIfNeeded 失败: {}, accountId={}", e.getMessage(), accountId);
         }
