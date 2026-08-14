@@ -1,6 +1,6 @@
 {
   "name": "xianyu-manager-desktop",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "闲鱼管理器桌面版 (Electron)",
   "main": "main.js",
   "author": "social-sdk",
