@@ -171,7 +171,7 @@ public class CloudStorageService {
             extractCode = String.format("%04d", new Random().nextInt(10000));
         }
 
-        String baseUrl = openListClient.getBaseUrlPublic();
+        String baseUrl = openListClient.getPublicBaseUrl();
         String filePath = file.getFilePath();
         if (filePath == null) filePath = "/xianyu-virtual-ship";
         String link = baseUrl + "/d" + filePath + "/" + file.getFileName();

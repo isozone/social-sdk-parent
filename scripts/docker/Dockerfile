@@ -91,6 +91,23 @@ RUN sed -i 's|//archive.ubuntu.com|//mirrors.aliyun.com|g; s|//security.ubuntu.c
     && ln -sf /opt/chrome-linux64/chrome /usr/bin/chromium-browser \
     && rm -rf /var/lib/apt/lists/*
 
+# ── 预置 OpenList 二进制(最佳努力；构建机无 GitHub 外网时跳过，运行时再下载) ──
+# 放到 /opt/openlist(非 volume)，避免被 ./data 绑定挂载遮挡；权限 755 供 xianyu 执行。
+ARG OPENLIST_ARCH=amd64
+RUN set -eux; \
+    mkdir -p /opt/openlist; \
+    OURL="https://github.com/OpenListTeam/OpenList/releases/latest/download/openlist-linux-${OPENLIST_ARCH}.tar.gz"; \
+    if curl -fsSL "$OURL" -o /tmp/openlist.tar.gz 2>/dev/null; then \
+      tar xzf /tmp/openlist.tar.gz -C /tmp; \
+      find /tmp/openlist-linux-${OPENLIST_ARCH} -maxdepth 1 -type f -name 'openlist' -exec cp -f {} /opt/openlist/openlist \; ; \
+      chmod 755 /opt/openlist/openlist; \
+      rm -rf /tmp/openlist.tar.gz /tmp/openlist-linux-${OPENLIST_ARCH}; \
+      echo "[openlist] 已预置二进制 /opt/openlist/openlist"; \
+    else \
+      echo "[openlist] 构建机无法下载 OpenList，跳过预置（运行时将尝试下载，可用 OPENLIST_DOWNLOAD_BASE_URLS 指定镜像）"; \
+    fi; \
+    chown -R xianyu:xianyu /opt/openlist 2>/dev/null || true
+
 # 创建非 root 用户
 RUN groupadd -r xianyu && useradd -r -g xianyu -d /app -s /sbin/nologin xianyu
 
@@ -115,7 +132,8 @@ ENV CHROME_BIN=/usr/bin/chromium-browser \
     SERVER_PORT=8080 \
     DB_PATH=/app/data/xianyu-manager.db \
     TMPDIR=/app/tmp \
-    TZ=Asia/Shanghai
+    TZ=Asia/Shanghai \
+    OPENLIST_BINARY_PATH=/opt/openlist/openlist
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \

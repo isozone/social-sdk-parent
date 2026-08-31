@@ -29,6 +29,18 @@ public class OpenListClient {
 
     // ============== 认证 ==============
 
+    /**
+     * 对外分享链接使用的可访问基址。优先 openlist.public-url（如 http://192.168.1.252:5244），
+     * 未配置则回落到 openlist.url（默认 127.0.0.1:5244，容器外不可达）。
+     */
+    public String getPublicBaseUrl() {
+        String pub = properties.getPublicUrl();
+        if (pub != null && !pub.isBlank()) {
+            return pub.replaceFirst("/$", "");
+        }
+        return getBaseUrl();
+    }
+
     public String login() throws IOException {
         Map<String, String> req = new LinkedHashMap<>();
         req.put("username", properties.getUsername());

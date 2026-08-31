@@ -20,6 +20,7 @@ public class OpenListInstallerService {
     private String osName;
     private String arch;
     private String downloadUrl;
+    private java.util.List<String> downloadCandidates = new java.util.ArrayList<>();
     private String localBinaryName;
 
     public OpenListInstallerService(OpenListProperties properties) {
@@ -47,8 +48,34 @@ public class OpenListInstallerService {
         }
 
         localBinaryName = getLocalBinaryName();
-        downloadUrl = buildDownloadUrl();
+        downloadCandidates = buildDownloadCandidates();
+        downloadUrl = downloadCandidates.isEmpty() ? "" : downloadCandidates.get(0);
         executablePath = dataDir.resolve(localBinaryName);
+    }
+
+    /**
+     * 按顺序生成下载候选地址。base url 列表来自 openlist.download-base-urls
+     * （默认 GitHub latest；受限网络可经 env 注入镜像，逗号分隔）。
+     * 每个 base url 末尾追加 openlist-{os}-{arch}{suffix} 得到完整下载地址。
+     */
+    private java.util.List<String> buildDownloadCandidates() {
+        String osFamily = "linux";
+        if (osName.contains("win")) osFamily = "windows";
+        else if (osName.contains("mac")) osFamily = "darwin";
+
+        String archFamily = arch.contains("arm64") ? "arm64" : "amd64";
+        String suffix = osName.contains("win") ? ".zip" : ".tar.gz";
+        String asset = String.format("openlist-%s-%s%s", osFamily, archFamily, suffix);
+
+        java.util.List<String> candidates = new java.util.ArrayList<>();
+        for (String base : properties.getDownloadBaseUrls()) {
+            String trimmed = base.trim();
+            if (trimmed.isEmpty()) continue;
+            // 去掉末尾斜杠，避免拼出 base//asset
+            while (trimmed.endsWith("/")) trimmed = trimmed.substring(0, trimmed.length() - 1);
+            candidates.add(trimmed + "/" + asset);
+        }
+        return candidates;
     }
 
     private String detectWindowsArch() {
@@ -116,18 +143,75 @@ public class OpenListInstallerService {
     }
 
     private void findExistingExecutable() {
-        for (String name : Arrays.asList(localBinaryName, "openlist", "openlist.exe")) {
-            Path candidate = dataDir.resolve(name);
-            if (Files.exists(candidate)) {
-                executablePath = candidate;
+        // 1) 显式指定的二进制路径优先（如 Docker 镜像内预置 /opt/openlist/openlist）
+        String bp = properties.getBinaryPath();
+        if (bp != null && !bp.isBlank()) {
+            Path p = Paths.get(bp);
+            if (Files.isRegularFile(p)) {
+                executablePath = p;
                 return;
             }
         }
+        // 2) 在 dataDir 中递归定位真实二进制（解压后可能在 openlist-<os>-<arch>/ 子目录内）
+        Path found = searchRealBinary(dataDir);
+        if (found != null) {
+            executablePath = found;
+            return;
+        }
+        // 3) 兜底：保持原约定路径（解压产物根目录），install/start 时会再 resolveExecutablePath
         executablePath = dataDir.resolve(localBinaryName);
     }
 
+    /**
+     * 在 root 下递归查找真实的 OpenList 可执行文件。
+     * OpenList 的 tar.gz 解压后结构为 openlist-&lt;os&gt;-&lt;arch&gt;/openlist（二进制在子目录），
+     * 因此必须递归查找，而不能仅凭 localBinaryName 直接当成文件路径去 exec。
+     */
+    private Path searchRealBinary(Path root) {
+        if (root == null || !Files.exists(root)) return null;
+        if (Files.isRegularFile(root)) {
+            return isOpenListBinary(root) ? root : null;
+        }
+        try (java.util.stream.Stream<Path> stream = Files.walk(root, 4)) {
+            return stream
+                .filter(Files::isRegularFile)
+                .filter(this::isOpenListBinary)
+                .findFirst()
+                .orElse(null);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private boolean isOpenListBinary(Path p) {
+        String name = p.getFileName().toString().toLowerCase();
+        return name.equals("openlist") || name.equals("openlist.exe");
+    }
+
+    /**
+     * 返回真实可执行文件。若当前 executablePath 是目录（解压产物根目录），
+     * 则在其内部递归解析真正的二进制；找不到再退回 dataDir 全局查找。
+     */
+    public Path resolveExecutablePath() {
+        Path p = executablePath;
+        if (p == null) return null;
+        if (Files.isRegularFile(p)) return p;
+        Path found = searchRealBinary(p);
+        if (found != null) {
+            executablePath = found;
+            return found;
+        }
+        Path global = searchRealBinary(dataDir);
+        if (global != null) {
+            executablePath = global;
+            return global;
+        }
+        return p;
+    }
+
     public Map<String, Object> getStatus() {
-        boolean installed = Files.exists(executablePath);
+        Path real = resolveExecutablePath();
+        boolean installed = real != null && Files.isRegularFile(real);
         boolean running = false;
 
         Map<String, Object> status = new LinkedHashMap<>();
@@ -139,18 +223,21 @@ public class OpenListInstallerService {
         status.put("username", properties.getUsername());
         status.put("password", properties.getPassword());
         status.put("downloadUrl", downloadUrl);
+        status.put("downloadCandidates", downloadCandidates);
         status.put("localBinaryName", localBinaryName);
-        status.put("execPath", executablePath.toString());
+        status.put("execPath", real != null ? real.toString() : executablePath.toString());
         status.put("osName", osName);
         status.put("arch", arch);
         return status;
     }
 
     public Map<String, Object> getInfo() {
+        Path real = resolveExecutablePath();
         Map<String, Object> info = new LinkedHashMap<>();
         info.put("downloadUrl", downloadUrl);
+        info.put("downloadCandidates", downloadCandidates);
         info.put("localBinaryName", localBinaryName);
-        info.put("execPath", executablePath.toString());
+        info.put("execPath", real != null ? real.toString() : executablePath.toString());
         info.put("dataDir", dataDir.toString());
         info.put("accessUrl", properties.getUrl());
         info.put("defaultUsername", properties.getUsername());
@@ -165,29 +252,44 @@ public class OpenListInstallerService {
     }
 
     public Path getExecutablePath() {
-        return executablePath;
+        return resolveExecutablePath();
     }
 
     public boolean install() throws IOException {
-        if (Files.exists(executablePath)) {
+        Path real = resolveExecutablePath();
+        if (real != null && Files.isRegularFile(real)) {
             // 已存在：mac/linux 下补一次可执行权限，避免历史解压但无 +x 导致启动 Permission denied
             ensureExecutablePermission();
             return true;
         }
 
-        System.out.println("Downloading OpenList from: " + downloadUrl);
         Path tempFile = dataDir.resolve(localBinaryName + ".download");
-        downloadFile(downloadUrl, tempFile);
+        boolean downloaded = false;
+        Exception lastErr = null;
+        for (String url : downloadCandidates) {
+            try {
+                System.out.println("Downloading OpenList from: " + url);
+                downloadFile(url, tempFile);
+                downloaded = true;
+                break;
+            } catch (IOException e) {
+                lastErr = e;
+                System.err.println("[OpenList] 下载失败(" + url + "): " + e.getMessage() + "，尝试下一个镜像");
+            }
+        }
+        if (!downloaded) {
+            throw new IOException("所有下载源均失败: " + (lastErr != null ? lastErr.getMessage() : "unknown"));
+        }
 
-        if (localBinaryName.endsWith(".exe") || downloadUrl.endsWith(".zip")) {
+        if (localBinaryName.endsWith(".exe") || downloadCandidates.isEmpty() || downloadCandidates.get(0).endsWith(".zip")) {
             extractZip(tempFile, dataDir, localBinaryName);
         } else {
             try {
                 extractTarGz(tempFile, dataDir, localBinaryName);
             } catch (IOException extractErr) {
-                // tar.gz 解压失败：按系统判断下载对应 zip 包重试（mac/linux 也有 zip release asset）
+                // tar.gz 解压失败：尝试下载对应 zip 包重试（mac/linux 也有 zip release asset）
                 System.out.println("tar.gz extract failed (" + extractErr.getMessage() + "), fallback to zip");
-                String fallbackUrl = downloadUrl.replace(".tar.gz", ".zip");
+                String fallbackUrl = downloadCandidates.get(0).replace(".tar.gz", ".zip");
                 Path zipTemp = dataDir.resolve(localBinaryName + ".zip.download");
                 try {
                     downloadFile(fallbackUrl, zipTemp);
@@ -199,7 +301,9 @@ public class OpenListInstallerService {
         }
 
         Files.deleteIfExists(tempFile);
-        executablePath = dataDir.resolve(localBinaryName);
+        // 解压后重新解析真实二进制（可能在 openlist-<os>-<arch>/ 子目录内）
+        Path resolved = resolveExecutablePath();
+        if (resolved != null) executablePath = resolved;
         // mac/linux 下解压后默认无执行权限，必须 chmod +x，否则 ProcessBuilder.start 抛 Permission denied
         ensureExecutablePermission();
         return true;

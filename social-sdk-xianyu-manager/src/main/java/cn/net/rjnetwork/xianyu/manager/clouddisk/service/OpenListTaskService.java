@@ -74,6 +74,15 @@ public class OpenListTaskService {
         );
     }
 
+    public boolean isInstalled() {
+        try {
+            Path p = installerService.getExecutablePath();
+            return p != null && Files.isRegularFile(p);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public Map<String, Object> getStatus() {
         Map<String, Object> s = new LinkedHashMap<>();
         s.put("installed", Files.exists(installerService.getExecutablePath()));
@@ -130,25 +139,14 @@ public class OpenListTaskService {
 
     private void doInstall() {
         try {
-            // 下载
+            // 下载 + 解压 + 解析真实二进制（含镜像回退），统一交由 OpenListInstallerService 处理
             updatePhase("downloading", "正在下载 OpenList...", 0.1);
             Files.createDirectories(dataDir);
             if (!Files.isWritable(dataDir)) {
                 throw new IOException("数据目录不可写: " + dataDir + " (Permission denied)，请检查目录属主/权限后重试");
             }
-            Path tempFile = dataDir.resolve("openlist.download");
-            downloadFile(downloadUrl, tempFile);
-
-            // 解压
-            updatePhase("extracting", "正在解压安装包...", 0.7);
-            if (downloadUrl.endsWith(".zip")) {
-                installerService.extractZip(tempFile, dataDir, installerService.getExecutablePath().getFileName().toString());
-            }
-            Files.deleteIfExists(tempFile);
-
-            // 完成
+            installerService.install();
             updatePhase("idle", "安装完成", 1.0);
-
         } catch (Exception e) {
             updatePhase("failed", "安装失败: " + e.getMessage(), 0.0);
         }
