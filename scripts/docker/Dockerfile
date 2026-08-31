@@ -99,7 +99,7 @@ RUN set -eux; \
     OURL="https://github.com/OpenListTeam/OpenList/releases/latest/download/openlist-linux-${OPENLIST_ARCH}.tar.gz"; \
     if curl -fsSL "$OURL" -o /tmp/openlist.tar.gz 2>/dev/null; then \
       tar xzf /tmp/openlist.tar.gz -C /tmp; \
-      find /tmp/openlist-linux-${OPENLIST_ARCH} -maxdepth 1 -type f -name 'openlist' -exec cp -f {} /opt/openlist/openlist \; ; \
+      find /tmp -maxdepth 3 -type f -name 'openlist' -exec cp -f {} /opt/openlist/openlist \; ; \
       chmod 755 /opt/openlist/openlist; \
       rm -rf /tmp/openlist.tar.gz /tmp/openlist-linux-${OPENLIST_ARCH}; \
       echo "[openlist] 已预置二进制 /opt/openlist/openlist"; \
