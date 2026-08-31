@@ -19,6 +19,11 @@
 
 目前 SDK 已集成了**完整的闲鱼多账号管理平台**，涵盖 AI 客服、AI 运营、市场情报、买家画像、自动发货、监控爬虫、Chrome 容器池、代理池等企业级能力。可用于个人演示与学习。如需商业级部署，后续我们会基于商业底座开发完整的商业系统。
 
+## 💬 交流群
+
+<img src="https://raw.githubusercontent.com/v18268185209/social-sdk-parent/refs/heads/main/docs/qqqunliao.jpg" width="200" />
+
+
 ---
 
 ## 🏗️ 技术架构
@@ -748,9 +753,6 @@ docker run -e SPRING_PROFILES_ACTIVE=mysql ...
 
 ---
 
-## 💬 交流群
-
-<img src="https://raw.githubusercontent.com/v18268185209/social-sdk-parent/refs/heads/main/docs/qqqunliao.jpg" width="200" />
 
 ---
 
