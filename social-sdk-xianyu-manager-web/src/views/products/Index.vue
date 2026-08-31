@@ -29,10 +29,10 @@
 
       <div class="page-toolbar">
         <div class="toolbar-left">
-          <el-select v-model="filters.accountId" placeholder="全部账号" clearable style="width: 160px;">
+          <el-select v-model="filters.accountId" placeholder="全部账号" clearable>
             <el-option v-for="a in accounts" :key="a.id" :label="a.accountName" :value="a.id" />
           </el-select>
-          <el-input v-model="filters.keyword" placeholder="搜索标题关键词" clearable style="width: 200px;" prefix-icon="Search" />
+          <el-input v-model="filters.keyword" placeholder="搜索标题关键词" clearable prefix-icon="Search" />
           <el-select v-model="filters.status" placeholder="全部状态" clearable style="width: 130px;">
             <template v-if="activeTab === 'xianyu'">
               <el-option label="在售" value="ON_SALE" />

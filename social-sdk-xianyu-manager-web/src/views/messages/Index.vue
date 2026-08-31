@@ -622,7 +622,7 @@ onUnmounted(() => {
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   padding: 10px 20px;
   background: #fff;
   border-bottom: 1px solid var(--border);
@@ -651,12 +651,12 @@ onUnmounted(() => {
 /* ==================== 主区域 ==================== */
 .message-container {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
-.chat-row { height: 100%; flex: 1; }
-.chat-row .el-col { height: 100%; }
+.chat-row { height: 100%; flex: 1; gap: 14px; }
+.chat-row .el-col { height: 100%; min-width: 0; }
 
 /* ==================== 会话列表 ==================== */
 .session-list {

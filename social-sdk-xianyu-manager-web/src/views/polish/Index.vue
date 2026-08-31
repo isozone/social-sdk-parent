@@ -11,7 +11,7 @@
           </div>
         </div>
         <el-select
-          v-model="accountId" placeholder="选择账号" :loading="accountsLoading" clearable style="width: 220px"
+          v-model="accountId" placeholder="选择账号" :loading="accountsLoading" clearable
           @change="onAccountChange"
         >
           <el-option v-for="a in accounts" :key="a.id" :label="a.accountName || a.id" :value="a.id" />
@@ -24,7 +24,7 @@
           <el-form :model="singleForm" inline>
             <el-form-item label="商品">
               <el-select v-model="singleForm.itemId" placeholder="选择商品" filterable
-                style="width: 380px" :loading="productLoading" clearable
+                style="width: 100%" :loading="productLoading" clearable
                 :disabled="!singleForm.accountId">
                 <el-option v-for="p in productOptions" :key="p.itemId"
                   :label="`${p.title} · ${p.itemId}`" :value="p.itemId" />
@@ -97,7 +97,7 @@
           <el-form :model="batchForm" :inline="true" style="gap: 10px;">
             <el-form-item label="商品">
               <el-select v-model="batchForm.itemIds" placeholder="选择商品（可多选）" multiple filterable
-                collapse-tags collapse-tags-tooltip style="width: 420px" :loading="productLoading" clearable
+                collapse-tags collapse-tags-tooltip style="width: 100%" :loading="productLoading" clearable
                 :disabled="!batchForm.accountId">
                 <el-option v-for="p in productOptions" :key="p.itemId"
                   :label="`${p.title} · ${p.itemId}`" :value="p.itemId" />
@@ -120,7 +120,7 @@
           <el-form :model="superForm" inline style="margin-top: 14px;">
             <el-form-item label="商品">
               <el-select v-model="superForm.itemId" placeholder="选择商品" filterable
-                style="width: 380px" :loading="productLoading" clearable
+                style="width: 100%" :loading="productLoading" clearable
                 :disabled="!superForm.accountId">
                 <el-option v-for="p in productOptions" :key="p.itemId"
                   :label="`${p.title} · ${p.itemId}`" :value="p.itemId" />
