@@ -146,6 +146,16 @@ public class DatabaseInitializer {
                 new ClassPathResource("db/schema.sql");
                 executeSchemaPerStatement();
             }
+        } catch (Exception e) {
+            logger.warn("Database schema initialization skipped (may already exist): {}", e.getMessage());
+        }
+
+        // ===== 旧库列补齐链路 =====
+        // 独立 try：executeSchemaFile 遇到硬错会冒泡，若与 ensure* 同处一个 try，
+        // 整条兜底链会被跳过 → 老库缺列（如 xianyu_account.last_keepalive_at）永远补不上，
+        // 运行期持续抛 "Unknown column 'xxx' in 'field list'"。
+        // ensure* 内部已对表/列存在性做幂等判断，schema 失败时它们只是空跑或按 tableExists 跳过。
+        try {
             ensureNotifyRetryColumns();
             ensureNotifyDigestConfigTable();
             ensureProductColumns();
@@ -174,15 +184,20 @@ public class DatabaseInitializer {
             // proxy 模块的 schema 文件在 social-sdk-proxys/db/proxy-bindings.sql，
             // 但本类只加载 manager 自己的 schema，proxy 表不会被建 → 启动时 findAllActive 抛 no such table。
             // 这里额外执行 proxy schema，保证删库重建时所有表都建好。
-            executeProxySchema();
-            // ===== Chrome 容器隔离字段补齐（旧库升级）=====
-            // 必须在主 schema 执行成功后跑；主 schema 失败时空库对着不存在的表 ALTER 会炸，
-            // ensureColumn 已加 tableExists 兜底，但放里层 try 更稳。
+            // 单独 try：proxy schema 抛错（方言/权限）不能连带跳过后面的账号列补齐。
+            try {
+                executeProxySchema();
+            } catch (Exception e) {
+                logger.warn("Proxy schema initialization skipped: {}", e.getMessage());
+            }
+            // ===== 账号会话/资料字段 + Chrome 容器隔离字段补齐（旧库升级）=====
+            // ensureColumn 内部已做 tableExists 兜底，主 schema 失败时空库不会对着不存在的表 ALTER。
+            ensureAccountColumns();
             ensureChromeColumns();
             // 本地商品运费偏好列（shipping_mode）旧库升级兜底
             ensureLocalProductShippingModeColumn();
         } catch (Exception e) {
-            logger.warn("Database initialization skipped (may already exist): {}", e.getMessage());
+            logger.warn("Database column backfill skipped: {}", e.getMessage());
         }
 
         try {
@@ -561,6 +576,36 @@ public class DatabaseInitializer {
         String trimmed = trim(userId);
         int at = trimmed.indexOf('@');
         return at > 0 ? trimmed.substring(0, at) : trimmed;
+    }
+
+    /**
+     * 补齐 xianyu_account 的会话/资料字段（旧库升级场景）。
+     * <p>老库在 last_keepalive_at 之前建表，MyBatis-Plus 按实体全字段 SELECT 时会抛
+     * "Unknown column 'last_keepalive_at' in 'field list'"，导致账号列表/保活任务全挂。
+     * schema-*.sql 新建库已含这些列；此处用 ALTER 逐列兜底已有库，保证与
+     * {@code XianyuAccount} 实体字段一一对应。</p>
+     */
+    private void ensureAccountColumns() {
+        // 会话与 Cookie 生命周期
+        ensureColumn("xianyu_account", "last_login_at", "DATETIME");
+        ensureColumn("xianyu_account", "last_keepalive_at", "DATETIME");
+        ensureColumn("xianyu_account", "cookie_expires_at", "DATETIME");
+        ensureColumn("xianyu_account", "cookies_json", "TEXT");
+        ensureColumn("xianyu_account", "last_error", "VARCHAR(512)");
+        // 个人信息（闲鱼 API 拉取）
+        ensureColumn("xianyu_account", "avatar", "VARCHAR(512)");
+        ensureColumn("xianyu_account", "introduction", "TEXT");
+        ensureColumn("xianyu_account", "ip_location", "VARCHAR(64)");
+        ensureColumn("xianyu_account", "followers", "INTEGER DEFAULT 0");
+        ensureColumn("xianyu_account", "following", "INTEGER DEFAULT 0");
+        ensureColumn("xianyu_account", "sold_count", "INTEGER DEFAULT 0");
+        ensureColumn("xianyu_account", "purchase_count", "INTEGER DEFAULT 0");
+        ensureColumn("xianyu_account", "collection_count", "INTEGER DEFAULT 0");
+        ensureColumn("xianyu_account", "on_sale_count", "INTEGER DEFAULT 0");
+        ensureColumn("xianyu_account", "shop_level", "VARCHAR(32)");
+        ensureColumn("xianyu_account", "credit_score", "INTEGER DEFAULT 0");
+        ensureColumn("xianyu_account", "review_num", "INTEGER DEFAULT 0");
+        ensureColumn("xianyu_account", "profile_synced_at", "DATETIME");
     }
 
     /**
