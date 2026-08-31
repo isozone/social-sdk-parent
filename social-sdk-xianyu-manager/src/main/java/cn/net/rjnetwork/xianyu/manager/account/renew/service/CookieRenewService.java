@@ -1,6 +1,8 @@
 package cn.net.rjnetwork.xianyu.manager.account.renew.service;
 
 import cn.net.rjnetwork.xianyu.api.XianyuLoginApiService;
+import cn.net.rjnetwork.xianyu.chrome.cdp.CdpCookieStore;
+import cn.net.rjnetwork.xianyu.chrome.cdp.CdpSession;
 import cn.net.rjnetwork.xianyu.manager.account.mapper.AccountMapper;
 import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
 import cn.net.rjnetwork.xianyu.manager.account.renew.mapper.CookieRefreshScheduleMapper;
@@ -12,6 +14,12 @@ import cn.net.rjnetwork.xianyu.manager.batch.service.BatchJobService;
 import cn.net.rjnetwork.xianyu.manager.circuit.CircuitBreakerService;
 import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -20,6 +28,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -42,6 +52,12 @@ public class CookieRenewService {
     private static final Logger log = LoggerFactory.getLogger(CookieRenewService.class);
     private static final String JOB_TYPE = "cookies_refresh";
     private static final String IM_PAGE_URL = "https://www.goofish.com/";
+
+    /** goofish/taobao 生态相关域名（提取 cookie 时只保留这些，过滤掉无关站点的 cookie 噪声）。 */
+    private static final List<String> RELATED_DOMAINS = List.of(
+            "goofish.com", "taobao.com", "tbcdn.cn", "alicdn.com", "aliyun.com", "alipay.com", "aliimg.com");
+    private static final OkHttpClient CDP_HTTP = new OkHttpClient();
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private final AccountMapper accountMapper;
     private final CookieRefreshScheduleMapper scheduleMapper;
@@ -277,17 +293,131 @@ public class CookieRenewService {
     }
 
     /**
-     * 通过 CDP Network.getCookies 从账号独占 Chrome 容器提取 goofish 域 Cookie。
-     * 容器已在 renewOne 中启动，这里直接走 CDP HTTP。
+     * 通过 CDP 从账号独占 Chrome 容器提取 goofish/taobao 生态 Cookie。
+     *
+     * <p>链路：{@code ChromeProfileManager.getCdpEndpoint(accountId)} 拿到 CDP HTTP 端点
+     * （如 {@code http://127.0.0.1:9222}）→ 请求 {@code /json/version} 拿到浏览器级
+     * {@code webSocketDebuggerUrl} → 经 {@link CdpSession} 建 WebSocket →
+     * {@link CdpCookieStore#getAllCookies()}（即 {@code Network.getAllCookies}）读取整个 cookie jar →
+     * 过滤 goofish/taobao 生态域并去重 → 拼成 {@code k1=v1; k2=v2} header 返回。</p>
+     *
+     * <p>与 {@code XianyuCaptchaSolver.extractCookie} 同思路，但复用更现代的
+     * {@link CdpSession}/{@link CdpCookieStore} 客户端栈（自动 id 匹配、事件订阅、超时保护）。
+     * 容器已由 {@code renewOne} 启动且 profile 目录持久化登录态，无需再导航到 goofish 页。</p>
+     *
+     * <p>任何一步失败都返回 {@link Optional#empty()}，让上层链路降级到 A3 重新登录，不抛异常。</p>
      */
     private Optional<String> extractCookieViaCdp(XianyuAccount account) {
-        // TODO: 调 ChromeProfileManager.getCdpEndpoint(accountId) 拿端点，
-        //       再走 CDP HTTP /json + WebSocket Network.getCookies 提取 goofish.com 域所有 cookie，
-        //       拼成 cookie header 形式（k1=v1; k2=v2）返回。
-        //       链路与 XianyuCaptchaSolver.extractCookie 类似，可后续抽公共 CDP cookie 工具。
-        // 当前先返回空让链路降级到 A3，待 ChromeProfileManager 暴露 CDP client 后补全。
-        log.warn("[A1] extractCookieViaCdp not yet wired for account {}, treat as failed", account.getId());
-        return Optional.empty();
+        String endpoint = resolveCdpEndpoint(account);
+        if (endpoint == null || endpoint.isBlank()) {
+            log.warn("[A1] extractCookieViaCdp: 无可用 CDP 端点, account {}", account.getId());
+            return Optional.empty();
+        }
+        String wsUrl;
+        try {
+            wsUrl = resolveBrowserWsUrl(endpoint);
+        } catch (Exception e) {
+            log.warn("[A1] extractCookieViaCdp: 解析 CDP WS 端点失败, account {}, err={}",
+                    account.getId(), e.getMessage());
+            return Optional.empty();
+        }
+        if (wsUrl == null || wsUrl.isBlank()) {
+            log.warn("[A1] extractCookieViaCdp: 未获取到浏览器级 WS 端点, account {}", account.getId());
+            return Optional.empty();
+        }
+
+        try (CdpSession session = CdpSession.connect(wsUrl, CDP_HTTP)) {
+            // 先 enable Network 域（与 XianyuCaptchaSolver 一致，避免部分 Chrome 版本拒绝 cookie 命令）
+            session.send("Network.enable", null);
+            CdpCookieStore store = new CdpCookieStore(session);
+            List<CdpCookieStore.Cookie> all = store.getAllCookies();
+            // 过滤生态域 + 按 name 去重（保留最后读到的值，避免同 name 多域副本污染 MTOP 请求）
+            LinkedHashMap<String, CdpCookieStore.Cookie> dedup = new LinkedHashMap<>();
+            for (CdpCookieStore.Cookie c : all) {
+                if (c == null || c.name == null || c.name.isEmpty() || c.domain == null) continue;
+                if (!isRelatedDomain(c.domain)) continue;
+                dedup.put(c.name, c);
+            }
+            if (dedup.isEmpty()) {
+                log.warn("[A1] extractCookieViaCdp: 容器 cookie jar 中无 goofish/taobao 生态 cookie, account {}",
+                        account.getId());
+                return Optional.empty();
+            }
+            String header = CdpCookieStore.toHeaderValue(new ArrayList<>(dedup.values()));
+            if (header.isBlank()) {
+                return Optional.empty();
+            }
+            log.info("[A1] extractCookieViaCdp: 提取到 {} 个生态 cookie, account {}",
+                    dedup.size(), account.getId());
+            return Optional.of(header);
+        } catch (Exception e) {
+            log.warn("[A1] extractCookieViaCdp: CDP 提取异常, account {}, err={}",
+                    account.getId(), e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * 解析账号 Chrome 容器的 CDP HTTP 端点：优先 {@code ChromeProfileManager.getCdpEndpoint}，
+     * 失败则回落到账号 {@code cdpPort} 字段拼 {@code http://127.0.0.1:<port>}。
+     */
+    private String resolveCdpEndpoint(XianyuAccount account) {
+        try {
+            var cpm = accountService.getChromeProfileManager();
+            if (cpm != null) {
+                var ep = cpm.getCdpEndpoint(account.getId());
+                if (ep.isPresent() && !ep.get().isBlank()) {
+                    return normalizeEndpoint(ep.get());
+                }
+            }
+        } catch (Exception ignored) {
+            // 容器未就绪或 ChromeProfileManager 不可用，回落到 cdpPort
+        }
+        Integer port = account.getCdpPort();
+        if (port != null && port > 0) {
+            return "http://127.0.0.1:" + port;
+        }
+        return null;
+    }
+
+    /** 去掉尾部斜杠，统一成 {@code http://host:port} 形式。 */
+    private static String normalizeEndpoint(String endpoint) {
+        String s = endpoint.trim();
+        while (s.endsWith("/")) s = s.substring(0, s.length() - 1);
+        return s;
+    }
+
+    /**
+     * 请求 {@code /json/version} 拿到浏览器级 {@code webSocketDebuggerUrl}。
+     * 浏览器级会话支持 {@code Network.getAllCookies}（跨所有 target 读取整个 cookie jar）。
+     */
+    private String resolveBrowserWsUrl(String endpoint) throws Exception {
+        Request req = new Request.Builder()
+                .url(endpoint + "/json/version")
+                .get()
+                .build();
+        try (Response resp = CDP_HTTP.newCall(req).execute()) {
+            if (!resp.isSuccessful()) {
+                throw new IllegalStateException("CDP /json/version HTTP " + resp.code());
+            }
+            try (ResponseBody body = resp.body()) {
+                if (body == null) throw new IllegalStateException("CDP /json/version 响应体为空");
+                JsonNode json = JSON.readTree(body.string());
+                String ws = json.path("webSocketDebuggerUrl").asText("");
+                if (ws.isBlank()) throw new IllegalStateException("CDP /json/version 无 webSocketDebuggerUrl");
+                return ws;
+            }
+        }
+    }
+
+    /** 判断域名是否属于 goofish/taobao 生态（含子域）。 */
+    private static boolean isRelatedDomain(String domain) {
+        if (domain == null) return false;
+        String d = domain.toLowerCase();
+        for (String related : RELATED_DOMAINS) {
+            if (d.equals(related) || d.endsWith("." + related)) return true;
+        }
+        return false;
     }
 
     // ==================== 批次日志辅助 ====================

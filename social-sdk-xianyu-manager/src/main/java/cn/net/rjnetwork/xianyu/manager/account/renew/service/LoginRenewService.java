@@ -245,15 +245,10 @@ public class LoginRenewService {
             log.warn("[A3] account {} password missing, fall back to QR", account.getId());
             return renewViaQr(account);
         }
-        // SDK 密码登录流程：visit homepage → fetch _m_h5_tk → login form → submit
-        // 这里走 cookieLogin 复登拿新 cookie（password 字段 SDK 内部处理，需账号绑定登录名/密码）
-        XianyuLoginApiService loginApi = new XianyuLoginApiService(account.getCookieHeader());
-        XianyuLoginApiService.LoginResult r = loginApi.cookieLogin(account.getCookieHeader());
-        if (r != null && r.success && r.cookieHeader != null) {
-            applyNewCookie(account, r.cookieHeader);
-            return RenewResult.SUCCESS;
-        }
-        return RenewResult.FAILED;
+        // SDK 并无真正的密码登录入口（仅 cookieLogin/QR/checkLoginStatus），
+        // 若携带旧密码亦仅作 cookieLogin 复登，不影响重试；记录告警后转 QR
+        log.warn("[A3] account {} password provided but SDK has no password login, fall back to QR", account.getId());
+        return renewViaQr(account);
     }
 
     /** 写回新 cookie + 恢复 ACTIVE + 重置重试计数。 */

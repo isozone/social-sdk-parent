@@ -39,8 +39,8 @@
           <div class="card-header">
             <span>帖子广场</span>
             <div class="dt-actions">
-              <el-input v-model="topicQuery.keyword" placeholder="搜索帖子" clearable style="width:200px" @keyup.enter="loadTopics" @clear="loadTopics" />
-              <el-select v-model="topicQuery.category_id" clearable placeholder="全部分类" style="width:150px" @change="loadTopics"><el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" /></el-select>
+              <el-input v-model="topicQuery.keyword" placeholder="搜索帖子" clearable @keyup.enter="loadTopics" @clear="loadTopics" />
+              <el-select v-model="topicQuery.category_id" clearable placeholder="全部分类" @change="loadTopics"><el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" /></el-select>
               <el-button @click="loadTopics">搜索</el-button>
               <el-button type="primary" @click="$router.push('/app/community/composer')">发布帖子</el-button>
             </div>
@@ -102,7 +102,7 @@
             <div class="custom-recharge">
               <el-radio-group v-model="rechargeChannel" class="mb12"><el-radio-button label="wechat">微信扫码</el-radio-button><el-radio-button label="alipay">支付宝扫码</el-radio-button></el-radio-group>
               <div class="custom-recharge-row">
-                <el-input-number v-model="customRechargeAmount" :min="1" :step="10" :precision="0" placeholder="充值社区币数量" style="width:200px" />
+                <el-input-number v-model="customRechargeAmount" :min="1" :step="10" :precision="0" placeholder="充值社区币数量" />
                 <span class="custom-recharge-tip">≈ ¥{{ formatCents(communityCreditAmountToCents(customRechargeAmount || 0, creditExchangeRate || 100)) }}</span>
                 <el-button type="primary" :loading="submitting" @click="createCustomCreditOrder">扫码充值</el-button>
               </div>
@@ -118,13 +118,8 @@
     <template v-else-if="section === 'orders'">
       <data-table title="支付订单" :data="displayOrders" :columns="orderColumns">
         <template #actions>
-          <el-select v-model="orderQuery.status" clearable placeholder="状态" style="width:130px">
-            <el-option label="待支付" value="pending" />
-            <el-option label="已支付" value="paid" />
-            <el-option label="已过期" value="expired" />
-            <el-option label="已取消" value="cancelled" />
-          </el-select>
-          <el-input v-model="orderQuery.keyword" clearable placeholder="搜索订单号" style="width:210px"><template #prefix><el-icon><Search /></el-icon></template></el-input>
+          <el-select v-model="orderQuery.status" clearable placeholder="状态"><el-option label="待支付" value="pending" /><el-option label="已支付" value="paid" /><el-option label="已过期" value="expired" /><el-option label="已取消" value="cancelled" /></el-select>
+          <el-input v-model="orderQuery.keyword" clearable placeholder="搜索订单号"><template #prefix><el-icon><Search /></el-icon></template></el-input>
         </template>
         <template #row-actions="{ row }"><el-button size="small" @click="openOrder(row)">详情/支付</el-button></template>
       </data-table>

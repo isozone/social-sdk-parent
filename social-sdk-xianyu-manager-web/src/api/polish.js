@@ -1,7 +1,6 @@
 import request from '@/api/request'
 
-// 擦亮 API — 调后台 PolishService（暂未独立 Controller，复用 product 域透出端点）
-// 后台 ProductController 需新增 /api/products/polish 端点，见后台 PolishService
+// 擦亮 API — 已对接后台 ProductController 的 /api/products/polish* 端点（由 PolishService 实现）
 export function polishItem(accountId, itemId) {
   return request.post('/products/polish', null, { params: { accountId, itemId } })
 }

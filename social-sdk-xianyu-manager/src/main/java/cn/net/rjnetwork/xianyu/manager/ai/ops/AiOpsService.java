@@ -1,5 +1,7 @@
 package cn.net.rjnetwork.xianyu.manager.ai.ops;
 
+import cn.net.rjnetwork.xianyu.manager.ai.mapper.AiModelMapper;
+import cn.net.rjnetwork.xianyu.manager.ai.model.AiModel;
 import cn.net.rjnetwork.xianyu.manager.ai.service.AiChatService;
 import cn.net.rjnetwork.xianyu.manager.ops.dto.OpsBatchCreateRequest;
 import cn.net.rjnetwork.xianyu.manager.ops.dto.OpsBatchCreateResult;
@@ -8,6 +10,8 @@ import cn.net.rjnetwork.xianyu.manager.ops.dto.OpsWeeklyReport;
 import cn.net.rjnetwork.xianyu.manager.ops.mapper.AiOpsKnowledgeMapper;
 import cn.net.rjnetwork.xianyu.manager.ops.mapper.AiOpsSuggestionMapper;
 import cn.net.rjnetwork.xianyu.manager.ops.mapper.AiOpsTaskMapper;
+import cn.net.rjnetwork.xianyu.manager.ops.model.AiOpsKnowledge;
+import cn.net.rjnetwork.xianyu.manager.ops.model.AiOpsSuggestion;
 import cn.net.rjnetwork.xianyu.manager.ops.model.AiOpsTask;
 import cn.net.rjnetwork.xianyu.manager.order.mapper.OrderMapper;
 import cn.net.rjnetwork.xianyu.manager.order.model.XianyuOrder;
@@ -15,9 +19,13 @@ import cn.net.rjnetwork.xianyu.manager.product.dto.ProductCreateRequest;
 import cn.net.rjnetwork.xianyu.manager.product.mapper.ProductMapper;
 import cn.net.rjnetwork.xianyu.manager.product.model.XianyuProduct;
 import cn.net.rjnetwork.xianyu.manager.product.service.ProductService;
+import cn.net.rjnetwork.xianyu.manager.reply.mapper.AutoReplyLogMapper;
+import cn.net.rjnetwork.xianyu.manager.reply.model.XianyuAutoReplyLog;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +44,7 @@ import java.util.stream.Collectors;
 @Service
 public class AiOpsService {
 
+    private static final Logger log = LoggerFactory.getLogger(AiOpsService.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final AiOpsTaskMapper taskMapper;
@@ -45,6 +54,8 @@ public class AiOpsService {
     private final ProductService productService;
     private final ProductMapper productMapper;
     private final OrderMapper orderMapper;
+    private final AiModelMapper aiModelMapper;
+    private final AutoReplyLogMapper autoReplyLogMapper;
 
     /** 任务进度缓存 */
     private final Map<Long, OpsBatchCreateResult> progressCache = new ConcurrentHashMap<>();
@@ -55,7 +66,9 @@ public class AiOpsService {
                         AiChatService chatService,
                         ProductService productService,
                         ProductMapper productMapper,
-                        OrderMapper orderMapper) {
+                        OrderMapper orderMapper,
+                        AiModelMapper aiModelMapper,
+                        AutoReplyLogMapper autoReplyLogMapper) {
         this.taskMapper = taskMapper;
         this.suggestionMapper = suggestionMapper;
         this.knowledgeMapper = knowledgeMapper;
@@ -63,6 +76,8 @@ public class AiOpsService {
         this.productService = productService;
         this.productMapper = productMapper;
         this.orderMapper = orderMapper;
+        this.aiModelMapper = aiModelMapper;
+        this.autoReplyLogMapper = autoReplyLogMapper;
     }
 
     // ======================================================================
@@ -419,8 +434,169 @@ public class AiOpsService {
     }
 
     @Scheduled(cron = "0 30 1 * * ?")
+    @Transactional(rollbackFor = Exception.class)
     public void archiveDailyToKnowledge() {
-        // TODO: 昨日销售数据沉淀到 ai_ops_knowledge
+        try {
+            LocalDate y = LocalDate.now().minusDays(1);
+            LocalDateTime start = y.atStartOfDay();
+            LocalDateTime end = y.plusDays(1).atStartOfDay();
+
+            // 昨日订单（成交趋势）
+            List<XianyuOrder> orders = orderMapper.selectList(
+                    new LambdaQueryWrapper<XianyuOrder>().between(XianyuOrder::getOrderTime, start, end));
+            int sold = (int) orders.stream().filter(o -> "SOLD".equals(o.getType())).count();
+            int bought = (int) orders.stream().filter(o -> "BOUGHT".equals(o.getType())).count();
+
+            // 商品按 categoryId 聚合
+            List<XianyuProduct> products = productMapper.selectList(null);
+            Map<String, CategoryStat> byCat = new LinkedHashMap<>();
+            for (XianyuProduct p : products) {
+                String cat = p.getCategoryId() != null ? p.getCategoryId() : "未分类";
+                CategoryStat s = byCat.computeIfAbsent(cat, k -> new CategoryStat());
+                s.productCount++;
+                s.views += p.getViewCount() != null ? p.getViewCount() : 0;
+                s.favs += p.getFavoriteCount() != null ? p.getFavoriteCount() : 0;
+            }
+
+            // 热门命中关键词（自动回复日志，近 7 天）
+            LocalDateTime kwSince = LocalDate.now().atStartOfDay().minusDays(6);
+            List<XianyuAutoReplyLog> logs = autoReplyLogMapper.selectList(
+                    new LambdaQueryWrapper<XianyuAutoReplyLog>().ge(XianyuAutoReplyLog::getCreatedAt, kwSince)
+                            .eq(XianyuAutoReplyLog::getMatched, true));
+            Map<String, Integer> kwHit = new LinkedHashMap<>();
+            for (XianyuAutoReplyLog l : logs) {
+                if (l.getKeyword() == null || l.getKeyword().isBlank()) continue;
+                kwHit.merge(l.getKeyword(), 1, Integer::sum);
+            }
+
+            Long modelId = resolveDefaultModelId();
+            if (modelId == null) {
+                log.warn("[AiOps] 无可用 AI 模型，跳过知识库 AI 生成（仅保留聚合统计）");
+            }
+
+            for (Map.Entry<String, CategoryStat> e : byCat.entrySet()) {
+                String cat = e.getKey();
+                CategoryStat s = e.getValue();
+                generateAndSaveKnowledge(modelId, cat, "PRICING",
+                        String.format("你是闲鱼运营专家。品类=%s，昨日成交=%d，买入=%d，在售商品=%d，总浏览=%d，总收藏=%d。请给出该品类的定价策略要点（3-5 条，简洁）。",
+                                cat, sold, bought, s.productCount, s.views, s.favs));
+                generateAndSaveKnowledge(modelId, cat, "KEYWORD",
+                        String.format("你是闲鱼运营专家。品类=%s。近 7 天命中高频关键词及次数：%s。请给出该品类标题/文案应重点覆盖的搜索关键词（5-8 个，逗号分隔）。",
+                                cat, topKeywords(kwHit, 10)));
+                generateAndSaveKnowledge(modelId, cat, "POSTING_TIME",
+                        String.format("你是闲鱼运营专家。品类=%s，在售=%d，昨日成交=%d。请给出生源该品类商品的最佳发布/擦亮时段建议（简洁）。",
+                                cat, s.productCount, sold));
+            }
+            log.info("[AiOps] 知识库沉淀完成：品类数={}", byCat.size());
+        } catch (Exception ex) {
+            log.error("[AiOps] 知识库沉淀失败: {}", ex.getMessage(), ex);
+        }
+    }
+
+    /** AI 生成并 upsert 知识（category+knowledgeType+source=AI_GENERATED 先删后插，避免重复堆积） */
+    private void generateAndSaveKnowledge(Long modelId, String category, String knowledgeType, String prompt) {
+        if (modelId == null) return;
+        try {
+            String content = chatService.chat(modelId, "你是一名闲鱼二手交易运营顾问，回答简洁、可执行。", prompt);
+            if (content == null || content.isBlank()) return;
+            knowledgeMapper.delete(new LambdaQueryWrapper<AiOpsKnowledge>()
+                    .eq(AiOpsKnowledge::getCategory, category)
+                    .eq(AiOpsKnowledge::getKnowledgeType, knowledgeType)
+                    .eq(AiOpsKnowledge::getSource, "AI_GENERATED"));
+            AiOpsKnowledge k = new AiOpsKnowledge();
+            k.setCategory(category);
+            k.setKnowledgeType(knowledgeType);
+            k.setContent(content.trim());
+            k.setSource("AI_GENERATED");
+            k.setUpdatedAt(LocalDateTime.now());
+            knowledgeMapper.insert(k);
+        } catch (Exception ex) {
+            log.warn("[AiOps] 生成知识失败 category={} type={}: {}", category, knowledgeType, ex.getMessage());
+        }
+    }
+
+    /** 解析一个可用的默认 AI 模型（优先启用项） */
+    private Long resolveDefaultModelId() {
+        try {
+            AiModel m = aiModelMapper.selectOne(new LambdaQueryWrapper<AiModel>()
+                    .eq(AiModel::getEnabled, true).last("LIMIT 1"));
+            return m != null ? m.getId() : null;
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private String topKeywords(Map<String, Integer> kwHit, int n) {
+        return kwHit.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(n).map(e -> e.getKey() + "(" + e.getValue() + ")")
+                .collect(Collectors.joining("、"));
+    }
+
+    /** 聚合中间结构 */
+    private static class CategoryStat {
+        int productCount = 0;
+        int views = 0;
+        int favs = 0;
+    }
+
+    // ======================================================================
+    // 2. 知识库 / 建议 管理（供前端 AiOps 知识库页面）
+    // ======================================================================
+
+    public List<AiOpsKnowledge> listKnowledge(String category, String knowledgeType, int page, int size) {
+        LambdaQueryWrapper<AiOpsKnowledge> w = new LambdaQueryWrapper<>();
+        if (category != null && !category.isBlank()) w.eq(AiOpsKnowledge::getCategory, category);
+        if (knowledgeType != null && !knowledgeType.isBlank()) w.eq(AiOpsKnowledge::getKnowledgeType, knowledgeType);
+        w.orderByDesc(AiOpsKnowledge::getUpdatedAt);
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<AiOpsKnowledge> p =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);
+        return knowledgeMapper.selectPage(p, w).getRecords();
+    }
+
+    public AiOpsKnowledge getKnowledge(Long id) {
+        return knowledgeMapper.selectById(id);
+    }
+
+    public void deleteKnowledge(Long id) {
+        knowledgeMapper.deleteById(id);
+    }
+
+    public AiOpsKnowledge createKnowledge(AiOpsKnowledge knowledge) {
+        if (knowledge.getSource() == null) knowledge.setSource("MANUAL");
+        if (knowledge.getUpdatedAt() == null) knowledge.setUpdatedAt(LocalDateTime.now());
+        knowledgeMapper.insert(knowledge);
+        return knowledge;
+    }
+
+    public List<AiOpsSuggestion> listSuggestions(Long accountId, Boolean adopted, int page, int size) {
+        LambdaQueryWrapper<AiOpsSuggestion> w = new LambdaQueryWrapper<>();
+        if (accountId != null) w.eq(AiOpsSuggestion::getAccountId, accountId);
+        if (adopted != null) w.eq(AiOpsSuggestion::getAdopted, adopted);
+        w.orderByDesc(AiOpsSuggestion::getCreatedAt);
+        com.baomidou.mybatisplus.extension.plugins.pagination.Page<AiOpsSuggestion> p =
+                new com.baomidou.mybatisplus.extension.plugins.pagination.Page<>(page, size);
+        return suggestionMapper.selectPage(p, w).getRecords();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public AiOpsSuggestion adoptSuggestion(Long id) {
+        AiOpsSuggestion s = suggestionMapper.selectById(id);
+        if (s == null) return null;
+        s.setAdopted(true);
+        s.setAdoptedAt(LocalDateTime.now());
+        suggestionMapper.updateById(s);
+        return s;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public AiOpsSuggestion ignoreSuggestion(Long id) {
+        AiOpsSuggestion s = suggestionMapper.selectById(id);
+        if (s == null) return null;
+        s.setAdopted(false);
+        s.setAdoptedAt(LocalDateTime.now());
+        suggestionMapper.updateById(s);
+        return s;
     }
 
     private String toJson(Object o) {

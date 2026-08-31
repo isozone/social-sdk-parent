@@ -8,6 +8,8 @@ import cn.net.rjnetwork.xianyu.manager.order.mapper.OrderMapper;
 import cn.net.rjnetwork.xianyu.manager.order.model.XianyuOrder;
 import cn.net.rjnetwork.xianyu.manager.product.mapper.ProductMapper;
 import cn.net.rjnetwork.xianyu.manager.product.model.XianyuProduct;
+import cn.net.rjnetwork.xianyu.manager.reply.mapper.AutoReplyLogMapper;
+import cn.net.rjnetwork.xianyu.manager.reply.model.XianyuAutoReplyLog;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -31,12 +33,14 @@ public class MonitorService {
     private final ProductMapper productMapper;
     private final MessageMapper messageMapper;
     private final OrderMapper orderMapper;
+    private final AutoReplyLogMapper autoReplyLogMapper;
 
-    public MonitorService(AccountMapper accountMapper, ProductMapper productMapper, MessageMapper messageMapper, OrderMapper orderMapper) {
+    public MonitorService(AccountMapper accountMapper, ProductMapper productMapper, MessageMapper messageMapper, OrderMapper orderMapper, AutoReplyLogMapper autoReplyLogMapper) {
         this.accountMapper = accountMapper;
         this.productMapper = productMapper;
         this.messageMapper = messageMapper;
         this.orderMapper = orderMapper;
+        this.autoReplyLogMapper = autoReplyLogMapper;
     }
 
     /**
@@ -265,13 +269,65 @@ public class MonitorService {
     }
 
     /**
-     * 构建规则命中统计，用于柱状图
+     * 构建规则命中统计，用于柱状图。
+     * 数据源：xianyu_auto_reply_log（每次自动回复/命中均落库，含 account_id/rule_id/rule_name/matched）。
+     * 采用内存聚合，规避 MySQL/PG/SQLite 的 GROUP BY / INTERVAL 方言差异（与本项目现有聚合风格一致）。
+     *
+     * @param days 统计窗口（天），默认 7
      */
     private List<Map<String, Object>> buildRuleHitStats() {
-        // 当前返回各账号规则命中计数（由前端展示），留个占位
-        // 后续可从 XianyuMessage 表的 auto_reply=true 字段聚合
-        // 当前仅按账号维度统计消息收发
-        return Collections.emptyList();
+        return buildRuleHitStats(7);
+    }
+
+    private List<Map<String, Object>> buildRuleHitStats(int days) {
+        LocalDateTime since = LocalDate.now().atStartOfDay().minusDays(days - 1L);
+        List<XianyuAutoReplyLog> logs = autoReplyLogMapper.selectList(
+                new LambdaQueryWrapper<XianyuAutoReplyLog>()
+                        .ge(XianyuAutoReplyLog::getCreatedAt, since));
+
+        // 账号 id -> 名称 映射，用于面板展示
+        Map<Long, String> accountNameMap = accountMapper.selectList(null).stream()
+                .collect(Collectors.toMap(XianyuAccount::getId,
+                        a -> a.getDisplayName() != null ? a.getDisplayName() : a.getAccountName(),
+                        (a, b) -> a));
+
+        // 按 (accountId, ruleId, ruleName) 聚合
+        Map<String, Stats> agg = new LinkedHashMap<>();
+        for (XianyuAutoReplyLog log : logs) {
+            Long ruleId = log.getRuleId() == null ? -1L : log.getRuleId();
+            String key = log.getAccountId() + "#" + ruleId + "#" + (log.getRuleName() == null ? "" : log.getRuleName());
+            Stats s = agg.computeIfAbsent(key, k -> new Stats());
+            s.hits++;
+            if (Boolean.TRUE.equals(log.getMatched())) s.matched++;
+            s.accountId = log.getAccountId();
+            s.ruleId = ruleId;
+            s.ruleName = log.getRuleName();
+        }
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Stats s : agg.values()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("accountId", s.accountId);
+            row.put("accountName", accountNameMap.getOrDefault(s.accountId, String.valueOf(s.accountId)));
+            row.put("ruleId", s.ruleId);
+            row.put("ruleName", s.ruleName);
+            row.put("hits", s.hits);
+            row.put("matched", s.matched);
+            row.put("rate", s.hits == 0 ? 0 : Math.round(s.matched * 100.0 / s.hits) / 100.0);
+            result.add(row);
+        }
+        // 命中数降序，取 Top 30
+        result.sort((a, b) -> Integer.compare((Integer) b.get("hits"), (Integer) a.get("hits")));
+        return result.size() > 30 ? result.subList(0, 30) : result;
+    }
+
+    /** 规则命中聚合中间结构 */
+    private static class Stats {
+        long accountId;
+        long ruleId;
+        String ruleName;
+        int hits = 0;
+        int matched = 0;
     }
 
     /**

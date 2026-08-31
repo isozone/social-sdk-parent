@@ -7,6 +7,7 @@ import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
 import cn.net.rjnetwork.xianyu.manager.audit.annotation.Audit;
 import cn.net.rjnetwork.xianyu.manager.common.ApiResponse;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -18,9 +19,14 @@ import java.util.Map;
  *
  * <p>真验接口名走真接通；候选接口名调通后看到 FAIL_SYS_API_NOT_FOUNDED 即知是命名规律候选错，
  * 后续真抓闲鱼 App WebView 域后微调即可，无需改前端。</p>
+ *
+ * <p><b>安全隔离：</b>本 Controller 直接触发真实 SDK 写操作（删商品/发货/拉黑名单等），
+ * 默认随应用启用（{@code bitefu.sdk-test.enabled} 缺省为 true）。生产环境建议显式设置
+ * {@code bitefu.sdk-test.enabled=false} 关闭，避免暴露真实写接口。</p>
  */
 @RestController
 @RequestMapping("/api")
+@ConditionalOnProperty(name = "bitefu.sdk-test.enabled", havingValue = "true", matchIfMissing = true)
 public class SdkTestController {
 
     private final AccountMapper accountMapper;

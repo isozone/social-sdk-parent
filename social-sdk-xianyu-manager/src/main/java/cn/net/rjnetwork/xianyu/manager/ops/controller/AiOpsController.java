@@ -6,6 +6,8 @@ import cn.net.rjnetwork.xianyu.manager.ops.dto.OpsBatchCreateRequest;
 import cn.net.rjnetwork.xianyu.manager.ops.dto.OpsBatchCreateResult;
 import cn.net.rjnetwork.xianyu.manager.ops.dto.OpsMultiSyncRequest;
 import cn.net.rjnetwork.xianyu.manager.ops.dto.OpsWeeklyReport;
+import cn.net.rjnetwork.xianyu.manager.ops.model.AiOpsKnowledge;
+import cn.net.rjnetwork.xianyu.manager.ops.model.AiOpsSuggestion;
 import cn.net.rjnetwork.xianyu.manager.ops.model.AiOpsTask;
 import org.springframework.web.bind.annotation.*;
 
@@ -91,5 +93,74 @@ public class AiOpsController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.ok(opsService.listTasks(accountId, status, page, size));
+    }
+
+    // ==================== 知识库 ====================
+
+    /**
+     * GET /api/ai/ops/knowledge?category=&knowledgeType=&page=1&size=20
+     */
+    @GetMapping("/knowledge")
+    public ApiResponse<List<AiOpsKnowledge>> listKnowledge(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String knowledgeType,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok(opsService.listKnowledge(category, knowledgeType, page, size));
+    }
+
+    /**
+     * GET /api/ai/ops/knowledge/{id}
+     */
+    @GetMapping("/knowledge/{id}")
+    public ApiResponse<AiOpsKnowledge> getKnowledge(@PathVariable Long id) {
+        return ApiResponse.ok(opsService.getKnowledge(id));
+    }
+
+    /**
+     * POST /api/ai/ops/knowledge  （手动新增/补全知识）
+     */
+    @PostMapping("/knowledge")
+    public ApiResponse<AiOpsKnowledge> createKnowledge(@RequestBody AiOpsKnowledge knowledge) {
+        return ApiResponse.ok(opsService.createKnowledge(knowledge));
+    }
+
+    /**
+     * DELETE /api/ai/ops/knowledge/{id}
+     */
+    @DeleteMapping("/knowledge/{id}")
+    public ApiResponse<Boolean> deleteKnowledge(@PathVariable Long id) {
+        opsService.deleteKnowledge(id);
+        return ApiResponse.ok(true);
+    }
+
+    // ==================== 运营建议 ====================
+
+    /**
+     * GET /api/ai/ops/suggestions?accountId=1&adopted=true&page=1&size=20
+     */
+    @GetMapping("/suggestions")
+    public ApiResponse<List<AiOpsSuggestion>> listSuggestions(
+            @RequestParam(required = false) Long accountId,
+            @RequestParam(required = false) Boolean adopted,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.ok(opsService.listSuggestions(accountId, adopted, page, size));
+    }
+
+    /**
+     * POST /api/ai/ops/suggestions/{id}/adopt  采纳建议
+     */
+    @PostMapping("/suggestions/{id}/adopt")
+    public ApiResponse<AiOpsSuggestion> adoptSuggestion(@PathVariable Long id) {
+        return ApiResponse.ok(opsService.adoptSuggestion(id));
+    }
+
+    /**
+     * POST /api/ai/ops/suggestions/{id}/ignore  忽略建议
+     */
+    @PostMapping("/suggestions/{id}/ignore")
+    public ApiResponse<AiOpsSuggestion> ignoreSuggestion(@PathVariable Long id) {
+        return ApiResponse.ok(opsService.ignoreSuggestion(id));
     }
 }
