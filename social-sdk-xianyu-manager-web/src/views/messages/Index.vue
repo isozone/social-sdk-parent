@@ -653,7 +653,7 @@ onUnmounted(() => {
   flex: 1;
   overflow-y: auto;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;  /* 改为 row，让左侧列表和右侧聊天并排 */
 }
 .chat-row { height: 100%; flex: 1; gap: 14px; }
 .chat-row .el-col { height: 100%; min-width: 0; }
