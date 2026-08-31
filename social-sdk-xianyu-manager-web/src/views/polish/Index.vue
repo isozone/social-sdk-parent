@@ -262,6 +262,11 @@ async function doSuperPolish() {
 .page-root { padding: 0; }
 
 .item-detail-panel { margin-top: 16px; }
+.sub-title {
+  font-size: 14px; font-weight: 600; color: var(--text-1);
+  margin-bottom: 10px; padding-left: 8px;
+  border-left: 3px solid var(--brand);
+}
 .section-label {
   font-size: 14px; font-weight: 600; color: var(--text-1);
   margin-bottom: 10px; padding-left: 8px;

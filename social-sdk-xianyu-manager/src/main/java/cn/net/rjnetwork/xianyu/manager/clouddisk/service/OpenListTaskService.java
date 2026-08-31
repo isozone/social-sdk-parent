@@ -225,17 +225,23 @@ public class OpenListTaskService {
                 } catch (UnsupportedOperationException ignored) {}
             }
 
-            // 确保 dataDir 存在并写入 config.json 配置端口
-            Files.createDirectories(dataDir);
-            writeConfigJson();
+            // 统一使用绝对路径作为 OpenList 数据目录：
+            // 避免相对路径与 pb.directory 叠加算出嵌套错误路径，导致 config.json 找不到。
+            Path dataAbs = dataDir.toAbsolutePath().normalize();
+            boolean firstRun = !Files.exists(dataAbs.resolve("data.db"));
 
-            // OpenList server 不支持 --port flag，端口通过 config.json 的 scheme.http_port 配置
+            // 确保 dataDir 存在并写入 config.json 配置端口
+            Files.createDirectories(dataAbs);
+            writeConfigJson(dataAbs);
+
+            // OpenList server 不支持 --port flag，端口通过 config.json 的 scheme.http_port 配置。
+            // --data 必须用绝对路径，否则相对路径以进程工作目录为基准会导致定位错乱。
             ProcessBuilder pb = new ProcessBuilder(
                 execPath.toString(),
                 "server",
-                "--data", dataDir.toString()
+                "--data", dataAbs.toString()
             );
-            pb.directory(dataDir.toFile());
+            pb.directory(dataAbs.toFile());
             pb.redirectErrorStream(true);
 
             this.process = pb.start();
@@ -263,6 +269,11 @@ public class OpenListTaskService {
             // 等待启动
             Thread.sleep(3000);
             if (p.isAlive()) {
+                // 首次初始化（尚无 data.db）时把配置的账号密码应用到 OpenList，
+                // 否则 OpenList 会忽略 config.json 里的 admin 字段并每次随机生成。
+                if (firstRun) {
+                    applyConfiguredAdminCreds(execPath, dataAbs);
+                }
                 updatePhase("running", "启动成功", 1.0);
             } else {
                 updatePhase("failed", "启动失败", 0.0);
@@ -270,6 +281,41 @@ public class OpenListTaskService {
 
         } catch (Exception e) {
             updatePhase("failed", "启动失败: " + e.getMessage(), 0.0);
+        }
+    }
+
+    /**
+     * OpenList 的 config.json 并不支持 admin_username/admin_password 字段（会被忽略），
+     * admin 密码只能通过 `openlist admin set <password>` 在启动后设定。
+     * 首次初始化（数据目录尚无 data.db）时执行一次，确保配置的账号密码(如 huzhenjie)生效。
+     */
+    private void applyConfiguredAdminCreds(Path execPath, Path dataAbs) {
+        String configuredPassword = properties.getPassword();
+        if (configuredPassword == null || configuredPassword.isBlank()) {
+            return;
+        }
+        try {
+            ProcessBuilder pb = new ProcessBuilder(
+                execPath.toString(),
+                "admin", "set", configuredPassword,
+                "--data", dataAbs.toString()
+            );
+            pb.directory(dataAbs.toFile());
+            pb.redirectErrorStream(true);
+            Process admin = pb.start();
+            boolean finished = admin.waitFor(15, TimeUnit.SECONDS);
+            if (finished && admin.exitValue() == 0) {
+                System.out.println("[OpenList] 已应用配置的 admin 密码");
+                // 同步内存与数据库，让前端“初始账号/密码”展示一致
+                this.initialUsername = properties.getUsername();
+                this.initialPassword = configuredPassword;
+                this.initialCredsCaptured = true;
+                persistCredentialsToDb(properties.getUsername(), configuredPassword);
+            } else {
+                System.out.println("[OpenList] 应用 admin 密码失败，将使用 OpenList 随机密码");
+            }
+        } catch (Exception e) {
+            System.err.println("[OpenList] 应用 admin 密码异常: " + e.getMessage());
         }
     }
 
@@ -357,25 +403,48 @@ public class OpenListTaskService {
     }
 
     /**
-     * 写入 config.json：配置端口、用户名、密码。
+     * 写入 config.json：配置监听端口、数据库与各数据目录（均为绝对路径）。
+     *
+     * <p>注意：OpenList 的配置结构不含 admin_username/admin_password 字段（会被静默忽略），
+     * admin 密码需在启动后通过 `openlist admin set` 设定（见 applyConfiguredAdminCreds）。</p>
      */
-    private void writeConfigJson() {
-        Path configFile = dataDir.resolve("config.json");
+    private void writeConfigJson(Path dataAbs) {
+        Path configFile = dataAbs.resolve("config.json");
         try {
+            String dbFile = dataAbs.resolve("data.db").toString();
+            String tempDir = dataAbs.resolve("temp").toString();
+            String bleveDir = dataAbs.resolve("bleve").toString();
+            String logName = dataAbs.resolve("log").resolve("log.log").toString();
             String config = String.format(
                 "{\n" +
+                "  \"force\": true,\n" +
                 "  \"scheme\": {\n" +
+                "    \"address\": \"0.0.0.0\",\n" +
                 "    \"http_port\": %d,\n" +
-                "    \"https_port\": 0\n" +
+                "    \"https_port\": -1,\n" +
+                "    \"force_https\": false,\n" +
+                "    \"cert_file\": \"\",\n" +
+                "    \"key_file\": \"\"\n" +
                 "  },\n" +
                 "  \"jwt_secret\": \"%s\",\n" +
-                "  \"admin_username\": \"%s\",\n" +
-                "  \"admin_password\": \"%s\"\n" +
+                "  \"database\": {\n" +
+                "    \"type\": \"sqlite3\",\n" +
+                "    \"db_file\": \"%s\",\n" +
+                "    \"table_prefix\": \"x_\"\n" +
+                "  },\n" +
+                "  \"temp_dir\": \"%s\",\n" +
+                "  \"bleve_dir\": \"%s\",\n" +
+                "  \"log\": {\n" +
+                "    \"enable\": true,\n" +
+                "    \"name\": \"%s\"\n" +
+                "  }\n" +
                 "}\n",
                 properties.getPort(),
                 UUID.randomUUID().toString().replace("-", ""),
-                properties.getUsername(),
-                properties.getPassword()
+                dbFile,
+                tempDir,
+                bleveDir,
+                logName
             );
             Files.writeString(configFile, config);
         } catch (IOException e) {

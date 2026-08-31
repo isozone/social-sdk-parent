@@ -89,7 +89,7 @@
           账号实时状态
           <span class="panel-sub">共 {{ accounts.length }} 个账号</span>
         </div>
-        <div v-if="accounts.length === 0" class="empty-empty" style="padding:24px;text-align:center;color:#546E7A;">暂无账号数据</div>
+        <div v-if="accounts.length === 0" style="padding:24px;text-align:center;color:#546E7A;">暂无账号数据</div>
         <div v-else class="account-grid">
           <div class="account-card" v-for="acc in accounts" :key="acc.id" :class="'status-' + (acc.status || 'UNKNOWN').toLowerCase()">
             <div class="acc-header">

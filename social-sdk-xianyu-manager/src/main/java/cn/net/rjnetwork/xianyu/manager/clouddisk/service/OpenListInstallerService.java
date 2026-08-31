@@ -25,7 +25,10 @@ public class OpenListInstallerService {
 
     public OpenListInstallerService(OpenListProperties properties) {
         this.properties = properties;
-        this.dataDir = Paths.get(properties.getDataDir());
+        // 统一为绝对路径：OpenList 的 --data / 配置相对路径均以当前工作目录为基准解析，
+        // 若 dataDir 保持相对路径，再与 pb.directory(dataDir) 叠加会算出嵌套错误路径，
+        // 导致 config.json 找不到、数据目录错乱。绝对化后可彻底规避该问题。
+        this.dataDir = Paths.get(properties.getDataDir()).toAbsolutePath().normalize();
     }
 
     @PostConstruct

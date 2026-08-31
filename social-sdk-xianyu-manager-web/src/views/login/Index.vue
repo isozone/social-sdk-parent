@@ -524,6 +524,14 @@ function copyWechat() {
   line-height: 1.75;
   font-size: 15px;
 }
+/* 品牌区纵向排列（内部各区块自带 margin，无需额外 gap） */
+.brand-top {
+  display: flex;
+  flex-direction: column;
+}
+/* 扫码加微信弹窗 */
+.qr-dialog { border-radius: 16px; }
+.qr-copy { width: 100%; margin-top: 10px; }
 .feature-list {
   list-style: none;
   display: flex;

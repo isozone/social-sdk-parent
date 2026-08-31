@@ -150,6 +150,19 @@
 .card-head-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .card-title { font-size: var(--font-lg); font-weight: 600; color: var(--text-1); }
 .card-sub { font-size: var(--font-sm); color: var(--text-3); }
+.card-head-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* ===== 通用提示条间距 ===== */
+.alert-box { margin-bottom: var(--space-4); }
+
+/* ===== 商品管理页 Tabs 与工具栏间距 ===== */
+.prod-tabs { margin-bottom: var(--space-4); }
 
 /* ===== 统一工具栏：左筛选 + 右操作 ===== */
 .page-toolbar {
