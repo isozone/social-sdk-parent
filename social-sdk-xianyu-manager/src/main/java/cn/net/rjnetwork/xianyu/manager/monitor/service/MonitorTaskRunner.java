@@ -140,8 +140,8 @@ public class MonitorTaskRunner {
                         ph.setSnapshotId(snapshot.getId());
                         priceHistoryService.batchRecordPriceHistory(task.getKeyword(), snapshot.getId(), List.of(ph));
 
-                        // 闭环：命中且用户开启「匹配通知」时推送 MONITOR_MATCH
-                        if (Boolean.TRUE.equals(task.getNotifyOnMatch())) {
+                        // 闭环：命中即推送 MONITOR_MATCH；仅当用户显式关闭「匹配通知」时才跳过
+                        if (!Boolean.FALSE.equals(task.getNotifyOnMatch())) {
                             notifyMonitorMatch(task, result);
                         }
                     } catch (Exception e) {

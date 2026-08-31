@@ -118,8 +118,8 @@
     <template v-else-if="section === 'orders'">
       <data-table title="支付订单" :data="displayOrders" :columns="orderColumns">
         <template #actions>
-          <el-select v-model="orderQuery.status" clearable placeholder="状态"><el-option label="待支付" value="pending" /><el-option label="已支付" value="paid" /><el-option label="已过期" value="expired" /><el-option label="已取消" value="cancelled" /></el-select>
-          <el-input v-model="orderQuery.keyword" clearable placeholder="搜索订单号"><template #prefix><el-icon><Search /></el-icon></template></el-input>
+          <el-select v-model="orderQuery.status" clearable placeholder="状态" @change="loadOrders"><el-option label="待支付" value="pending" /><el-option label="已支付" value="paid" /><el-option label="已过期" value="expired" /><el-option label="已取消" value="cancelled" /></el-select>
+          <el-input v-model="orderQuery.keyword" clearable placeholder="搜索订单号" @keyup.enter="loadOrders" @clear="loadOrders"><template #prefix><el-icon><Search /></el-icon></template></el-input>
         </template>
         <template #row-actions="{ row }"><el-button size="small" @click="openOrder(row)">详情/支付</el-button></template>
       </data-table>
@@ -492,6 +492,10 @@ function normalizeFeatureArray(raw){ if(!raw) return []; let v = raw; if(typeof 
 .topic-side { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
 .reply-item { padding: 10px 0; border-bottom: 1px dashed var(--border); color: var(--text-1); }
 
+/* 自定义充值 */
+.custom-recharge-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.custom-recharge-tip { color: var(--text-3); font-size: 13px; }
+
 /* 充值套餐网格 */
 .recharge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 14px; margin-top: 4px; }
 .recharge-plan { border-radius: 14px; text-align: center; transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
@@ -521,6 +525,16 @@ function normalizeFeatureArray(raw){ if(!raw) return []; let v = raw; if(typeof 
 .community-page .el-dialog { border-radius: 14px; }
 .pay-json { background: #0f172a; color: #e5e7eb; padding: 12px; border-radius: 10px; white-space: pre-wrap; max-height: 260px; overflow: auto; margin-top: 12px; }
 .topic-content { max-height: 420px; overflow: auto; }
+
+/* 充值支付弹窗 */
+.wallet-pay-box { text-align: center; margin-top: 14px; }
+.wallet-pay-qr { width: 220px; height: 220px; border: 1px solid var(--border); border-radius: 10px; }
+.wallet-pay-title { font-weight: 600; margin: 12px 0 4px; color: var(--text-1); }
+.wallet-pay-countdown { color: var(--color-warning); font-weight: 600; margin-top: 6px; }
+.wallet-pay-expired { color: var(--color-danger); font-weight: 600; margin-top: 6px; }
+
+/* 表单提示（发布帖子等） */
+.form-tip { color: var(--text-3); font-size: 12px; margin-top: 2px; line-height: 1.5; }
 
 /* 排行榜 */
 .leaderboard-card :deep(.el-card__body) { padding: 8px 12px; }
@@ -578,6 +592,10 @@ function normalizeFeatureArray(raw){ if(!raw) return []; let v = raw; if(typeof 
 .community-page .data-table-card .el-table th.el-table__cell { background: var(--bg-soft); color: var(--text-2); font-weight: 600; }
 .community-page .simple-list-card .el-card__body { padding: 8px 12px; }
 .community-page .empty-box { text-align: center; color: var(--text-3); padding: 36px; }
+
+/* 支付订单/流水表格头部搜索区：下拉与输入框定宽，避免 100% 宽度被 flex-wrap 挤成两行 */
+.community-page .data-table-card .dt-actions .el-select { width: 130px; flex-shrink: 0; }
+.community-page .data-table-card .dt-actions .el-input { width: 220px; flex-shrink: 0; }
 
 /* 通用简单列表（我的帖子/收藏/草稿/社区通知等） */
 .community-page .sl-list { display: flex; flex-direction: column; gap: 2px; }

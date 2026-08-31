@@ -8,6 +8,8 @@ import cn.net.rjnetwork.xianyu.manager.market.model.MarketSnapshot;
 import cn.net.rjnetwork.xianyu.manager.market.model.PriceHistory;
 import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
@@ -21,6 +23,8 @@ import java.util.stream.Collectors;
  */
 @Service
 public class PriceHistoryService {
+
+    private static final Logger logger = LoggerFactory.getLogger(PriceHistoryService.class);
 
     private final PriceHistoryMapper priceMapper;
     private final MarketSnapshotMapper snapshotMapper;
