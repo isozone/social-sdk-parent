@@ -6,7 +6,9 @@ import cn.net.rjnetwork.xianyu.manager.market.mapper.PriceHistoryMapper;
 import cn.net.rjnetwork.xianyu.manager.market.model.MarketDailyStat;
 import cn.net.rjnetwork.xianyu.manager.market.model.MarketSnapshot;
 import cn.net.rjnetwork.xianyu.manager.market.model.PriceHistory;
+import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -23,11 +25,14 @@ public class PriceHistoryService {
     private final PriceHistoryMapper priceMapper;
     private final MarketSnapshotMapper snapshotMapper;
     private final MarketDailyStatMapper dailyStatMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public PriceHistoryService(PriceHistoryMapper priceMapper, MarketSnapshotMapper snapshotMapper, MarketDailyStatMapper dailyStatMapper) {
+    public PriceHistoryService(PriceHistoryMapper priceMapper, MarketSnapshotMapper snapshotMapper,
+                               MarketDailyStatMapper dailyStatMapper, ApplicationEventPublisher eventPublisher) {
         this.priceMapper = priceMapper;
         this.snapshotMapper = snapshotMapper;
         this.dailyStatMapper = dailyStatMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     /** 记录一次搜索快照 */
@@ -102,6 +107,27 @@ public class PriceHistoryService {
         stat.setVolume(records.size());
         stat.setTotalListings(records.size());
         stat.setDeleted(0);
+
+        // 闭环：与上一日均值比较，均价下跌则推送 MARKET_PRICE_DROP 通知
+        try {
+            LocalDate prev = date.minusDays(1);
+            List<MarketDailyStat> prevList = dailyStatMapper.selectByKeywordAndRange(keyword, prev, prev);
+            MarketDailyStat prevStat = (prevList != null && !prevList.isEmpty()) ? prevList.get(0) : null;
+            if (prevStat != null && prevStat.getAvgPrice() != null && stat.getAvgPrice() != null
+                    && stat.getAvgPrice() < prevStat.getAvgPrice()) {
+                double change = (stat.getAvgPrice() - prevStat.getAvgPrice()) / prevStat.getAvgPrice() * 100.0;
+                Map<String, Object> vars = new LinkedHashMap<>();
+                vars.put("keyword", keyword);
+                vars.put("avgPrice", stat.getAvgPrice().toString());
+                vars.put("changePercent", String.format("%.2f", change));
+                vars.put("minPrice", stat.getMinPrice() != null ? stat.getMinPrice().toString() : "");
+                vars.put("maxPrice", stat.getMaxPrice() != null ? stat.getMaxPrice().toString() : "");
+                vars.put("volume", stat.getVolume() != null ? stat.getVolume().toString() : "0");
+                eventPublisher.publishEvent(new NotifyEvent("MARKET_PRICE_DROP", null, null, vars));
+            }
+        } catch (Exception e) {
+            logger.warn("[MARKET] 推送 MARKET_PRICE_DROP 失败: {}", e.getMessage());
+        }
 
         // upsert
         MarketDailyStat existing = dailyStatMapper.selectLatest(keyword);

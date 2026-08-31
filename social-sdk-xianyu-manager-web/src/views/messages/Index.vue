@@ -651,12 +651,18 @@ onUnmounted(() => {
 /* ==================== 主区域 ==================== */
 .message-container {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;          /* 允许收缩，左右两栏高度正确撑满 */
+  overflow: hidden;       /* 滚动交给内部列表区域 */
   display: flex;
-  flex-direction: row;  /* 改为 row，让左侧列表和右侧聊天并排 */
+  flex-direction: row;    /* 左列表 + 右聊天并排 */
 }
-.chat-row { height: 100%; flex: 1; gap: 14px; }
+/* nowrap 是关键：el-col 宽度为 25%/75% 百分比，若 flex-wrap 换行且加了 gap，
+   25% + 75% + gap 超过容器宽度会把右侧聊天栏挤到第二行（上下堆叠） */
+.chat-row { height: 100%; flex: 1; flex-wrap: nowrap; }
 .chat-row .el-col { height: 100%; min-width: 0; }
+/* 用内边距模拟两栏间距，避免 gap 改变百分比宽度计算 */
+.chat-row .el-col:first-child { padding-right: 7px; }
+.chat-row .el-col:last-child { padding-left: 7px; }
 
 /* ==================== 会话列表 ==================== */
 .session-list {
@@ -664,7 +670,9 @@ onUnmounted(() => {
   flex-direction: column;
   height: 100%;
   background: var(--bg-soft);
-  border-right: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
 }
 .session-list-header {
   padding: 14px 18px;
@@ -755,7 +763,11 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  width: 100%;
   background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
 }
 .chat-header {
   padding: 14px 20px;

@@ -126,20 +126,7 @@
     </template>
 
     <template v-else-if="section === 'circles'">
-      <el-card shadow="never" class="circle-create-card">
-        <template #header>创建圈子</template>
-        <el-form class="circle-create-form" label-width="72px">
-          <el-row :gutter="12">
-            <el-col :xs="24" :sm="12" :md="8"><el-form-item label="名称"><el-input v-model="circleForm.name" placeholder="圈子名称" /></el-form-item></el-col>
-            <el-col :xs="24" :sm="12" :md="8"><el-form-item label="加入方式"><el-select v-model="circleForm.join_policy" style="width:100%"><el-option label="免费" value="free" /><el-option label="审批" value="approve" /><el-option label="付费" value="paid" /></el-select></el-form-item></el-col>
-            <el-col v-if="circleForm.join_policy === 'paid'" :xs="24" :sm="12" :md="8"><el-form-item label="价格"><el-input-number v-model="circleForm.join_price" :min="0" style="width:100%" /></el-form-item></el-col>
-          </el-row>
-          <el-form-item label="简介"><el-input v-model="circleForm.description" type="textarea" :rows="2" placeholder="一句话介绍这个圈子，方便他人了解" /></el-form-item>
-          <el-form-item label=" " style="margin-bottom:0"><el-button type="primary" @click="createCircle">创建圈子</el-button></el-form-item>
-        </el-form>
-      </el-card>
-
-      <el-card shadow="never" class="circles-card mt16">
+      <el-card shadow="never" class="circles-card">
         <template #header>
           <div class="card-header">
             <span>社区圈子</span>
@@ -321,7 +308,7 @@ const creditExchangeRate = computed(() => {
   return 100
 })
 function communityCreditAmountToCents(amount, rate) { const r = Number(rate || 100); return Math.ceil((Number(amount || 0) * 100) / r) }
-const composer = ref({ title:'', content:'', circle_id:0, category_id:null, price:0, tagsText:'' }); const circleForm = ref({ name:'', description:'', join_policy:'free', join_price:0 })
+const composer = ref({ title:'', content:'', circle_id:0, category_id:null, price:0, tagsText:'' })
 const titleMap = { home:'社区首页', profile:'我的身份', benefits:'我的权益', bindings:'账户绑定', topics:'帖子广场', composer:'发布帖子', wallet:'社区钱包', orders:'支付订单', circles:'社区圈子', 'my-topics':'我的帖子', favorites:'我的收藏', drafts:'草稿箱', notifications:'社区通知', leaderboard:'排行榜', announcements:'社区公告' }
 const section = computed(() => route.params.section || 'home'); const pageTitle = computed(() => titleMap[section.value] || '社区首页')
 const globalCategories = computed(() => categories.value.filter(c => Number(c.circle_id || 0) === 0))
@@ -421,7 +408,6 @@ async function setOrderPayInfo(info){ stopOrderPayTimers(); orderPayInfo.value=i
 function stopOrderPayTimers(){ if(orderPayTimer) clearInterval(orderPayTimer); if(orderPayPollTimer) clearInterval(orderPayPollTimer); orderPayTimer=null; orderPayPollTimer=null }
 function startOrderPayTimers(){ stopOrderPayTimers(); orderPayTimer=setInterval(()=>{ orderPayRemainSeconds.value=Math.max(0,orderPayRemainSeconds.value-1); if(orderPayRemainSeconds.value<=0) stopOrderPayTimers() },1000); orderPayPollTimer=setInterval(()=>refreshOrder(false),3000) }
 function formatPayRemain(seconds){ const s=Math.max(0,Number(seconds||0)); const m=Math.floor(s/60); const r=s%60; return `${m}:${String(r).padStart(2,'0')}` }
-async function createCircle(){ if(!circleForm.value.name){ElMessage.warning('请输入圈子名称');return} try{await communityPost('/circles', circleForm.value); ElMessage.success('圈子已创建，系统已自动初始化圈子分类'); circleForm.value={name:'',description:'',join_policy:'free',join_price:0}; await Promise.allSettled([loadCircles(),loadCategories()])}catch(e){ElMessage.error(e.message||'创建失败')} }
 async function joinCircle(item){ if(item.joined)return; try{ if(item.join_policy==='paid') await ElMessageBox.confirm(`确认花费 ${item.join_price || 0} 社区币加入？`,'付费加入'); await communityPost(`/circles/${item.id}/join`,{}); ElMessage.success('加入申请已提交'); await loadCircles()}catch(e){ if(e !== 'cancel') ElMessage.error(e.message||'加入失败') } }
 async function leaveCircle(item){ try{await communityDelete(`/circles/${item.id}/leave`); ElMessage.success('已退出'); await loadCircles()}catch(e){ElMessage.error(e.message||'退出失败')} }
 async function deleteTopic(item){ try{await ElMessageBox.confirm('确认删除该帖子？','删除确认'); await communityDelete(`/topics/${item.id}`); ElMessage.success('已删除'); await loadMyTopics()}catch(e){ if(e !== 'cancel') ElMessage.error(e.message||'删除失败') } }
@@ -473,20 +459,11 @@ function normalizeFeatureArray(raw){ if(!raw) return []; let v = raw; if(typeof 
 .hero-card p { margin: 0; color: var(--text-2); line-height: 1.6; max-width: 640px; }
 .hero-card .el-space { flex-wrap: wrap; }
 
-/* 卡片标题区 */
-.card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.dt-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-
-/* MetricCard 指标卡 */
-.metric-card { transition: transform .2s ease, box-shadow .2s ease; }
-.metric-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(79,70,229,.10); }
-.metric-card :deep(.el-card__body) { padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
-.metric-top { display: flex; align-items: center; gap: 10px; }
-.metric-icon { width: 24px; height: 24px; min-width: 24px; min-height: 24px; max-width: 24px; max-height: 24px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; background: var(--el-color-primary-light-9); color: var(--brand); font-size: 14px; flex: 0 0 24px; line-height: 1; overflow: hidden; box-sizing: border-box; }
-.metric-icon :deep(svg), .metric-icon :deep(.metric-svg) { width: 14px !important; height: 14px !important; min-width: 14px !important; min-height: 14px !important; max-width: 14px !important; max-height: 14px !important; display: block !important; flex: 0 0 14px !important; }
-.metric-title { font-size: 13px; color: var(--text-2); font-weight: 500; }
-.metric-value { font-size: 22px; font-weight: 800; color: var(--text-1); word-break: break-word; line-height: 1.25; }
-.metric-desc { font-size: 12.5px; color: var(--text-3); line-height: 1.5; }
+/* 帖子广场搜索区：输入框与分类下拉框合并一行
+   （el-input/el-select 默认宽度 100%，不限制会被 flex-wrap 挤成上下两行）
+   card-header / dt-actions 基础布局见下方全局样式（render 组件元素不带 scoped 属性） */
+.topics-card .dt-actions .el-input { flex: 1; min-width: 160px; }
+.topics-card .dt-actions .el-select { width: 160px; flex-shrink: 0; }
 
 /* 功能闭环卡片 */
 .feature-card :deep(.el-card__body) { padding: 18px 20px; }
@@ -498,14 +475,7 @@ function normalizeFeatureArray(raw){ if(!raw) return []; let v = raw; if(typeof 
 .feature-item strong { font-size: 15px; color: var(--text-1); }
 .feature-item span { color: var(--text-2); font-size: 13px; line-height: 1.5; }
 
-/* 列表类卡片（帖子/表格） */
-.list-card :deep(.el-card__body), .data-table-card :deep(.el-card__body) { padding: 12px 16px; }
-.data-table-card :deep(.el-table) { font-size: 13px; }
-.data-table-card :deep(.el-table) th.el-table__cell { background: var(--bg-soft); color: var(--text-2); font-weight: 600; }
-.simple-list-card :deep(.el-card__body) { padding: 8px 12px; }
-
 /* 帖子广场列表 */
-.empty-box { text-align: center; color: var(--text-3); padding: 36px; }
 .topics-card :deep(.el-card__body) { padding: 6px 4px; }
 .topic-card { display: flex; align-items: flex-start; gap: 14px; padding: 16px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background .15s ease; }
 .topic-card:last-child { border-bottom: none; }
@@ -521,19 +491,6 @@ function normalizeFeatureArray(raw){ if(!raw) return []; let v = raw; if(typeof 
 .topic-tags { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
 .topic-side { display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
 .reply-item { padding: 10px 0; border-bottom: 1px dashed var(--border); color: var(--text-1); }
-
-/* 通用简单列表（我的帖子/收藏/草稿/兑换/排行榜等） */
-.sl-list { display: flex; flex-direction: column; gap: 2px; }
-.sl-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 10px; transition: background .15s ease; }
-.sl-item:hover { background: var(--bg-soft); }
-.sl-icon { width: 22px; height: 22px; min-width: 22px; min-height: 22px; max-width: 22px; max-height: 22px; border-radius: 6px; background: var(--el-color-primary-light-9); color: var(--brand); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; box-sizing: border-box; overflow: hidden; }
-.sl-icon :deep(svg), .sl-icon :deep(.el-icon) { width: 14px !important; height: 14px !important; min-width: 14px !important; min-height: 14px !important; max-width: 14px !important; max-height: 14px !important; display: block !important; flex: 0 0 14px !important; }
-.sl-body { flex: 1; min-width: 0; }
-.sl-title { font-size: 14.5px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sl-desc { font-size: 12.5px; color: var(--text-3); margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.sl-actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
-.circle-create-form .el-form-item { margin-bottom: 0; margin-right: 14px; }
-.circle-create-form .el-button { margin-left: 2px; }
 
 /* 充值套餐网格 */
 .recharge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 14px; margin-top: 4px; }
@@ -581,9 +538,6 @@ function normalizeFeatureArray(raw){ if(!raw) return []; let v = raw; if(typeof 
 .lb-score { font-size: 12.5px; color: var(--text-3); margin-top: 2px; }
 
 /* 圈子 */
-.circle-create-card :deep(.el-card__body) { padding: 16px 18px; }
-.circle-create-form .el-row { margin-bottom: 0; }
-.circle-create-form .el-form-item { margin-bottom: 14px; }
 .circles-card :deep(.el-card__body) { padding: 8px 12px; }
 .circle-list { display: flex; flex-direction: column; gap: 2px; }
 .circle-item { display: flex; align-items: flex-start; gap: 12px; padding: 14px 12px; border-radius: 10px; transition: background .15s ease; }
@@ -598,4 +552,41 @@ function normalizeFeatureArray(raw){ if(!raw) return []; let v = raw; if(typeof 
 .circle-members, .circle-cat { font-size: 12.5px; color: var(--text-3); }
 .circle-desc { font-size: 13px; color: var(--text-2); line-height: 1.6; margin-top: 6px; white-space: pre-wrap; }
 .circle-actions { flex-shrink: 0; display: flex; gap: 8px; }
+</style>
+
+<style>
+/* ============ 全局样式（非 scoped）============
+   MetricCard / ListCard / DataTable / SimpleList 等组件由 script 内 h() 渲染，
+   内部元素不带 data-v 作用域属性，scoped 样式无法命中，必须用全局样式并限定 .community-page。 */
+.community-page .card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.community-page .dt-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* MetricCard 指标卡 */
+.community-page .metric-card { transition: transform .2s ease, box-shadow .2s ease; }
+.community-page .metric-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(79,70,229,.10); }
+.community-page .metric-card .el-card__body { padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
+.community-page .metric-top { display: flex; align-items: center; gap: 10px; }
+.community-page .metric-icon { width: 24px; height: 24px; min-width: 24px; min-height: 24px; max-width: 24px; max-height: 24px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; background: var(--el-color-primary-light-9); color: var(--brand); font-size: 14px; flex: 0 0 24px; line-height: 1; overflow: hidden; box-sizing: border-box; }
+.community-page .metric-icon svg, .community-page .metric-icon .metric-svg { width: 14px !important; height: 14px !important; min-width: 14px !important; min-height: 14px !important; max-width: 14px !important; max-height: 14px !important; display: block !important; flex: 0 0 14px !important; }
+.community-page .metric-title { font-size: 13px; color: var(--text-2); font-weight: 500; }
+.community-page .metric-value { font-size: 22px; font-weight: 800; color: var(--text-1); word-break: break-word; line-height: 1.25; }
+.community-page .metric-desc { font-size: 12.5px; color: var(--text-3); line-height: 1.5; }
+
+/* 列表类卡片（帖子/表格/简单列表） */
+.community-page .list-card .el-card__body, .community-page .data-table-card .el-card__body { padding: 12px 16px; }
+.community-page .data-table-card .el-table { font-size: 13px; }
+.community-page .data-table-card .el-table th.el-table__cell { background: var(--bg-soft); color: var(--text-2); font-weight: 600; }
+.community-page .simple-list-card .el-card__body { padding: 8px 12px; }
+.community-page .empty-box { text-align: center; color: var(--text-3); padding: 36px; }
+
+/* 通用简单列表（我的帖子/收藏/草稿/社区通知等） */
+.community-page .sl-list { display: flex; flex-direction: column; gap: 2px; }
+.community-page .sl-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 10px; transition: background .15s ease; }
+.community-page .sl-item:hover { background: var(--bg-soft); }
+.community-page .sl-icon { width: 22px; height: 22px; min-width: 22px; min-height: 22px; max-width: 22px; max-height: 22px; border-radius: 6px; background: var(--el-color-primary-light-9); color: var(--brand); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; box-sizing: border-box; overflow: hidden; }
+.community-page .sl-icon svg, .community-page .sl-icon .el-icon { width: 14px !important; height: 14px !important; min-width: 14px !important; min-height: 14px !important; max-width: 14px !important; max-height: 14px !important; display: block !important; flex: 0 0 14px !important; }
+.community-page .sl-body { flex: 1; min-width: 0; }
+.community-page .sl-title { font-size: 14.5px; font-weight: 600; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.community-page .sl-desc { font-size: 12.5px; color: var(--text-3); margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.community-page .sl-actions { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
 </style>

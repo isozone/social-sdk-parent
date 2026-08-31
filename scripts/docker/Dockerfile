@@ -94,18 +94,25 @@ RUN sed -i 's|//archive.ubuntu.com|//mirrors.aliyun.com|g; s|//security.ubuntu.c
 # ── 预置 OpenList 二进制(最佳努力；构建机无 GitHub 外网时跳过，运行时再下载) ──
 # 放到 /opt/openlist(非 volume)，避免被 ./data 绑定挂载遮挡；权限 755 供 xianyu 执行。
 ARG OPENLIST_ARCH=amd64
-RUN set -eux; \
-    mkdir -p /opt/openlist; \
+# 最佳努力预置：构建机无 GitHub 外网/下载异常时一律跳过，绝不中断镜像构建（运行时再下载）。
+# 不使用 set -e，且解压目录名不固定，改为在临时目录递归查找真实二进制。
+RUN set -ux; \
+    mkdir -p /opt/openlist /tmp/olbuild || true; \
     OURL="https://github.com/OpenListTeam/OpenList/releases/latest/download/openlist-linux-${OPENLIST_ARCH}.tar.gz"; \
-    if curl -fsSL "$OURL" -o /tmp/openlist.tar.gz 2>/dev/null; then \
-      tar xzf /tmp/openlist.tar.gz -C /tmp; \
-      find /tmp -maxdepth 3 -type f -name 'openlist' -exec cp -f {} /opt/openlist/openlist \; ; \
-      chmod 755 /opt/openlist/openlist; \
-      rm -rf /tmp/openlist.tar.gz /tmp/openlist-linux-${OPENLIST_ARCH}; \
-      echo "[openlist] 已预置二进制 /opt/openlist/openlist"; \
+    if curl -fsSL "$OURL" -o /tmp/olbuild/openlist.tar.gz 2>/dev/null; then \
+      tar xzf /tmp/olbuild/openlist.tar.gz -C /tmp/olbuild 2>/dev/null || echo "[openlist] 解压失败，跳过预置"; \
+      BIN=$(find /tmp/olbuild -type f -name 'openlist' 2>/dev/null | head -n1); \
+      if [ -n "$BIN" ]; then \
+        cp -f "$BIN" /opt/openlist/openlist; \
+        chmod 755 /opt/openlist/openlist; \
+        echo "[openlist] 已预置二进制 /opt/openlist/openlist"; \
+      else \
+        echo "[openlist] 压缩包内未找到 openlist 二进制，运行时将尝试下载"; \
+      fi; \
     else \
       echo "[openlist] 构建机无法下载 OpenList，跳过预置（运行时将尝试下载，可用 OPENLIST_DOWNLOAD_BASE_URLS 指定镜像）"; \
     fi; \
+    rm -rf /tmp/olbuild; \
     chown -R xianyu:xianyu /opt/openlist 2>/dev/null || true
 
 # 创建非 root 用户

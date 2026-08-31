@@ -16,6 +16,16 @@ public enum NotifyScenario {
             "闲鱼账号 {accountName} 已离线",
             "账号 {accountName} 当前处于离线状态，可能影响消息/订单处理。",
             3600),
+    // 登录续期需要人工扫码（A3 链路 human-in-the-loop 交接点）
+    ACCOUNT_QR_LOGIN_REQUIRED("账号需要扫码登录",
+            "闲鱼账号 {accountName} 需要扫码登录",
+            "账号 {accountName} 的自动登录续期已触发二维码登录，请打开管理端「账号续期」页扫码完成登录（会话 {sessionId}）。",
+            300),
+    // 登录续期重试耗尽，转人工介入
+    ACCOUNT_LOGIN_FAILED("账号登录失败",
+            "闲鱼账号 {accountName} 登录失败",
+            "账号 {accountName} 的登录续期重试已耗尽（原因：{reason}），请人工介入处理，否则相关自动化将中断。",
+            3600),
     NEW_ORDER("新订单",
             "账号 {accountName} 收到新订单",
             "账号 {accountName} 收到新订单：{itemTitle}，金额 {amount}，对手方 {counterparty}。",
@@ -23,6 +33,10 @@ public enum NotifyScenario {
     ORDER_STATUS_CHANGED("订单状态变更",
             "订单 {orderId} 状态更新",
             "账号 {accountName} 的订单 {orderId}（{itemTitle}）状态变更为：{status}。",
+            60),
+    ORDER_UPDATED("订单信息更新",
+            "订单 {orderId} 信息有更新",
+            "账号 {accountName} 的订单 {orderId}（{itemTitle}）信息已更新，当前状态：{status}。",
             60),
     NEW_MESSAGE("新消息",
             "账号 {accountName} 收到买家消息",
@@ -46,7 +60,7 @@ public enum NotifyScenario {
     MONITOR_MATCH("监控发现匹配商品",
             "关键词 {keyword} 发现匹配商品",
             "任务 {taskName} 发现匹配商品：{itemTitle}，价格 {price} 元，卖家 {sellerNickname}。AI 评分：{aiScore} 分。理由：{aiReason}。链接：{itemUrl}",
-            0),
+            600),
 
     // AI 客服会话
     AI_CS_DEAL_CLOSED("AI客服成交",
@@ -108,6 +122,10 @@ public enum NotifyScenario {
     AUTO_SHIP_NO_CARD("自动发货缺少卡券",
             "订单 {orderId} 自动发货缺少卡券",
             "订单 {orderId} 商品 {productId} 无可用卡券：{reason}，请及时补充卡券池。",
+            60),
+    AUTO_SHIP_DUMMY_FAILED("自动发货平台确认失败",
+            "订单 {orderId} 平台侧确认发货失败",
+            "订单 {orderId} 商品 {productId}（{itemTitle}）已向买家发送发货内容，但闲鱼平台侧确认失败：{reason}。消息已送达买家，需后台人工补确认。",
             60);
 
     private final String label;

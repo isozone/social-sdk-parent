@@ -14,11 +14,13 @@ import cn.net.rjnetwork.xianyu.manager.monitor.mapper.MonitorResultMapper;
 import cn.net.rjnetwork.xianyu.manager.monitor.mapper.MonitorTaskMapper;
 import cn.net.rjnetwork.xianyu.manager.monitor.model.MonitorResult;
 import cn.net.rjnetwork.xianyu.manager.monitor.model.MonitorTask;
+import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,13 +45,14 @@ public class MonitorTaskRunner {
     private final PriceHistoryService priceHistoryService;
     private final MarketSnapshotMapper snapshotMapper;
     private final AiChatService aiChatService;
+    private final ApplicationEventPublisher eventPublisher;
     @org.springframework.beans.factory.annotation.Autowired
     private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
 
     public MonitorTaskRunner(MonitorTaskMapper taskMapper, MonitorResultMapper resultMapper,
                               AccountMapper accountMapper, CircuitBreakerService circuitBreaker,
                               PriceHistoryService priceHistoryService, MarketSnapshotMapper snapshotMapper,
-                              AiChatService aiChatService) {
+                              AiChatService aiChatService, ApplicationEventPublisher eventPublisher) {
         this.taskMapper = taskMapper;
         this.resultMapper = resultMapper;
         this.accountMapper = accountMapper;
@@ -57,6 +60,7 @@ public class MonitorTaskRunner {
         this.priceHistoryService = priceHistoryService;
         this.snapshotMapper = snapshotMapper;
         this.aiChatService = aiChatService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -103,35 +107,47 @@ public class MonitorTaskRunner {
                     totalResults = items.size();
                     snapshot.setTotalResults(totalResults);
 
-                    for (JsonNode item : items) {
-                        try {
-                            MonitorResult result = parseItem(item, task);
-                            if (result == null) continue;
-                            if (passesFilter(result, task)) {
-                                // AI 分析
-                                if (Boolean.TRUE.equals(task.getAiEnabled()) && task.getAiModelId() != null) {
-                                    analyzeWithAi(result, task);
-                                }
-                                result.setDeleted(0);
-                                result.setCreatedAt(LocalDateTime.now());
-                                resultMapper.insert(result);
-                                newResults.add(result);
+                for (JsonNode item : items) {
+                    try {
+                        MonitorResult result = parseItem(item, task);
+                        if (result == null) continue;
+                        if (!passesFilter(result, task)) continue;
 
-                                // 记录价格历史
-                                PriceHistory ph = new PriceHistory();
-                                ph.setKeyword(task.getKeyword());
-                                ph.setItemId(result.getItemId());
-                                ph.setItemTitle(result.getItemTitle());
-                                ph.setPrice(result.getPrice());
-                                ph.setSellerNickname(result.getSellerNickname());
-                                ph.setSellerCreditScore(result.getSellerCreditScore());
-                                ph.setSnapshotId(snapshot.getId());
-                                priceHistoryService.batchRecordPriceHistory(task.getKeyword(), snapshot.getId(), List.of(ph));
-                            }
-                        } catch (Exception e) {
-                            logger.warn("处理商品失败: {}", e.getMessage());
+                        // 去重：同一任务 + 同一商品已记录过则跳过，避免每轮重复插入与重复通知
+                        boolean alreadyTracked = resultMapper.selectCount(
+                                new LambdaQueryWrapper<MonitorResult>()
+                                        .eq(MonitorResult::getTaskId, task.getId())
+                                        .eq(MonitorResult::getItemId, result.getItemId())) > 0;
+                        if (alreadyTracked) continue;
+
+                        // AI 分析
+                        if (Boolean.TRUE.equals(task.getAiEnabled()) && task.getAiModelId() != null) {
+                            analyzeWithAi(result, task);
                         }
+                        result.setDeleted(0);
+                        result.setCreatedAt(LocalDateTime.now());
+                        resultMapper.insert(result);
+                        newResults.add(result);
+
+                        // 记录价格历史
+                        PriceHistory ph = new PriceHistory();
+                        ph.setKeyword(task.getKeyword());
+                        ph.setItemId(result.getItemId());
+                        ph.setItemTitle(result.getItemTitle());
+                        ph.setPrice(result.getPrice());
+                        ph.setSellerNickname(result.getSellerNickname());
+                        ph.setSellerCreditScore(result.getSellerCreditScore());
+                        ph.setSnapshotId(snapshot.getId());
+                        priceHistoryService.batchRecordPriceHistory(task.getKeyword(), snapshot.getId(), List.of(ph));
+
+                        // 闭环：命中且用户开启「匹配通知」时推送 MONITOR_MATCH
+                        if (Boolean.TRUE.equals(task.getNotifyOnMatch())) {
+                            notifyMonitorMatch(task, result);
+                        }
+                    } catch (Exception e) {
+                        logger.warn("处理商品失败: {}", e.getMessage());
                     }
+                }
                 }
             }
 
@@ -210,6 +226,32 @@ public class MonitorTaskRunner {
         if (task.getConsecutiveFailures() >= 5) {
             task.setCircuitOpen(true);
             task.setCircuitOpenUntil(LocalDateTime.now().plusMinutes(30));
+        }
+    }
+
+    /**
+     * 闭环：把一次监控命中推送给通知子系统（MONITOR_MATCH 场景）。
+     * 注意 eventPublisher 异步分发，失败不影响主流程；推送成功后标记 result.notified，
+     * 配合上面的按 itemId 去重，避免重复轮询造成的通知轰炸。
+     */
+    private void notifyMonitorMatch(MonitorTask task, MonitorResult result) {
+        try {
+            Map<String, Object> vars = new LinkedHashMap<>();
+            vars.put("keyword", task.getKeyword());
+            vars.put("taskName", task.getName() != null ? task.getName() : task.getKeyword());
+            vars.put("itemTitle", result.getItemTitle());
+            vars.put("price", result.getPrice() != null ? result.getPrice().toString() : "");
+            vars.put("sellerNickname", result.getSellerNickname());
+            vars.put("aiScore", result.getAiScore() != null ? result.getAiScore().toString() : "");
+            vars.put("aiReason", result.getAiReason() != null ? result.getAiReason() : "");
+            vars.put("itemUrl", result.getItemUrl());
+            String accountName = task.getName() != null ? task.getName() : task.getKeyword();
+            eventPublisher.publishEvent(new NotifyEvent("MONITOR_MATCH", task.getAccountId(), accountName, vars));
+            result.setNotified(true);
+            resultMapper.updateById(result);
+            logger.info("[MONITOR] 命中匹配已推送通知 taskId={} itemId={}", task.getId(), result.getItemId());
+        } catch (Exception e) {
+            logger.warn("[MONITOR] 推送 MONITOR_MATCH 失败: {}", e.getMessage());
         }
     }
 

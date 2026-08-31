@@ -84,7 +84,7 @@ public class VipService {
         if (subscription != null && "ACTIVE".equals(subscription.getStatus()) && subscription.getExpiredAt() != null && subscription.getExpiredAt().isAfter(LocalDateTime.now())) {
             data.put("state", "active");
             data.put("label", "I 社区");
-            data.put("communityUid", subscription.getCommunityUid());
+            data.put("communityUid", firstNonBlank(subscription.getCommunityUid(), binding != null ? binding.getCommunityUid() : ""));
             data.put("vipLevel", subscription.getVipLevel());
             data.put("expiredAt", subscription.getExpiredAt());
             data.put("daysLeft", Math.max(0, Duration.between(LocalDateTime.now(), subscription.getExpiredAt()).toDays()));
@@ -134,7 +134,7 @@ public class VipService {
         Map<String, Object> data = new LinkedHashMap<>();
         boolean active = sub != null && "ACTIVE".equals(sub.getStatus()) && sub.getExpiredAt() != null && sub.getExpiredAt().isAfter(LocalDateTime.now());
         data.put("active", active);
-        data.put("communityUid", sub != null ? sub.getCommunityUid() : binding != null ? binding.getCommunityUid() : deployment.getCommunityUid());
+        data.put("communityUid", firstNonBlank(sub != null ? sub.getCommunityUid() : "", binding != null ? binding.getCommunityUid() : "", deployment.getCommunityUid()));
         data.put("email", firstNonBlank(sub != null ? sub.getEmail() : "", binding != null ? binding.getEmail() : "", deployment.getBoundEmail()));
         data.put("emailVerified", binding != null ? Boolean.TRUE.equals(binding.getEmailVerified()) : Boolean.TRUE.equals(deployment.getEmailVerified()));
         data.put("vipLevel", active ? sub.getVipLevel() : "free");
@@ -169,7 +169,7 @@ public class VipService {
         data.put("deploymentId", deployment.getDeploymentId());
         data.put("email", binding != null ? stringValue(binding.getEmail()) : stringValue(deployment.getBoundEmail()));
         data.put("emailVerified", binding != null ? Boolean.TRUE.equals(binding.getEmailVerified()) : Boolean.TRUE.equals(deployment.getEmailVerified()));
-        data.put("communityUid", sub != null ? sub.getCommunityUid() : binding != null ? binding.getCommunityUid() : deployment.getCommunityUid());
+        data.put("communityUid", firstNonBlank(sub != null ? sub.getCommunityUid() : "", binding != null ? binding.getCommunityUid() : "", deployment.getCommunityUid()));
         data.put("identityStatus", binding != null ? defaultString(binding.getIdentityStatus(), "unbound") : "unbound");
         data.put("hasActiveVip", active);
         data.put("vipLevel", active ? sub.getVipLevel() : "free");
@@ -752,10 +752,10 @@ public class VipService {
         return builder;
     }
 
+    // 社区客户端代理用「每部署账户绑定令牌(bind_token)」签名，与部署级接入密钥(app_id/secret)无关，
+    // 因此不要求 properties.isConfigured()——已是 pro（通过订阅/权益激活）并完成绑定的用户即可访问，
+    // 不应被"未配置接入密钥"拦截。签名所需字段（deploymentId / bindToken）已由 communityClientProxy 校验。
     private HttpRequest.Builder signedCommunityRequest(String method, String path, String body, CommunityUserBinding binding) throws Exception {
-        if (!properties.isConfigured()) {
-            throw new IllegalStateException("未配置 I 社区接入密钥，请按套餐付费获取后通过环境变量 XIANYU_COMMUNITY_APP_ID / XIANYU_COMMUNITY_SECRET 配置");
-        }
         String baseUrl = properties.getBaseUrl() == null ? "" : properties.getBaseUrl().replaceAll("/+$", "");
         String timestamp = String.valueOf(Instant.now().getEpochSecond());
         String nonce = UUID.randomUUID().toString().replace("-", "");

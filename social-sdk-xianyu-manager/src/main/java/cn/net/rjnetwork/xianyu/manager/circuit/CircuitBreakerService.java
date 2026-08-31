@@ -1,8 +1,12 @@
 package cn.net.rjnetwork.xianyu.manager.circuit;
 
+import cn.net.rjnetwork.xianyu.manager.account.mapper.AccountMapper;
+import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
 import cn.net.rjnetwork.xianyu.manager.circuit.service.RiskControlLogService;
+import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
@@ -10,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -25,6 +30,8 @@ public class CircuitBreakerService {
 
     private final JdbcTemplate jdbc;
     private final RiskControlLogService riskControlLogService;
+    private final AccountMapper accountMapper;
+    private final ApplicationEventPublisher eventPublisher;
     private final Map<String, CircuitBreaker> cache = new ConcurrentHashMap<>();
 
     private static final RowMapper<CircuitBreaker> MAPPER = (rs, rowNum) -> {
@@ -49,9 +56,12 @@ public class CircuitBreakerService {
         return cb;
     };
 
-    public CircuitBreakerService(JdbcTemplate jdbc, RiskControlLogService riskControlLogService) {
+    public CircuitBreakerService(JdbcTemplate jdbc, RiskControlLogService riskControlLogService,
+                                 AccountMapper accountMapper, ApplicationEventPublisher eventPublisher) {
         this.jdbc = jdbc;
         this.riskControlLogService = riskControlLogService;
+        this.accountMapper = accountMapper;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -79,8 +89,13 @@ public class CircuitBreakerService {
      */
     public void recordSuccess(Long accountId, String serviceName) {
         CircuitBreaker cb = getOrCreate(accountId, serviceName);
+        boolean wasActive = cb.isOpen() || cb.isHalfOpen();
         cb.recordSuccess();
         persist(cb);
+        // 闭环：开闸/半开 -> 关闭 的跃迁视为恢复，推送通知
+        if (wasActive && cb.isClosed()) {
+            publishRecovered(accountId, serviceName, cb);
+        }
     }
 
     /**
@@ -93,6 +108,7 @@ public class CircuitBreakerService {
             return;
         }
         CircuitBreaker cb = getOrCreate(accountId, serviceName);
+        boolean wasOpen = cb.isOpen();
         cb.recordFailure(message);
         persist(cb);
         if (cb.isOpen()) {
@@ -105,6 +121,10 @@ public class CircuitBreakerService {
             int cooldown = Optional.ofNullable(cb.getCooldownSeconds()).orElse(300);
             riskControlLogService.log(accountId, triggerType, serviceName, riskCode,
                     message, cooldown, null);
+            // 闭环：仅在「未开闸 -> 开闸」的跃迁时推送通知，避免持续失败反复轰炸
+            if (!wasOpen) {
+                publishOpened(accountId, serviceName, cb, message);
+            }
         }
     }
 
@@ -147,6 +167,46 @@ public class CircuitBreakerService {
         CircuitBreaker cb = getOrCreate(accountId, serviceName);
         cb.reset();
         persist(cb);
+    }
+
+    /** 闭环：熔断器开闸时推送 CIRCUIT_BREAKER_OPENED 通知 */
+    private void publishOpened(Long accountId, String serviceName, CircuitBreaker cb, String message) {
+        try {
+            String accountName = resolveAccountName(accountId);
+            Map<String, Object> vars = new LinkedHashMap<>();
+            vars.put("serviceName", serviceName);
+            vars.put("accountName", accountName);
+            vars.put("failureCount", String.valueOf(cb.getFailureCount()));
+            vars.put("cooldownSeconds", String.valueOf(cb.getCooldownSeconds()));
+            vars.put("lastError", message != null ? truncate(message, 200) : "");
+            eventPublisher.publishEvent(new NotifyEvent("CIRCUIT_BREAKER_OPENED", accountId, accountName, vars));
+        } catch (Exception e) {
+            logger.warn("[CIRCUIT] 推送 OPENED 通知失败: {}", e.getMessage());
+        }
+    }
+
+    /** 闭环：熔断器恢复（开闸/半开 -> 关闭）时推送 CIRCUIT_BREAKER_RECOVERED 通知 */
+    private void publishRecovered(Long accountId, String serviceName, CircuitBreaker cb) {
+        try {
+            String accountName = resolveAccountName(accountId);
+            Map<String, Object> vars = new LinkedHashMap<>();
+            vars.put("serviceName", serviceName);
+            vars.put("accountName", accountName);
+            eventPublisher.publishEvent(new NotifyEvent("CIRCUIT_BREAKER_RECOVERED", accountId, accountName, vars));
+        } catch (Exception e) {
+            logger.warn("[CIRCUIT] 推送 RECOVERED 通知失败: {}", e.getMessage());
+        }
+    }
+
+    private String resolveAccountName(Long accountId) {
+        if (accountId == null) return "GLOBAL";
+        try {
+            XianyuAccount acc = accountMapper.selectById(accountId);
+            if (acc != null) {
+                return acc.getDisplayName() != null ? acc.getDisplayName() : acc.getAccountName();
+            }
+        } catch (Exception ignored) {}
+        return String.valueOf(accountId);
     }
 
     public List<CircuitBreaker> listAll() {
