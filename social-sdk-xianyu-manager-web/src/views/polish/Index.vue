@@ -190,6 +190,7 @@ onMounted(async () => {
       singleForm.value.accountId = accounts.value[0].id
       batchForm.value.accountId = accounts.value[0].id
       superForm.value.accountId = accounts.value[0].id
+      await onAccountChange()
     }
   } catch (e) {
     ElMessage.error('拉账号列表失败')
@@ -204,10 +205,14 @@ async function onAccountChange() {
   superForm.value.itemId = ''
   productOptions.value = []
   singleResult.value = null; batchResult.value = null; superResult.value = null
-  if (!accountId.value) return
+  const selectedId = accountId.value
+  singleForm.value.accountId = selectedId
+  batchForm.value.accountId = selectedId
+  superForm.value.accountId = selectedId
+  if (!selectedId) return
   productLoading.value = true
   try {
-    const res = await request.get('/products', { params: { accountId, status: 'ON_SALE', page: 1, size: 200 } })
+    const res = await request.get('/products', { params: { accountId: selectedId, status: 'ON_SALE', page: 1, size: 200 } })
     productOptions.value = (res.data?.records || []).filter(p => p.itemId)
     if (!productOptions.value.length) {
       ElMessage.warning('该账号暂无已同步的在售商品，请先在「商品管理」同步闲鱼')

@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS xianyu_account (
     remark VARCHAR(256),
     last_error VARCHAR(512),
     last_login_at DATETIME,
+    last_keepalive_at DATETIME,
     cookie_expires_at DATETIME,
     -- ===== Chrome 容器隔离字段 =====
     -- 账号独占 Chrome user-data-dir 路径

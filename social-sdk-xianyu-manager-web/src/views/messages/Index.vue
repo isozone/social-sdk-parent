@@ -149,12 +149,12 @@
               type="textarea"
               :rows="3"
               placeholder="输入消息，按 Enter 发送（Shift+Enter 换行）"
-              @keydown.enter.prevent="onEnterKey"
+              @keydown.enter="onEnterKey"
               :disabled="!selectedSession"
             />
             <div class="input-footer">
               <span class="tip">Enter 发送 | Shift+Enter 换行</span>
-              <el-button type="primary" :disabled="!newMessage.trim() || !selectedSession" @click="handleSend">发送</el-button>
+              <el-button type="primary" :loading="sending" :disabled="!newMessage.trim() || !selectedSession || sending" @click="handleSend">发送</el-button>
             </div>
           </div>
         </div>
@@ -194,6 +194,7 @@ function applyQuickReply(val) {
   quickReplyPlaceholder.value = ''  // 清空选中态，避免重复点同一条不触发 change
 }
 const syncing = ref(false)
+const sending = ref(false)
 const chatBoxRef = ref(null)
 const searchText = ref('')
 
@@ -501,12 +502,15 @@ async function handleSyncNow() {
 }
 
 function onEnterKey(e) {
-  if (e.shiftKey) return // Shift+Enter 不换行（textarea 默认行为）
+  if (e.shiftKey) return // Shift+Enter 保留默认换行行为
+  e.preventDefault()
   handleSend()
 }
 
 async function handleSend() {
+  if (sending.value) return
   if (!selectedAccount.value || !selectedSession.value || !newMessage.value.trim()) return
+  sending.value = true
   try {
     await api.post('/messages/send', {
       accountId: selectedAccount.value,
@@ -519,6 +523,8 @@ async function handleSend() {
     await loadHistory()
   } catch (e) {
     ElMessage.error(e?.response?.data?.message || '发送失败')
+  } finally {
+    sending.value = false
   }
 }
 

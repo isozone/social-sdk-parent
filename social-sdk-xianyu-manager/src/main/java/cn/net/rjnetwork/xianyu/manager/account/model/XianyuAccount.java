@@ -33,6 +33,8 @@ public class XianyuAccount extends BaseEntity {
 
     private LocalDateTime lastLoginAt;
 
+    private LocalDateTime lastKeepaliveAt;
+
     private LocalDateTime cookieExpiresAt;
 
     // ===== IM / 滑块验证 cookie（与登录 cookie 分开存储） =====

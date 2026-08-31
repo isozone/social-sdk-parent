@@ -5,7 +5,6 @@ import cn.net.rjnetwork.xianyu.manager.monitor.service.MonitorTaskRunner;
 import cn.net.rjnetwork.xianyu.manager.monitor.service.MonitorTaskService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -27,8 +26,11 @@ public class MonitorScheduler {
         this.runner = runner;
     }
 
-    /** 每分钟检查一次 */
-    @Scheduled(cron = "0 * * * * ?")
+    /**
+     * 监控任务执行入口 —— 由 {@link cn.net.rjnetwork.xianyu.manager.task.ScheduledTasks#runMonitorTasks}
+     * 统一调度（每 30 秒）。这里不再挂独立 @Scheduled，避免与 ScheduledTasks 双重执行同一到期任务，
+     * 造成资源浪费与闲鱼侧风控风险。
+     */
     public void pollAndRun() {
         try {
             List<MonitorTask> dueTasks = taskService.getDueTasks(10);

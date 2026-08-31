@@ -670,6 +670,15 @@ const breadcrumbMap = {
   '/app/buyer': ['数据资产', '买家画像'],
   '/app/accounts': ['账号管理'],
   '/app/circuit-breaker': ['数据资产', '熔断器管理'],
+  '/app/chrome': ['浏览器配置'],
+  '/app/proxy': ['代理管理'],
+  '/app/logs': ['日志管理'],
+  '/app/logs/cookies-refresh': ['规则合规', 'Cookie 刷新日志'],
+  '/app/logs/login-renew': ['规则合规', '登录续期日志'],
+  '/app/delivery-rules': ['发货仓储', '发货匹配规则'],
+  '/app/comment-templates': ['店铺管理', '评价模板'],
+  '/app/item-reply': ['店铺管理', '商品专属回复'],
+  '/app/close-notice': ['规则合规', '关闭平台通知'],
   '/app/profile': ['系统', '个人中心']
 }
 
@@ -696,6 +705,16 @@ const headerIconMap = {
   '/app/buyer': 'User',
   '/app/circuit-breaker': 'Warning',
   '/app/accounts': 'UserFilled',
+  '/app/chrome': 'Setting',
+  '/app/proxy': 'Connection',
+  '/app/logs': 'Delete',
+  '/app/logs/cookies-refresh': 'Refresh',
+  '/app/logs/login-renew': 'Avatar',
+  '/app/reply-logs': 'ChatLineSquare',
+  '/app/delivery-rules': 'Switch',
+  '/app/comment-templates': 'ChatLineSquare',
+  '/app/item-reply': 'Comment',
+  '/app/close-notice': 'Bell',
   '/app/profile': 'User'
 }
 
@@ -721,6 +740,18 @@ const titleMap = {
   '/app/tasks': '监控任务',
   '/app/reviews': '评价与信用',
   '/app/polish': '商品擦亮',
+  '/app/chrome': '谷歌浏览器配置',
+  '/app/proxy': '代理管理',
+  '/app/logs': '日志管理',
+  '/app/logs/cookies-refresh': 'Cookie 刷新日志',
+  '/app/logs/login-renew': '登录续期日志',
+  '/app/reply-logs': '自动回复日志',
+  '/app/circuit-breaker': '熔断器管理',
+  '/app/collect': '收藏关注',
+  '/app/delivery-rules': '发货匹配规则',
+  '/app/comment-templates': '评价模板',
+  '/app/item-reply': '商品专属回复',
+  '/app/close-notice': '关闭平台通知',
   '/app/profile': '个人中心'
 }
 
@@ -1393,6 +1424,7 @@ async function handleBrowserReset() {
 
 /* ========== 页脚 ========== */
 .app-footer {
+  height: auto; min-height: 42px;
   display: flex; align-items: center; justify-content: center;
   flex-wrap: wrap; gap: 6px 18px;
   padding: 10px 16px;

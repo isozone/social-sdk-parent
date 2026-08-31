@@ -60,6 +60,8 @@ Thumbs.db
 # Logs
 logs/
 *.log
+# 但保留 web 前端源码里的 logs 视图目录（路由引用 @/views/logs/...），使其可被版本管理
+!social-sdk-xianyu-manager-web/src/views/logs/
 
 # Test coverage
 coverage/

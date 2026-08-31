@@ -16,16 +16,23 @@ api.interceptors.request.use(config => {
   return config
 })
 
+let isRedirecting = false
+
 // 响应拦截器 - 统一处理错误
 api.interceptors.response.use(
   response => response.data,
   error => {
     if (error.response) {
       const { status, data } = error.response
-      if (status === 401) {
+      if (status === 401 || status === 403) {
         localStorage.removeItem('token')
-        router.push('/login')
-        ElMessage.error('登录已过期，请重新登录')
+        if (!isRedirecting) {
+          isRedirecting = true
+          router.push('/login').finally(() => {
+            isRedirecting = false
+          })
+          ElMessage.error(status === 401 ? '登录已过期，请重新登录' : '权限不足，请重新登录')
+        }
       } else {
         ElMessage.error(data?.message || '请求失败')
       }

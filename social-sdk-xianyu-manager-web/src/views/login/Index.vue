@@ -172,6 +172,7 @@ const form = ref({ username: '', password: '' })
 const loading = ref(false)
 
 async function handleLogin() {
+  if (loading.value) return
   if (!form.value.username || !form.value.password) {
     ElMessage.warning('请输入用户名和密码')
     return
@@ -181,7 +182,7 @@ async function handleLogin() {
     const ok = await authStore.login(form.value.username, form.value.password)
     if (ok) {
       ElMessage.success('登录成功')
-      router.push('/app/dashboard')
+      router.push(POST_LOGIN_REDIRECT)
     } else {
       ElMessage.error('登录失败：账号或密码错误')
     }

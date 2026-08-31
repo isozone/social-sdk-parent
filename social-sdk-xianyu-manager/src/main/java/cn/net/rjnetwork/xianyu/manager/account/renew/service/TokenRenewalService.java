@@ -21,7 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Token/IM 续期服务 —— A4。
@@ -82,10 +85,14 @@ public class TokenRenewalService {
                         .isNull(ImTokenCache::getNextRenewAt)
                         .or()
                         .le(ImTokenCache::getNextRenewAt, LocalDateTime.now()));
+        // 批量加载涉及的账号，避免过滤阶段 + 执行阶段两次 N+1 逐条查询
+        Map<Long, XianyuAccount> accountMap = candidates.isEmpty() ? Map.of()
+                : accountMapper.selectBatchIds(candidates.stream().map(ImTokenCache::getAccountId).distinct().toList())
+                        .stream().collect(Collectors.toMap(XianyuAccount::getId, Function.identity()));
         // 过滤掉账号已 DISABLED / COOKIE_EXPIRED 的
         candidates = candidates.stream()
                 .filter(c -> {
-                    XianyuAccount acc = accountMapper.selectById(c.getAccountId());
+                    XianyuAccount acc = accountMap.get(c.getAccountId());
                     return acc != null && !"DISABLED".equals(acc.getStatus())
                             && !"COOKIE_EXPIRED".equals(acc.getStatus());
                 })
@@ -100,7 +107,7 @@ public class TokenRenewalService {
         StringBuilder failureSummary = new StringBuilder();
         for (ImTokenCache cache : candidates) {
             long t0 = System.currentTimeMillis();
-            XianyuAccount account = accountMapper.selectById(cache.getAccountId());
+            XianyuAccount account = accountMap.get(cache.getAccountId());
             try {
                 RenewOutcome r = renewOne(account, cache);
                 switch (r) {

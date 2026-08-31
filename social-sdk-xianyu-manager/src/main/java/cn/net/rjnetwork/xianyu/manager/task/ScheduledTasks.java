@@ -3,6 +3,7 @@ package cn.net.rjnetwork.xianyu.manager.task;
 import cn.net.rjnetwork.xianyu.manager.account.mapper.AccountMapper;
 import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
 import cn.net.rjnetwork.xianyu.manager.account.task.AccountHealthTask;
+import cn.net.rjnetwork.xianyu.manager.account.task.SessionKeepaliveTask;
 import cn.net.rjnetwork.xianyu.manager.account.renew.task.CookiesRefreshTask;
 import cn.net.rjnetwork.xianyu.manager.account.renew.task.LoginRenewTask;
 import cn.net.rjnetwork.xianyu.manager.account.renew.task.TokenRenewalTask;
@@ -41,6 +42,7 @@ public class ScheduledTasks {
     private final ProductService productService;
     private final MonitorService monitorService;
     private final AccountHealthTask healthTask;
+    private final SessionKeepaliveTask sessionKeepaliveTask;
     private final ImMessageWatcherService watcherService;
     private final VirtualShipService virtualShipService;
     private final OrderSyncService orderSyncService;
@@ -61,6 +63,7 @@ public class ScheduledTasks {
 
     public ScheduledTasks(AccountMapper accountMapper, ProductService productService,
                           MonitorService monitorService, AccountHealthTask healthTask,
+                          SessionKeepaliveTask sessionKeepaliveTask,
                           ImMessageWatcherService watcherService,
                           VirtualShipService virtualShipService,
                           OrderSyncService orderSyncService,
@@ -82,6 +85,7 @@ public class ScheduledTasks {
         this.productService = productService;
         this.monitorService = monitorService;
         this.healthTask = healthTask;
+        this.sessionKeepaliveTask = sessionKeepaliveTask;
         this.watcherService = watcherService;
         this.virtualShipService = virtualShipService;
         this.orderSyncService = orderSyncService;
@@ -210,6 +214,20 @@ public class ScheduledTasks {
     @Scheduled(cron = "0 0/5 * * * *")
     public void runHealthCheck() {
         healthTask.checkAccountHealth();
+    }
+
+    // ======================== Session Keepalive 定时链路（BOT-A1） ========================
+
+    /** 每 60 分钟错峰探测所有账号会话存活；频率与 token 续期（110 分钟）形成阶梯，
+     *  且内部按需跳过 + 随机抖动，避免高频规律探活触发闲鱼风控。
+     */
+    @Scheduled(cron = "0 0 * * * *")
+    public void runSessionKeepalive() {
+        try {
+            sessionKeepaliveTask.runScheduled();
+        } catch (Exception e) {
+            log.warn("[BOT-A1] session keepalive failed: {}", e.getMessage());
+        }
     }
 
     @Scheduled(cron = "0 0 * * * *")

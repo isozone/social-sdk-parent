@@ -23,7 +23,7 @@ const routes = [
     path: '/data-board',
     name: 'DataBoard',
     component: () => import('@/views/data-board/Index.vue'),
-    meta: { title: '实时大屏', fullscreen: true }
+    meta: { title: '实时大屏', fullscreen: true, requiresAuth: true }
   },
   {
     // 默认主页 = 企业介绍页（公开），右上角「登录」按钮跳 /login
