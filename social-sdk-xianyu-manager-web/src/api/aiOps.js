@@ -26,3 +26,28 @@ export function listTasks(accountId, status, page = 1, size = 20) {
     params: { ...(accountId ? { accountId } : {}), ...(status ? { status } : {}), page, size }
   })
 }
+
+// ============== 运营知识库 ==============
+export function listKnowledge(params = {}) {
+  return api.get('/ai/ops/knowledge', { params })
+}
+export function getKnowledge(id) {
+  return api.get(`/ai/ops/knowledge/${id}`)
+}
+export function createKnowledge(data) {
+  return api.post('/ai/ops/knowledge', data)
+}
+export function deleteKnowledge(id) {
+  return api.delete(`/ai/ops/knowledge/${id}`)
+}
+
+// ============== 运营建议 ==============
+export function listSuggestions(params = {}) {
+  return api.get('/ai/ops/suggestions', { params })
+}
+export function adoptSuggestion(id) {
+  return api.post(`/ai/ops/suggestions/${id}/adopt`)
+}
+export function ignoreSuggestion(id) {
+  return api.post(`/ai/ops/suggestions/${id}/ignore`)
+}

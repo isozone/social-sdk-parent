@@ -11,7 +11,7 @@
           </div>
         </div>
         <el-select
-          v-model="accountId" placeholder="选择账号" :loading="accountsLoading" clearable style="width: 220px"
+          v-model="accountId" placeholder="选择账号" :loading="accountsLoading" clearable 
           @change="onAccountChange"
         >
           <el-option v-for="a in accounts" :key="a.id" :label="a.accountName || a.id" :value="a.id" />
@@ -23,7 +23,7 @@
         <el-tab-pane label="评价管理" name="reviews">
           <div class="page-toolbar">
             <div class="toolbar-left">
-              <el-input v-model="buyerId" placeholder="用户 ID（留空拉当前账号）" clearable style="width: 240px" />
+              <el-input v-model="buyerId" placeholder="用户 ID（留空拉当前账号）" clearable  />
             </div>
             <div class="toolbar-right">
               <el-button type="primary" :loading="loading" @click="loadReviews">
@@ -66,17 +66,17 @@
             <div class="section-label">发表评价</div>
             <el-form :model="reviewForm" inline>
               <el-form-item label="订单号">
-                <el-input v-model="reviewForm.orderId" placeholder="订单号" style="width: 200px" />
+                <el-input v-model="reviewForm.orderId" placeholder="订单号"  />
               </el-form-item>
               <el-form-item label="评分">
-                <el-select v-model="reviewForm.rating" style="width: 140px">
+                <el-select v-model="reviewForm.rating" >
                   <el-option label="好评" value="GOOD" />
                   <el-option label="中评" value="NORMAL" />
                   <el-option label="差评" value="BAD" />
                 </el-select>
               </el-form-item>
               <el-form-item label="内容">
-                <el-input v-model="reviewForm.content" placeholder="不错的买家" style="width: 320px" />
+                <el-input v-model="reviewForm.content" placeholder="不错的买家"  />
               </el-form-item>
               <el-form-item>
                 <el-button type="primary" :loading="submittingReview" @click="submitReview">
@@ -90,7 +90,7 @@
         <el-tab-pane label="信用画像" name="credit">
           <div class="page-toolbar">
             <div class="toolbar-left">
-              <el-input v-model="creditUserId" placeholder="用户 ID（留空取自己）" clearable style="width: 240px" />
+              <el-input v-model="creditUserId" placeholder="用户 ID（留空取自己）" clearable  />
             </div>
             <div class="toolbar-right">
               <el-button type="primary" :loading="loading" @click="loadCredit">
@@ -171,7 +171,7 @@
         <el-tab-pane label="退款管理" name="refunds">
           <div class="page-toolbar">
             <div class="toolbar-left">
-              <el-select v-model="refundStatus" placeholder="退款状态" clearable style="width: 160px">
+              <el-select v-model="refundStatus" placeholder="退款状态" clearable >
                 <el-option label="全部" value="" />
                 <el-option label="退款中" value="1" />
                 <el-option label="退款审核中" value="2" />
@@ -218,13 +218,13 @@
             <div class="section-label">申请退款</div>
             <el-form :model="refundForm" inline>
               <el-form-item label="订单号">
-                <el-input v-model="refundForm.orderId" placeholder="订单号" style="width: 200px" />
+                <el-input v-model="refundForm.orderId" placeholder="订单号"  />
               </el-form-item>
               <el-form-item label="原因">
-                <el-input v-model="refundForm.reason" placeholder="退款原因" style="width: 220px" />
+                <el-input v-model="refundForm.reason" placeholder="退款原因"  />
               </el-form-item>
               <el-form-item label="金额">
-                <el-input v-model="refundForm.amount" placeholder="退款金额" style="width: 140px" />
+                <el-input v-model="refundForm.amount" placeholder="退款金额"  />
               </el-form-item>
               <el-form-item>
                 <el-button type="warning" :loading="submittingRefund" @click="submitRefund">
