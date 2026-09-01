@@ -103,7 +103,7 @@
                       <el-button
                         v-if="parseJsonCard(msg.content).buttonText"
                         size="small"
-                        :color="parseJsonCard(msg.content).buttonBgColor || '#7c3aed'"
+                        :color="parseJsonCard(msg.content).buttonBgColor || '#0080E0'"
                         class="card-btn"
                         @click="openMedia(parseJsonCard(msg.content).targetUrl)"
                       >{{ parseJsonCard(msg.content).buttonText }}</el-button>
@@ -615,6 +615,23 @@ onUnmounted(() => {
   flex-direction: column;
   height: 100%;
   width: 100%;
+  /* 蓝色调（对齐 Ydisks 闲鱼助手「在线聊天」风格）：仅作用于消息管理页，不改全局主题 */
+  --brand: #0080E0;
+  --brand-2: #409eff;
+  --brand-gradient: linear-gradient(135deg, #0080E0 0%, #409eff 100%);
+  --el-color-primary: #0080E0;
+  --el-color-primary-light-3: #4da3e7;
+  --el-color-primary-light-5: #7fbfef;
+  --el-color-primary-light-7: #b2d7f7;
+  --el-color-primary-light-8: #cce4fb;
+  --el-color-primary-light-9: #e6f1fc;
+  --el-color-primary-dark-2: #0066b3;
+  --msg-accent: #0080E0;
+  --msg-incoming-bg: #e9eaec;
+  --msg-outgoing-bg: #0080E0;
+  --msg-outgoing-text: #ffffff;
+  --msg-panel-bg: #eef3f9;
+  --msg-app-bg: #f5f8fc;
 }
 
 /* ==================== 顶部工具栏 ==================== */
@@ -638,7 +655,7 @@ onUnmounted(() => {
   font-weight: 600;
   padding: 3px 10px;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(79,70,229,0.25);
+  box-shadow: 0 2px 8px rgba(0,128,224,0.28);
 }
 .countdown-tag :deep(.el-icon) {
   animation: spin 2s linear infinite;
@@ -655,6 +672,7 @@ onUnmounted(() => {
   overflow: hidden;       /* 滚动交给内部列表区域 */
   display: flex;
   flex-direction: row;    /* 左列表 + 右聊天并排 */
+  background: var(--msg-app-bg);
 }
 /* nowrap 是关键：el-col 宽度为 25%/75% 百分比，若 flex-wrap 换行且加了 gap，
    25% + 75% + gap 超过容器宽度会把右侧聊天栏挤到第二行（上下堆叠） */
@@ -669,7 +687,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--bg-soft);
+  background: var(--msg-panel-bg);
   border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
@@ -708,8 +726,8 @@ onUnmounted(() => {
   border-bottom: 1px solid var(--border);
   transition: background 0.15s ease;
 }
-.session-item:hover { background: var(--bg-soft); }
-.session-item.active { background: var(--el-color-primary-light-9); }
+.session-item:hover { background: #eef4fb; }
+.session-item.active { background: #e6f1fc; }
 .unread .name { color: var(--color-danger); font-weight: 600; }
 .unread .last-msg { color: var(--color-danger); }
 .session-info {
@@ -837,14 +855,14 @@ onUnmounted(() => {
   word-break: break-word;
 }
 .msg-wrapper:not(.mine) .bubble {
-  background: #fff;
+  background: var(--msg-incoming-bg);
   color: var(--text-1);
   border-top-left-radius: 0;
   box-shadow: 0 1px 4px rgba(0,0,0,0.04);
 }
 .msg-wrapper.mine .bubble {
-  background: #d9fdd0;
-  color: var(--text-1);
+  background: var(--msg-outgoing-bg);
+  color: var(--msg-outgoing-text);
   border-top-right-radius: 0;
 }
 .bubble-text {
