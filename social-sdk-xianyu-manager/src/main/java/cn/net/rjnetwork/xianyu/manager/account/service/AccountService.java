@@ -14,7 +14,6 @@ import cn.net.rjnetwork.xianyu.manager.account.mapper.AccountMapper;
 import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
 import cn.net.rjnetwork.xianyu.manager.notify.mapper.NotifySubscriptionMapper;
 import cn.net.rjnetwork.xianyu.manager.notify.model.NotifySubscription;
-import cn.net.rjnetwork.xianyu.manager.vip.service.VipService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -44,7 +43,6 @@ public class AccountService {
     private static final Logger logger = LoggerFactory.getLogger(AccountService.class);
 
     private final AccountMapper accountMapper;
-    private final VipService vipService;
     private final Map<String, XianyuLoginApiService> qrLoginServices = new ConcurrentHashMap<>();
     /** 缓存每个二维码会话对应的创建请求（含 accountName / remark）*/
     private final Map<String, QrLoginRequest> qrLoginRequests = new ConcurrentHashMap<>();
@@ -87,9 +85,8 @@ public class AccountService {
             "auto_rate_config", "red_flower_config",
             "scheduled_close_notice_log", "scheduled_polish_log");
 
-    public AccountService(AccountMapper accountMapper, VipService vipService) {
+    public AccountService(AccountMapper accountMapper) {
         this.accountMapper = accountMapper;
-        this.vipService = vipService;
     }
 
     /** Spring 自动注入 ChromeProfileManager（如果容器中存在）。 */
@@ -104,8 +101,6 @@ public class AccountService {
         if (cookie == null || cookie.isBlank()) {
             throw new IllegalArgumentException("Cookie is required");
         }
-
-        vipService.assertAccountCreateAllowed(accountMapper.selectCount(new LambdaQueryWrapper<XianyuAccount>()));
 
         XianyuAccount account = new XianyuAccount();
         account.setAccountName(request.getAccountName());
@@ -346,7 +341,6 @@ public class AccountService {
             System.err.println("[ACCOUNT-SERVICE] Failed to fetch profile after login: " + e.getMessage());
         }
 
-        vipService.assertAccountCreateAllowed(accountMapper.selectCount(new LambdaQueryWrapper<XianyuAccount>()));
         accountMapper.insert(account);
 
         // Chrome 容器：为账号启动独占 Chrome 容器
