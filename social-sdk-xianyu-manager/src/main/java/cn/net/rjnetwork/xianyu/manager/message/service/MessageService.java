@@ -97,6 +97,10 @@ public class MessageService {
         this.riskControlProtector = riskControlProtector;
     }
 
+    /** AI 客服引擎（可选注入）：规则未命中时按账号策略 AUTO 模式自动接管回复（闭环兜底）。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private cn.net.rjnetwork.xianyu.manager.cs.engine.AiCsEngine aiCsEngine;
+
     /** Spring 注入 AutoShipService（@Lazy 避启动期循环依赖：AutoShipService 已注入本 MessageService）。 */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     public void setAutoShipService(@org.springframework.context.annotation.Lazy
@@ -1736,6 +1740,45 @@ public class MessageService {
     }
 
     /**
+     * AI 客服 AUTO 接管：识别意图 → 按策略生成回复 → 返回内容。
+     * 配置为「转人工」的意图返回 null（不自动发送，交人工处理）。
+     */
+    private String aiCsAutoReply(Long accountId, XianyuMessage incomingMessage) {
+        try {
+            cn.net.rjnetwork.xianyu.manager.cs.model.AiCsMessage aiMsg = aiCsEngine.handleIncomingMessage(
+                    accountId,
+                    stripGoofishSuffix(incomingMessage.getSenderId()),
+                    incomingMessage.getSenderName(),
+                    incomingMessage.getContent(),
+                    null);
+            if (aiMsg == null || aiMsg.getContent() == null || aiMsg.getContent().isBlank()) {
+                return null;
+            }
+            // 转人工意图：落库留痕但不自动发送
+            if (aiCsEngine.isTransferIntent(accountId, aiMsg.getIntent())) {
+                log.info("[MESSAGE] AI CS intent {} marked transfer-to-human, skip auto send: account={} session={}",
+                        aiMsg.getIntent(), accountId, incomingMessage.getSessionId());
+                return null;
+            }
+            logServiceLike(aiMsg, accountId);
+            return aiMsg.getContent();
+        } catch (Exception e) {
+            log.warn("[MESSAGE] AI CS auto reply failed: account={} session={} err={}",
+                    accountId, incomingMessage.getSessionId(), e.getMessage());
+            return null;
+        }
+    }
+
+    /** AI 客服接管回复记录到自动回复日志（便于命中统计与排查）。 */
+    private void logServiceLike(cn.net.rjnetwork.xianyu.manager.cs.model.AiCsMessage aiMsg, Long accountId) {
+        try {
+            eventPublisher.publishEvent(new NotifyEvent("AI_CS_AUTO_REPLIED", accountId, "AI 客服",
+                    Map.of("intent", aiMsg.getIntent() == null ? "" : aiMsg.getIntent())));
+        } catch (Exception ignored) {
+        }
+    }
+
+    /**
      * 自动回复（同步执行）：检查消息是否命中规则，命中后真实调用闲鱼 IM 发送并发布站内/站外通知。
      * 仅供异步包装、测试接口、手动触发使用，不要直接在消息同步链路里调（会阻塞）。
      */
@@ -1744,6 +1787,11 @@ public class MessageService {
             return null;
         }
         String reply = ruleService.autoReply(accountId, incomingMessage.getContent(), incomingMessage.getSessionId());
+        // 规则/关键词/AI 接管/兜底均未命中 → AI 客服 AUTO 模式接管（此前 AiCsEngine 从未接入真实消息链路）
+        if ((reply == null || reply.isBlank()) && aiCsEngine != null
+                && aiCsEngine.isAutoReplyEnabled(accountId)) {
+            reply = aiCsAutoReply(accountId, incomingMessage);
+        }
         if (reply == null || reply.isBlank()) {
             return reply;
         }

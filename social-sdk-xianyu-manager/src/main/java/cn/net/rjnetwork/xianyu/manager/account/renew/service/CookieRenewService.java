@@ -127,6 +127,9 @@ public class CookieRenewService {
      * @return 批次日志主键
      */
     public Long runBatch(String triggerSource, boolean onlyExpiredOnly) {
+        // 0. 闭环兜底：为尚无刷新计划的账号自动补建默认计划（720 分钟 / onlyOnExpired=1）。
+        //    否则 QR 登录的账号永远不进 collectCandidates，cookie 失效后无人续期。
+        ensureSchedules();
         // 1. 收集待刷新账号：enabled=1 且（nextRunAt 已到 或 onlyOnExpired=1 且已失效）
         List<XianyuAccount> candidates = collectCandidates(onlyExpiredOnly);
         ScheduledCookiesRefreshLog batch = startLog(triggerSource, candidates.size());
@@ -421,6 +424,39 @@ public class CookieRenewService {
     }
 
     // ==================== 批次日志辅助 ====================
+
+    /**
+     * 为所有非 DISABLED 且尚无刷新计划的账号自动补建默认计划（12 小时 / 仅失效时刷新）。
+     * <p>此前计划只能通过管理端 /schedule 手工创建，QR 登录的账号没有任何计划，
+     * A1 批次永远扫不到它们 —— cookie 失效后无人续期，这是「cookie 总是自己失效」的根因之一。</p>
+     */
+    private void ensureSchedules() {
+        try {
+            List<CookieRefreshSchedule> existing = scheduleMapper.selectList(null);
+            java.util.Set<Long> covered = existing.stream()
+                    .map(CookieRefreshSchedule::getAccountId)
+                    .collect(java.util.stream.Collectors.toSet());
+            List<XianyuAccount> accounts = accountMapper.selectList(
+                    new LambdaQueryWrapper<XianyuAccount>().ne(XianyuAccount::getStatus, "DISABLED"));
+            int created = 0;
+            for (XianyuAccount a : accounts) {
+                if (a.getId() == null || covered.contains(a.getId())) continue;
+                CookieRefreshSchedule s = new CookieRefreshSchedule();
+                s.setAccountId(a.getId());
+                s.setEnabled(1);
+                s.setIntervalMinutes(720);
+                s.setOnlyOnExpired(1);
+                s.setNextRunAt(LocalDateTime.now());
+                scheduleMapper.insert(s);
+                created++;
+            }
+            if (created > 0) {
+                log.info("[A1] ensureSchedules: auto-created {} cookie refresh schedules", created);
+            }
+        } catch (Exception e) {
+            log.warn("[A1] ensureSchedules failed: {}", e.getMessage());
+        }
+    }
 
     private List<XianyuAccount> collectCandidates(boolean onlyExpiredOnly) {
         List<CookieRefreshSchedule> schedules = scheduleMapper.selectList(

@@ -70,11 +70,25 @@ public class AccountHealthTask {
                     continue;
                 }
 
-                // 校验未通过：根据 message 区分鉴权失效与连接失败
+                // 校验未通过：严格区分「真正登录态失效」与「可恢复签名错误」
+                // TOKEN_EXOIRED / ILLEGAL_REQUEST / TOKEN_EMPTY 只是 _m_h5_tk 签名 token 过期或预热抖动，
+                // 登录 cookie 本体仍健康（闲鱼登录 cookie 可存活几十天），不能判为 COOKIE_EXPIRED，
+                // 否则会把健康账号误标过期并反复告警（CookieRenewService/MessageService 均已按此白名单处理）。
                 String msg = r == null ? "" : (r.message == null ? "" : r.message);
-                boolean loginExpired = msg.toLowerCase().contains("login")
-                        || msg.toLowerCase().contains("token")
-                        || msg.toLowerCase().contains("empty cookie");
+                String low = msg.toLowerCase();
+                boolean recoverableSignError = low.contains("token_exoired")
+                        || low.contains("illegal_request")
+                        || low.contains("token_empty")
+                        || low.contains("recoverable sign error");
+                if (recoverableSignError) {
+                    // 签名抖动：不改状态，等下一轮自然恢复（避免误报 COOKIE_EXPIRED）
+                    continue;
+                }
+                // 真正登录态失效白名单：login-error / user_validate / session_expired / fail_sys_login
+                boolean loginExpired = low.contains("login")
+                        || low.contains("user_validate")
+                        || low.contains("session_expired")
+                        || low.contains("empty cookie");
 
                 if (loginExpired) {
                     if (!"COOKIE_EXPIRED".equals(account.getStatus())) {

@@ -418,6 +418,30 @@ public class AiCsEngine {
                 new LambdaQueryWrapper<AiCsPolicy>().eq(AiCsPolicy::getAccountId, accountId));
     }
 
+    /**
+     * 该账号是否允许 AI 客服自动接管回复。
+     * <p>此前 AiCsEngine 只被手动测试端点调用，真实消息链路从不触发，
+     * 导致 AI 客服的策略/会话/知识库子系统形同虚设（闭环断裂）。
+     * 判定条件：已配置策略且 autoReplyEnabled=true 且 mode=AUTO。</p>
+     */
+    public boolean isAutoReplyEnabled(Long accountId) {
+        AiCsPolicy policy = getPolicy(accountId);
+        return policy != null
+                && Boolean.TRUE.equals(policy.getAutoReplyEnabled())
+                && "AUTO".equals(policy.getMode());
+    }
+
+    /** 该意图是否配置为「转人工」（不自动发送 AI 回复）。 */
+    public boolean isTransferIntent(Long accountId, String intent) {
+        if (intent == null || intent.isBlank()) return false;
+        AiCsPolicy policy = getPolicy(accountId);
+        if (policy == null || policy.getTransferToIntents() == null) return false;
+        for (String t : policy.getTransferToIntents().split(",")) {
+            if (intent.equalsIgnoreCase(t.trim())) return true;
+        }
+        return false;
+    }
+
     // ======================================================================
     // 内部类
     // ======================================================================

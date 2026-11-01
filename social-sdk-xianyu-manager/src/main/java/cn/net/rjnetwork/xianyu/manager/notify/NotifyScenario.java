@@ -71,6 +71,10 @@ public enum NotifyScenario {
             "AI 客服未能成交",
             "账号 {accountName} 与买家 {buyerNickname} 议价 {bargainRound} 轮未达成一致，买家最后出价 {lowestOffer} 元，商品原价 {originalPrice} 元",
             300),
+    AI_CS_AUTO_REPLIED("AI客服自动回复",
+            "AI 客服已自动回复",
+            "账号 {accountName} 的 AI 客服按 AUTO 策略自动回复了买家消息（意图：{intent}）。",
+            600),
 
     // 账号健康
     ACCOUNT_HEALTH_DROP("账号健康度下降",
