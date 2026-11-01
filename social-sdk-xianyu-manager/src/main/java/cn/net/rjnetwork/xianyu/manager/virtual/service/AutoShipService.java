@@ -521,11 +521,18 @@ public class AutoShipService {
 
     /** 拼卡券发货文本（四类型各自格式）。 */
     private String buildDeliverContent(ShipCard card) {
-        return switch (Optional.ofNullable(card.getCardType()).orElse("CARD")) {
+        String type = Optional.ofNullable(card.getCardType()).orElse("CARD");
+        // TEXT 是 TEXT 类卡的常见别名；未知类型也优先用 content，避免发出"卡号：\n卡密："空内容
+        if ("TEXT".equalsIgnoreCase(type) || !(type.equals("ACCOUNT") || type.equals("LINK_QRCODE")
+                || type.equals("PLAIN_TEXT") || type.equals("CARD"))) {
+            return isBlank(card.getContent())
+                    ? "卡号：" + nullSafe(card.getCardCode()) + "\n卡密：" + nullSafe(card.getCardPassword())
+                    : nullSafe(card.getContent());
+        }
+        return switch (type) {
             case "ACCOUNT" -> "账号：" + nullSafe(card.getCardCode()) + "\n密码：" + nullSafe(card.getCardPassword())
                     + (card.getExtra() == null ? "" : "\n服务器：" + card.getExtra());
-            case "LINK_QRCODE" -> nullSafe(card.getContent());
-            case "PLAIN_TEXT" -> nullSafe(card.getContent());
+            case "LINK_QRCODE", "PLAIN_TEXT" -> nullSafe(card.getContent());
             default -> "卡号：" + nullSafe(card.getCardCode()) + "\n卡密：" + nullSafe(card.getCardPassword());
         };
     }

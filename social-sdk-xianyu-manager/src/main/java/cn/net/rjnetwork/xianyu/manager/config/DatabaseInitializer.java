@@ -842,6 +842,18 @@ public class DatabaseInitializer {
         // ai_cs_session 表补齐
         ensureColumn("ai_cs_session", "product_id", "INTEGER");
         ensureColumn("ai_cs_session", "order_id", "INTEGER");
+        // ai_cs_* 继承 BaseEntity 的表补齐（旧库 SQLite schema 缺 updated_at/deleted 会导致插入失败）
+        ensureColumn("ai_cs_message", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+        ensureColumn("ai_cs_message", "deleted", "INTEGER DEFAULT 0");
+        ensureColumn("ai_cs_session", "created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+        ensureColumn("ai_cs_session", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+        ensureColumn("ai_cs_session", "deleted", "INTEGER DEFAULT 0");
+        ensureColumn("ai_cs_policy", "created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+        ensureColumn("ai_cs_policy", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+        ensureColumn("ai_cs_policy", "deleted", "INTEGER DEFAULT 0");
+        ensureColumn("ai_cs_knowledge", "created_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+        ensureColumn("ai_cs_knowledge", "updated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP");
+        ensureColumn("ai_cs_knowledge", "deleted", "INTEGER DEFAULT 0");
     }
 
     /**

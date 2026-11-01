@@ -271,7 +271,9 @@ public class ProductService {
 
         // 7. 步骤 D：运费设置（由前端透传 shippingMode 决定，默认 NONE=无需邮寄）
         // NONE  = 无需邮寄（supportFreight=false + canFreeShipping=true，不传 templateId）
-        // FREE  = 包邮（supportFreight=true + canFreeShipping=true，templateId=-100 按距离计费但包邮）
+        // FREE  = 包邮（supportFreight=true + canFreeShipping=true + postPriceInCent=0 固定 0 元运费。
+        //         不能只传 templateId=-100（按距离计费模板）：闲鱼端会按距离算出真实运费（实测 8 元），
+        //         canFreeShipping=true 不生效 → 必须显式 0 元固定运费）
         // DISTANCE = 按距离计费（supportFreight=true + canFreeShipping=false，templateId=-100）
         Map<String, Object> deliverySettings = new LinkedHashMap<>();
         String mode = request.getShippingMode() != null ? request.getShippingMode() : "NONE";
@@ -280,7 +282,10 @@ public class ProductService {
         deliverySettings.put("supportFreight", supportFreight);
         deliverySettings.put("canFreeShipping", canFreeShipping);
         deliverySettings.put("onlyTakeSelf", false);
-        if (supportFreight) {
+        if ("FREE".equalsIgnoreCase(mode)) {
+            // 包邮：显式 0 元固定运费，不传距离模板
+            deliverySettings.put("postPriceInCent", "0");
+        } else if (supportFreight) {
             deliverySettings.put("templateId", "-100");  // 按距离计费模板
         }
 

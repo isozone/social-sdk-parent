@@ -552,6 +552,12 @@ public class VirtualShipService {
             }
         }
 
+        // AUTO：deliverContentTemplate 即交付内容（发布商品时填写，支持 ${itemTitle}/${orderId} 占位符）
+        if ("AUTO".equals(type)) {
+            if (template == null || template.isBlank()) return null;
+            return renderTemplate(template, vars);
+        }
+
         return null;
     }
 
