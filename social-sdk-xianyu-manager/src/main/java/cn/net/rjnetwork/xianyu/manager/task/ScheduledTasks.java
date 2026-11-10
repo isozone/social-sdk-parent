@@ -21,6 +21,7 @@ import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
 import cn.net.rjnetwork.xianyu.manager.product.service.ProductService;
 import cn.net.rjnetwork.xianyu.manager.virtual.service.VirtualShipService;
 import cn.net.rjnetwork.xianyu.manager.order.service.OrderSyncService;
+import cn.net.rjnetwork.xianyu.manager.order.service.RefundMonitorService;
 import cn.net.rjnetwork.xianyu.manager.monitor.service.MonitorTaskService;
 import cn.net.rjnetwork.xianyu.manager.monitor.service.MonitorTaskRunner;
 import cn.net.rjnetwork.xianyu.manager.monitor.model.MonitorTask;
@@ -60,6 +61,7 @@ public class ScheduledTasks {
     private final RedFlowerTask redFlowerTask;
     private final PolishTask polishTask;
     private final CloseNoticeTask closeNoticeTask;
+    private final RefundMonitorService refundMonitorService;
 
     public ScheduledTasks(AccountMapper accountMapper, ProductService productService,
                           MonitorService monitorService, AccountHealthTask healthTask,
@@ -80,7 +82,8 @@ public class ScheduledTasks {
                           AutoRateTask autoRateTask,
                           RedFlowerTask redFlowerTask,
                           PolishTask polishTask,
-                          CloseNoticeTask closeNoticeTask) {
+                          CloseNoticeTask closeNoticeTask,
+                          RefundMonitorService refundMonitorService) {
         this.accountMapper = accountMapper;
         this.productService = productService;
         this.monitorService = monitorService;
@@ -103,6 +106,7 @@ public class ScheduledTasks {
         this.redFlowerTask = redFlowerTask;
         this.polishTask = polishTask;
         this.closeNoticeTask = closeNoticeTask;
+        this.refundMonitorService = refundMonitorService;
         // B1：启动时把现有 cron 任务幂等注册到 scheduled_task 表，便于管理端启停/改 cron/查最近执行
         try { scheduledTaskService.registerDefaults(); }
         catch (Exception e) { log.warn("[B1] registerDefaults failed (non-fatal): {}", e.getMessage()); }
@@ -116,6 +120,22 @@ public class ScheduledTasks {
     @Scheduled(cron = "0 0/10 * * * *")
     public void runCookieRefresh() {
         cookiesRefreshTask.runScheduled();
+    }
+
+    // ======================== 退款分级处理定时链路 ========================
+
+    /** 每 15 分钟轮询退款中列表，按订单发货状态分级：
+     *  已发货虚拟订单自动发拒绝沟通话术 + 通知卖家点拒绝；未发货通知人工处理（拒绝会被平台判败）。 */
+    @Scheduled(cron = "0 0/15 * * * *")
+    public void runRefundMonitor() {
+        try {
+            int handled = refundMonitorService.runMonitor();
+            if (handled > 0) {
+                log.info("[REFUND] refund monitor done, handled={}", handled);
+            }
+        } catch (Exception e) {
+            log.warn("[REFUND] refund monitor failed: {}", e.getMessage());
+        }
     }
 
     // ======================== 登录续期定时链路（A3） ========================
@@ -153,7 +173,7 @@ public class ScheduledTasks {
     /** 每天 10:00 扫已发货 N 天（autoConfirmDays）但买家未确认的订单，按 confirmReceiptMessage 模板发话术催确认。
      *  闲鱼侧 SDK 无专门「确认收货」MTOP API，走消息话术催确认（轻量可行）。
      */
-    @Scheduled(cron = "0 0 10 * * *")
+    @Scheduled(cron = "0 0 10 * * *", zone = "UTC")
     public void runConfirmReceipt() {
         confirmReceiptTask.runScheduled();
     }
@@ -163,7 +183,7 @@ public class ScheduledTasks {
     /** 每天 11:00 扫已收货 N 天（delayDays）且卖家未评的订单，按 AutoRateConfig 调 reviewOrder 评好评。
      *  话术模板支持 {itemTitle}/{buyerNick}/{accountName} 占位符替换。
      */
-    @Scheduled(cron = "0 0 11 * * *")
+    @Scheduled(cron = "0 0 11 * * *", zone = "UTC")
     public void runAutoRate() {
         autoRateTask.runScheduled();
     }
@@ -173,17 +193,18 @@ public class ScheduledTasks {
     /** 每天 09:00 给已成交订单买家送红花提信誉，每日送花上限（dailyLimit）防风控盯上。
      *  闲鱼侧送红花走 XianyuApiFacade.sendRedFlower（mtop.taobao.idlemessage.red.flower）。
      */
-    @Scheduled(cron = "0 0 9 * * *")
+    @Scheduled(cron = "0 0 9 * * *", zone = "UTC")
     public void runRedFlower() {
         redFlowerTask.runScheduled();
     }
 
     // ======================== 定时擦亮定时链路（B4） ========================
 
-    /** 每 2 小时扫账号在售商品调 editItem 触发擦亮，提升商品在闲鱼搜索排序。
-     *  闲鱼侧 SDK 无专门 polish API，走商品编辑链路触发排序刷新（与参考项目一致）。
+    /** 每天擦亮一次（闲鱼限制每商品一天只能擦亮一次，跑多次全是无效调用）。
+     *  服务器时区为 UTC，17:00 UTC = 北京时间次日 01:00，落在闲鱼"一天"窗口刚开始的时段。
+     *  由 ScheduledTasks 统一调度，扫账号在售商品调 editItem 触发擦亮，提升搜索排序。
      */
-    @Scheduled(cron = "0 0 0/2 * * *")
+    @Scheduled(cron = "0 0 17 * * *", zone = "UTC")
     public void runPolish() {
         polishTask.runScheduled();
     }
@@ -199,7 +220,9 @@ public class ScheduledTasks {
     @Scheduled(cron = "0 0/30 * * * *")
     public void autoSyncProducts() {
         log.info("[Schedule] auto-sync products start");
-        List<XianyuAccount> accounts = accountMapper.selectList(null);
+        List<XianyuAccount> accounts = accountMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<XianyuAccount>()
+                        .ne(cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount::getStatus, "DISABLED"));
         for (XianyuAccount acc : accounts) {
             try {
                 ProductService.SyncResult r = productService.syncFromXianyu(acc.getId());
@@ -279,7 +302,7 @@ public class ScheduledTasks {
     }
 
     /** 每天凌晨 3 点扫描超期未确认收货的订单，自动确认（auto_confirm_days 由配置控制） */
-    @Scheduled(cron = "0 0 3 * * *")
+    @Scheduled(cron = "0 0 3 * * *", zone = "UTC")
     public void autoConfirmReceipt() {
         try {
             virtualShipService.autoConfirmReceipt();
@@ -294,7 +317,9 @@ public class ScheduledTasks {
     /** 每 2 分钟拉一次闲鱼订单（BOUGHT+SOLD），同步入库并触发 NEW_ORDER 通知 */
     @Scheduled(cron = "0 0/2 * * * *")
     public void autoSyncOrders() {
-        List<XianyuAccount> accounts = accountMapper.selectList(null);
+        List<XianyuAccount> accounts = accountMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<XianyuAccount>()
+                        .ne(cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount::getStatus, "DISABLED"));
         for (XianyuAccount acc : accounts) {
             try {
                 OrderSyncService.SyncResult r = orderSyncService.syncOrders(acc.getId());

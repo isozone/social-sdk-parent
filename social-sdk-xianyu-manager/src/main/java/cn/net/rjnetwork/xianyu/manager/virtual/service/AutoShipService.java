@@ -193,7 +193,12 @@ public class AutoShipService {
                 if (templateDirect) {
                     DeliverPayload payload = parseDeliverPayload(template);
                     if ("LINK".equals(deliverType)) {
-                        String link = payload != null && !isBlank(payload.link) ? payload.link : template;
+                        if (payload != null && isBlank(payload.link)) {
+                            // 模板是合法 JSON 但链接为空：绝不能回退把原始 JSON 文本发给买家
+                            finalizeSkip(task, audit, "链接发货模板 JSON 中 link 为空（deliverContentTemplate 配置不完整）");
+                            return;
+                        }
+                        String link = payload != null ? payload.link : template;
                         if (isBlank(link)) {
                             finalizeSkip(task, audit, "链接发货但商品未配置链接（deliverContentTemplate 为空）");
                             return;
@@ -360,8 +365,16 @@ public class AutoShipService {
                     matched != null ? " via card " + matched.getId() : " (retry dummyDelivery only)",
                     task.getMessageId());
         } catch (Exception e) {
-            finalizeFail(task, audit, "FAILED", e.getClass().getSimpleName() + ": " + e.getMessage());
-            publishShipFailed(task, null, e.getClass().getSimpleName() + ": " + e.getMessage());
+            // 消息已真发过的（MESSAGE_SENT 前缀）绝不能丢前缀：重试链路据此走 dummyDelivery 轮次而非重发，
+            // 丢前缀会导致重试时重新匹配卡券再发一份，买家收双份
+            String prev = task.getErrorMessage();
+            String reason = e.getClass().getSimpleName() + ": " + e.getMessage();
+            if (prev != null && prev.startsWith("MESSAGE_SENT:")) {
+                finalizeFail(task, audit, "FAILED", prev + " | " + reason);
+            } else {
+                finalizeFail(task, audit, "FAILED", reason);
+            }
+            publishShipFailed(task, null, reason);
             log.warn("[A8] processShipTask order {} failed: {}", task.getOrderId(), e.getMessage());
         }
     }
@@ -598,20 +611,21 @@ public class AutoShipService {
         return sb.toString();
     }
 
-    /** FILE 类型发货：deliverContentTemplate 是本地文件路径，上传网盘后返回 下载链接+提取码。 */
+    /** FILE 类型发货：deliverContentTemplate 是本地文件路径，上传网盘后返回 下载链接+提取码。
+     *  失败一律抛异常（而非返回错误文案字符串）——错误文案会被当作发货内容发给买家且任务被标成功，无法重试。 */
     private String uploadFileDeliver(String filePath, String messageTemplate, XianyuProduct product) {
         if (filePath == null || filePath.isBlank()) {
-            return "【系统错误】商品文件路径为空";
+            throw new IllegalStateException("FILE 发货失败: 商品文件路径为空");
         }
         try {
             List<CloudStorageAccount> accounts = cloudStorageService.listAccounts(product.getAccountId());
             if (accounts.isEmpty()) {
-                return "【系统忙碌】网盘账号未配置，请稍后重试";
+                throw new IllegalStateException("FILE 发货失败: 网盘账号未配置");
             }
             CloudStorageAccount account = accounts.get(0);
             File file = new File(filePath);
             if (!file.exists()) {
-                return "【系统错误】商品文件不存在: " + filePath;
+                throw new IllegalStateException("FILE 发货失败: 商品文件不存在: " + filePath);
             }
             cn.net.rjnetwork.xianyu.manager.clouddisk.dto.FileUploadRequest uploadReq =
                     new cn.net.rjnetwork.xianyu.manager.clouddisk.dto.FileUploadRequest();
@@ -648,10 +662,12 @@ public class AutoShipService {
                     return sb.toString();
                 }
             }
-            return "【系统错误】文件上传失败，请稍后重试";
+            throw new IllegalStateException("FILE 发货失败: 文件上传未完成");
+        } catch (IllegalStateException e) {
+            throw e;
         } catch (Exception e) {
             log.warn("[A8] FILE deliver failed: {}", e.getMessage());
-            return "【系统错误】文件发货失败，请联系客服";
+            throw new IllegalStateException("FILE 发货失败: " + e.getMessage(), e);
         }
     }
 

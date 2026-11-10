@@ -10,8 +10,12 @@ public enum NotifyScenario {
 
     ACCOUNT_COOKIE_EXPIRED("账号Cookie过期",
             "闲鱼账号 {accountName} 登录已失效",
-            "账号 {accountName} 的登录状态已失效（Cookie 过期），请尽快重新扫码登录，否则相关自动化将中断。",
-            3600),
+            "账号 {accountName} 的登录状态已失效（Cookie 过期）。服务器已自动打开登录页等待扫码，请点开下方链接完成扫码恢复（约 1 分钟）：\n{controlUrl}",
+            86400),
+    ACCOUNT_COOKIE_RECOVERED("账号登录态已恢复",
+            "闲鱼账号 {accountName} 登录态已恢复",
+            "账号 {accountName} 的登录态已自动恢复（保活续期成功）。此前该账号曾处于过期状态，现已恢复正常。",
+            0),
     ACCOUNT_OFFLINE("账号离线",
             "闲鱼账号 {accountName} 已离线",
             "账号 {accountName} 当前处于离线状态，可能影响消息/订单处理。",
@@ -26,6 +30,11 @@ public enum NotifyScenario {
             "闲鱼账号 {accountName} 登录失败",
             "账号 {accountName} 的登录续期重试已耗尽（原因：{reason}），请人工介入处理，否则相关自动化将中断。",
             3600),
+    // 商品被平台（违规）下架/删除：同步对账时检测到本地在售但平台列表已不存在
+    PRODUCT_TAKE_DOWN("商品被平台下架",
+            "账号 {accountName} 有商品被平台下架",
+            "账号 {accountName} 检测到以下商品已被平台下架（可能为违规下架或被删除）：{items}。请登录闲鱼 App 查看违规原因并及时处理。",
+            600),
     NEW_ORDER("新订单",
             "账号 {accountName} 收到新订单",
             "账号 {accountName} 收到新订单：{itemTitle}，金额 {amount}，对手方 {counterparty}。",
@@ -130,7 +139,12 @@ public enum NotifyScenario {
     AUTO_SHIP_DUMMY_FAILED("自动发货平台确认失败",
             "订单 {orderId} 平台侧确认发货失败",
             "订单 {orderId} 商品 {productId}（{itemTitle}）已向买家发送发货内容，但闲鱼平台侧确认失败：{reason}。消息已送达买家，需后台人工补确认。",
-            60);
+            60),
+    // 退款分级处理：action=AUTO_REFUSE_SCRIPT（已发货虚拟已交付，已自动发拒绝话术）/ MANUAL（未发货，转人工）
+    ORDER_REFUND_REQUESTED("买家申请退款",
+            "订单 {orderId} 收到退款申请",
+            "账号 {accountName} 的订单 {orderId}（{itemTitle}，{amount}）收到买家退款申请。处理建议：{action}。{detail}",
+            300);
 
     private final String label;
     private final String defaultTitle;

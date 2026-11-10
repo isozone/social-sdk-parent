@@ -110,6 +110,11 @@ public class ApiCookieRenewService {
             account.setLastError(null);
             account.setUpdatedAt(LocalDateTime.now());
             accountMapper.updateById(account);
+            // updateById 忽略 null 字段：last_error 必须用 UpdateWrapper 显式置空，
+            // 否则恢复 ACTIVE 后页面仍显示旧的"Session过期"误报
+            accountMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<XianyuAccount>()
+                    .eq(XianyuAccount::getId, account.getId())
+                    .set(XianyuAccount::getLastError, null));
             circuitBreaker.recordSuccess(account.getId(), "API_COOKIE_RENEW");
             log.info("[A2] account {} cookie renewed via MTOP, resp code={}",
                     account.getId(), resp != null ? resp.path("ret").asText() : "null");

@@ -252,6 +252,19 @@ public class TokenRenewalService {
         cache.setConsecutiveFailures(0);
         cache.setNextRenewAt(LocalDateTime.now().plusMinutes(RENEW_INTERVAL_MINUTES));
         tokenCacheMapper.updateById(cache);
+        // 同步账号侧 imCookieHeader，避免消息链路读到与缓存脱节的旧 x5sec/token
+        try {
+            cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount acc =
+                    accountMapper.selectById(cache.getAccountId());
+            if (acc != null && newCookie != null && !newCookie.equals(acc.getImCookieHeader())) {
+                acc.setImCookieHeader(newCookie);
+                acc.setUpdatedAt(LocalDateTime.now());
+                accountMapper.updateById(acc);
+            }
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(TokenRenewalService.class)
+                    .warn("[A4] 同步账号 imCookieHeader 失败 accountId={}: {}", cache.getAccountId(), e.getMessage());
+        }
     }
 
     private void updateCacheAfterRun(ImTokenCache cache, RenewOutcome result, String reason) {

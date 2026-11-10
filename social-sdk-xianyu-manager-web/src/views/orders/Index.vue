@@ -656,7 +656,7 @@ function contactBuyer(row) {
   width: 44px; height: 44px; border-radius: 13px;
   display: flex; align-items: center; justify-content: center;
   color: #fff; font-size: 20px; flex-shrink: 0;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  background: linear-gradient(135deg, var(--brand), var(--brand-hover));
   box-shadow: 0 8px 18px rgba(79, 70, 229, 0.22);
 }
 .card-head-text {

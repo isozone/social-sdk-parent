@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 
 const routes = [
   {
@@ -81,12 +81,6 @@ const routes = [
         meta: { title: '规则管理' }
       },
       {
-        path: 'wallet',
-        name: 'Wallet',
-        component: () => import('@/views/wallet/Index.vue'),
-        meta: { title: '钱包资产' }
-      },
-      {
         path: 'collect',
         name: 'Collect',
         component: () => import('@/views/collect/Index.vue'),
@@ -97,12 +91,6 @@ const routes = [
         name: 'Ai',
         component: () => import('@/views/ai/Index.vue'),
         meta: { title: 'AI 厂商' }
-      },
-      {
-        path: 'ai-ops',
-        name: 'AiOps',
-        component: () => import('@/views/aiOps/Index.vue'),
-        meta: { title: 'AI 运营' }
       },
       {
         path: 'cloud-storage',
@@ -133,18 +121,6 @@ const routes = [
         name: 'Notify',
         component: () => import('@/views/notify/Index.vue'),
         meta: { title: '消息通知' }
-      },
-      {
-        path: 'market',
-        name: 'Market',
-        component: () => import('@/views/market/Index.vue'),
-        meta: { title: '市场情报' }
-      },
-      {
-        path: 'buyer',
-        name: 'Buyer',
-        component: () => import('@/views/buyer/Index.vue'),
-        meta: { title: '买家画像' }
       },
       {
         path: 'ai-cs',
@@ -207,18 +183,6 @@ const routes = [
         meta: { title: '个人中心' }
       },
       {
-        path: 'community/:section?',
-        name: 'Community',
-        component: () => import('@/views/community/Index.vue'),
-        meta: { title: 'I 社区' }
-      },
-      {
-        path: 'community/topic/:id',
-        name: 'CommunityTopicDetail',
-        component: () => import('@/views/community/TopicDetail.vue'),
-        meta: { title: '帖子详情' }
-      },
-      {
         path: 'logs/cookies-refresh',
         name: 'CookiesRefreshLogs',
         component: () => import('@/views/logs/cookiesRefresh/Index.vue'),
@@ -259,7 +223,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHashHistory(),
   routes
 })
 

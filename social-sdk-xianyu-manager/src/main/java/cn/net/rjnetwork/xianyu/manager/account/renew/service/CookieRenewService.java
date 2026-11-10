@@ -16,6 +16,7 @@ import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -186,6 +187,32 @@ public class CookieRenewService {
     /**
      * 对单个账号执行浏览器刷新：检测失效 → 启动 Chrome 容器 → 提取新 Cookie → 写回。
      */
+    /** 对外暴露：将账号绑定的 Chrome 容器页面导航到指定地址（Chrome 内扫码登录链路用）。 */
+    public boolean navigatePageTo(XianyuAccount account, String url) {
+        try {
+            String endpoint = resolveCdpEndpoint(account);
+            if (endpoint == null || endpoint.isBlank()) {
+                log.warn("[A1] navigatePageTo: 无可用 CDP 端点");
+                return false;
+            }
+            String wsUrl = resolvePageWsUrl(endpoint);
+            try (CdpSession session = CdpSession.connect(wsUrl, CDP_HTTP)) {
+                ObjectNode nav = JSON.createObjectNode();
+                nav.put("url", url);
+                session.send("Page.navigate", nav);
+                return true;
+            }
+        } catch (Exception e) {
+            log.warn("[A1] navigatePageTo failed: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /** 对外暴露：经 CDP 从容器 cookie jar 提取生态 cookie（Chrome 内扫码登录回写链路用）。 */
+    public Optional<String> extractCookieHeaderViaCdp(XianyuAccount account) {
+        return extractCookieViaCdp(account);
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public RenewResult renewOne(XianyuAccount account) {
         // 熔断器检查：账号已在风控冷却中则跳过
@@ -199,26 +226,31 @@ public class CookieRenewService {
         boolean onlyOnExpired = schedule == null || schedule.getOnlyOnExpired() == null || schedule.getOnlyOnExpired() == 1;
         if (onlyOnExpired) {
             RenewResult status = checkCookieStatus(account);
-            if (status != RenewResult.EXPIRED) {
+            if (status == RenewResult.SUCCESS) {
                 // Cookie 仍健康，无需刷新
-                return status == RenewResult.SUCCESS ? RenewResult.SKIPPED : status;
-            }
-        }
-
-        // 2. A2 优先通道：先尝试 MTOP 轻量续期（不启动 Chrome 容器，省资源）
-        //    典型场景：_m_h5_tk token 过期但 cookie2/unb 登录态仍健康，A2 调一次 MTOP 即可续 token。
-        //    A2 成功 → 直接返回；A2 失败 → 降级到 A1 浏览器刷新。
-        try {
-            ApiCookieRenewService.RenewResult apiResult = apiCookieRenewService.renewViaApi(account);
-            if (apiResult == ApiCookieRenewService.RenewResult.SUCCESS) {
-                return RenewResult.SUCCESS;
-            }
-            if (apiResult == ApiCookieRenewService.RenewResult.SKIPPED) {
                 return RenewResult.SKIPPED;
             }
-            log.info("[A1] A2 API renew failed for account {}, fall back to browser refresh", account.getId());
-        } catch (Exception e) {
-            log.warn("[A1] A2 API renew threw, fall back to browser refresh: {}", e.getMessage());
+            // EXPIRED 与 FAILED（token 过期/签名错误等可恢复错误）都继续走 A2→A1 续期链：
+            // FAILED 若在此短路返回，A2 的目标场景（_m_h5_tk 过期）永远不会被续上
+        }
+
+        // 2. A2 通道 —— 注意：MTOP 调用只续 _m_h5_tk token，【不会延长服务端 session TTL】
+        //    （实测：扫码后 14 轮 A2 SUCCESS，session 照样在 ~24h 硬 TTL 到期死亡）。
+        //    因此保活模式（onlyOnExpired=0）下 A2 只作降级兜底，主路径是 A1 浏览器真实会话活动；
+        //    仅「失效才刷」模式（onlyOnExpired=1）保持 A2 优先（省资源，失效场景无需保活）。
+        if (onlyOnExpired) {
+            try {
+                ApiCookieRenewService.RenewResult apiResult = apiCookieRenewService.renewViaApi(account);
+                if (apiResult == ApiCookieRenewService.RenewResult.SUCCESS) {
+                    return RenewResult.SUCCESS;
+                }
+                if (apiResult == ApiCookieRenewService.RenewResult.SKIPPED) {
+                    return RenewResult.SKIPPED;
+                }
+                log.info("[A1] A2 API renew failed for account {}, fall back to browser refresh", account.getId());
+            } catch (Exception e) {
+                log.warn("[A1] A2 API renew threw, fall back to browser refresh: {}", e.getMessage());
+            }
         }
 
         // 3. A1 降级通道：启动/复用账号独占 Chrome 容器
@@ -255,6 +287,17 @@ public class CookieRenewService {
         account.setLastLoginAt(LocalDateTime.now());
         account.setUpdatedAt(LocalDateTime.now());
         accountMapper.updateById(account);
+        // updateById 忽略 null 字段：last_error 需显式置空（否则恢复 ACTIVE 后仍显示旧误报）
+        accountMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<XianyuAccount>()
+                .eq(XianyuAccount::getId, account.getId())
+                .set(XianyuAccount::getLastError, null));
+        // 边沿通知：此前处于过期态 → 本次续期成功即"已恢复"，让用户安心（不轰炸：仅翻转时发一次）
+        XianyuAccount db = accountMapper.selectById(account.getId());
+        if (db != null && "COOKIE_EXPIRED".equals(db.getStatus())) {
+            String name = Optional.ofNullable(account.getDisplayName()).orElse(account.getAccountName());
+            eventPublisher.publishEvent(new NotifyEvent("ACCOUNT_COOKIE_RECOVERED", account.getId(), name,
+                    Map.of("accountName", name)));
+        }
         circuitBreaker.recordSuccess(account.getId(), "COOKIE_RENEW");
         return RenewResult.SUCCESS;
     }
@@ -318,22 +361,44 @@ public class CookieRenewService {
         }
         String wsUrl;
         try {
-            wsUrl = resolveBrowserWsUrl(endpoint);
+            wsUrl = resolvePageWsUrl(endpoint);
         } catch (Exception e) {
-            log.warn("[A1] extractCookieViaCdp: 解析 CDP WS 端点失败, account {}, err={}",
+            log.warn("[A1] extractCookieViaCdp: 解析 CDP 页面 WS 端点失败, account {}, err={}",
                     account.getId(), e.getMessage());
             return Optional.empty();
         }
         if (wsUrl == null || wsUrl.isBlank()) {
-            log.warn("[A1] extractCookieViaCdp: 未获取到浏览器级 WS 端点, account {}", account.getId());
+            log.warn("[A1] extractCookieViaCdp: 未获取到页面级 WS 端点, account {}", account.getId());
             return Optional.empty();
         }
 
         try (CdpSession session = CdpSession.connect(wsUrl, CDP_HTTP)) {
-            // 先 enable Network 域（与 XianyuCaptchaSolver 一致，避免部分 Chrome 版本拒绝 cookie 命令）
-            session.send("Network.enable", null);
+            // Network/Page 域命令只对 page target 有效（浏览器级会话在 Chrome 117+ 拒绝 Network.enable）
+            try {
+                session.send("Network.enable", null);
+            } catch (Exception enableErr) {
+                log.warn("[A1] Network.enable 被拒(继续): {}", enableErr.getMessage());
+            }
+            // 把账号当前 cookie 注入容器：会话仍有效时导航即续期，同时把登录态固化进 profile
+            injectAccountCookies(session, account);
+            // 导航到登录态页面：主页 + 个人页。仅导航主页可能不触发服务端会话续期，
+            // 追加个人页（服务端校验 session 的登录态页面）提高"真实用户活动"信号
+            try {
+                ObjectNode nav = JSON.createObjectNode();
+                nav.put("url", IM_PAGE_URL);
+                session.send("Page.navigate", nav);
+                Thread.sleep(7000);
+                ObjectNode nav2 = JSON.createObjectNode();
+                nav2.put("url", "https://www.goofish.com/personal");
+                session.send("Page.navigate", nav2);
+                Thread.sleep(6000);
+            } catch (Exception navErr) {
+                log.warn("[A1] 导航 goofish 失败(继续提取): {}", navErr.getMessage());
+            }
             CdpCookieStore store = new CdpCookieStore(session);
-            List<CdpCookieStore.Cookie> all = store.getAllCookies();
+            // Network.getAllCookies 已在 Chrome 117+ 移除，改用带 URL 的 Network.getCookies
+            List<CdpCookieStore.Cookie> all = store.getCookies(
+                    "https://www.goofish.com/", "https://h5api.m.goofish.com/", "https://login.taobao.com/");
             // 过滤生态域 + 按 name 去重（保留最后读到的值，避免同 name 多域副本污染 MTOP 请求）
             LinkedHashMap<String, CdpCookieStore.Cookie> dedup = new LinkedHashMap<>();
             for (CdpCookieStore.Cookie c : all) {
@@ -357,6 +422,72 @@ public class CookieRenewService {
             log.warn("[A1] extractCookieViaCdp: CDP 提取异常, account {}, err={}",
                     account.getId(), e.getMessage());
             return Optional.empty();
+        }
+    }
+
+    /**
+     * 请求 {@code /json/list} 取第一个 page target 的 {@code webSocketDebuggerUrl}。
+     * Network/Page 域命令只对 page target 有效（浏览器级会话在 Chrome 117+ 拒绝 Network.enable，
+     * 且 Network.getAllCookies 已移除）。无 page target 时用 {@code PUT /json/new} 创建
+     * （新版 Chrome 已改为 PUT 语义）。
+     */
+    private String resolvePageWsUrl(String endpoint) throws Exception {
+        Request listReq = new Request.Builder().url(endpoint + "/json/list").get().build();
+        try (Response resp = CDP_HTTP.newCall(listReq).execute()) {
+            if (resp.isSuccessful()) {
+                try (ResponseBody body = resp.body()) {
+                    if (body != null) {
+                        JsonNode arr = JSON.readTree(body.string());
+                        for (JsonNode t : arr) {
+                            if ("page".equalsIgnoreCase(t.path("type").asText())) {
+                                String ws = t.path("webSocketDebuggerUrl").asText("");
+                                if (!ws.isBlank()) return ws;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Request newReq = new Request.Builder()
+                .url(endpoint + "/json/new?about:blank")
+                .put(okhttp3.RequestBody.create(null, new byte[0]))
+                .build();
+        try (Response resp = CDP_HTTP.newCall(newReq).execute()) {
+            try (ResponseBody body = resp.body()) {
+                if (body == null) throw new IllegalStateException("CDP /json/new 响应体为空");
+                JsonNode json = JSON.readTree(body.string());
+                String ws = json.path("webSocketDebuggerUrl").asText("");
+                if (ws.isBlank()) throw new IllegalStateException("CDP /json/new 无 webSocketDebuggerUrl");
+                return ws;
+            }
+        }
+    }
+
+    /** 把账号当前 cookie 注入 Chrome 容器（host 域 www.goofish.com），用于浏览器侧会话激活/续期。 */
+    private void injectAccountCookies(CdpSession session, XianyuAccount account) {
+        String header = account.getCookieHeader();
+        if (header == null || header.isBlank()) return;
+        int injected = 0;
+        for (String pair : header.split(";")) {
+            String p = pair.trim();
+            int eq = p.indexOf('=');
+            if (eq <= 0) continue;
+            try {
+                ObjectNode params = JSON.createObjectNode();
+                params.put("name", p.substring(0, eq).trim());
+                params.put("value", p.substring(eq + 1).trim());
+                // 用 .goofish.com 域注入：host-only 的 www.goofish.com 不会被 h5api.m.goofish.com
+                // 的 MTOP 请求携带，导致注入后提取/续期取不到关键登录 cookie
+                params.put("domain", ".goofish.com");
+                params.put("path", "/");
+                session.send("Network.setCookie", params);
+                injected++;
+            } catch (Exception ignored) {
+                // 单条注入失败不影响整体
+            }
+        }
+        if (injected > 0) {
+            log.info("[A1] 已注入 {} 个账号 cookie 到 Chrome 容器, account {}", injected, account.getId());
         }
     }
 
@@ -475,9 +606,12 @@ public class CookieRenewService {
         schedule.setLastRunAt(LocalDateTime.now());
         schedule.setLastResult(result.name());
         schedule.setLastFailureReason(result == RenewResult.FAILED ? "见批次明细" : null);
-        // 失败则 30 分钟后重试，成功则按 intervalMinutes 排下次
-        int interval = schedule.getIntervalMinutes() != null ? schedule.getIntervalMinutes() : 720;
-        schedule.setNextRunAt(LocalDateTime.now().plusMinutes(result == RenewResult.FAILED ? 30 : interval));
+        // 保活间隔默认 90 分钟：闲鱼服务端 session TTL 约半天，12h 一轮撑不过去。
+        // 失败退避 15 分钟（而非小时级）：保活失败多意味会话濒死，拖越久越死；
+        // 只有 long 退避才会把"续命窗口"整个错过（曾致 22h 无一次有效续期）
+        int interval = schedule.getIntervalMinutes() != null && schedule.getIntervalMinutes() > 0
+                ? schedule.getIntervalMinutes() : 90;
+        schedule.setNextRunAt(LocalDateTime.now().plusMinutes(result == RenewResult.FAILED ? 15 : interval));
         scheduleMapper.updateById(schedule);
     }
 
@@ -507,9 +641,22 @@ public class CookieRenewService {
     }
 
     private void publishLoginExpired(XianyuAccount account) {
+        // 边沿触发：仅状态翻转（非过期→过期）时发一次，防止退避重试期间每小时轰炸
+        XianyuAccount db = accountMapper.selectById(account.getId());
+        if (db != null && "COOKIE_EXPIRED".equals(db.getStatus())) {
+            return;
+        }
+        // 自动化恢复准备：Chrome 已常驻，直接导航到登录页待扫——
+        // 用户点开邮件里的控制页直链就能扫码，无需任何服务器操作
+        try {
+            navigatePageTo(account, cn.net.rjnetwork.xianyu.manager.account.controller.RenewLoginController.LOGIN_URL);
+        } catch (Exception e) {
+            log.warn("[A1] auto-navigate to login page failed: {}", e.getMessage());
+        }
         String name = Optional.ofNullable(account.getDisplayName()).orElse(account.getAccountName());
+        String controlUrl = "http://192.168.1.252:40000/captcha-control?accountId=" + account.getId();
         eventPublisher.publishEvent(new NotifyEvent("ACCOUNT_COOKIE_EXPIRED", account.getId(), name,
-                Map.of("accountName", name, "reason", "cookie_renew_failed")));
+                Map.of("accountName", name, "reason", "cookie_renew_failed", "controlUrl", controlUrl)));
     }
 
     /**

@@ -241,6 +241,10 @@ public class AccountService {
         }
 
         accountMapper.updateById(account);
+        // updateById 忽略 null 字段：扫码恢复后 last_error 需显式置空，否则页面持续显示旧的"Session过期"误报
+        accountMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<XianyuAccount>()
+                .eq(XianyuAccount::getId, accountId)
+                .set(XianyuAccount::getLastError, null));
         logger.info("Account cookie updated via QR re-login, accountId={}, accountName={}",
                 accountId, account.getAccountName());
 

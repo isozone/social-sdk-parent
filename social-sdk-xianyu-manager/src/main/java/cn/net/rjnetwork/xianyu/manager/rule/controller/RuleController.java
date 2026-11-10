@@ -65,8 +65,11 @@ public class RuleController {
     }
 
     @PostMapping("/auto-reply")
-    public ApiResponse<Map<String, Object>> autoReply(@RequestParam Long accountId, @RequestParam String message) {
-        String reply = ruleService.autoReply(accountId, message);
+    public ApiResponse<Map<String, Object>> autoReply(@RequestParam Long accountId, @RequestParam String message,
+                                                      @RequestParam(required = false) String sessionId,
+                                                      @RequestParam(required = false) String buyerId) {
+        // sessionId/buyerId 可选：传真实值可端到端验证商品/订单上下文解析（买家→最近订单→商品）
+        String reply = ruleService.autoReply(accountId, message, sessionId, buyerId);
         if (reply != null) {
             return ApiResponse.ok(Map.of("matched", true, "reply", reply));
         }

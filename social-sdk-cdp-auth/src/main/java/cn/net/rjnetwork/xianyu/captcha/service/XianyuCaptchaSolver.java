@@ -165,6 +165,19 @@ public class XianyuCaptchaSolver {
         return extractCookie(ensureGoofishImPageEndpoint(), IM_PAGE_URL);
     }
 
+    /**
+     * 在受控 Chrome 容器内导航到指定 URL（供人工扫码登录流程使用）。
+     * 会话/指纹/反检测与滑块控制页共用同一套 CDP 通道。
+     */
+    public void navigateControlPage(String url) throws Exception {
+        String pageEndpoint = ensureGoofishImPageEndpoint();
+        try (Socket socket = openWebSocket(pageEndpoint)) {
+            Map<String, Object> nav = new LinkedHashMap<>();
+            nav.put("url", url);
+            sendCommand(socket, "Page.navigate", nav);
+        }
+    }
+
     private String ensureGoofishImPageEndpoint() throws Exception {
         String cdpHttpEndpoint = resolveCdpHttpEndpoint(null);
         String browserEndpoint = getCdpEndpointFromBrowser(cdpHttpEndpoint);

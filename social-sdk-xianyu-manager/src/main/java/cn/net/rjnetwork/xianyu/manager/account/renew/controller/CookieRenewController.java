@@ -62,10 +62,10 @@ public class CookieRenewController {
         return ApiResponse.ok(scheduleMapper.selectByAccountId(accountId));
     }
 
-    /** 手动触发一次刷新批次（仅刷新失效账号）。 */
+    /** 手动触发一次刷新批次（健康账号在 renewOne 内判 SKIPPED，保活计划按计划间隔执行）。 */
     @PostMapping("/run")
     public ApiResponse<Long> runManually() {
-        return ApiResponse.ok(cookieRenewService.runBatch("MANUAL", true));
+        return ApiResponse.ok(cookieRenewService.runBatch("MANUAL", false));
     }
 
     /**

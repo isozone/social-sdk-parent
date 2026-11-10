@@ -190,7 +190,9 @@ public class MessageService {
     public void syncAllAccounts() {
         List<XianyuAccount> accounts;
         try {
-            accounts = accountMapper.selectList(null);
+            accounts = accountMapper.selectList(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<XianyuAccount>()
+                            .ne(XianyuAccount::getStatus, "DISABLED"));
         } catch (Exception e) {
             return;
         }
@@ -331,7 +333,18 @@ public class MessageService {
     private String cookieFingerprint(XianyuAccount acc) {
         String loginCookie = acc.getCookieHeader() != null ? acc.getCookieHeader() : "";
         String imCookie = acc.getImCookieHeader() != null ? acc.getImCookieHeader() : "";
-        return Integer.toHexString((loginCookie + "\n" + imCookie).hashCode());
+        // SHA-256 而非 hashCode：32 位 hashCode 对长 cookie 碰撞会导致
+        // 账号 B 复用账号 A 的 IM 客户端（发消息/拉历史全走 A 的登录态）
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest((loginCookie + "\n" + imCookie).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            // JVM 必带 SHA-256，理论不可达；退化为明文等值比较
+            return loginCookie + "\n" + imCookie;
+        }
     }
 
     private void closeMessageApi(Long accountId, XianyuMessageApiService msgApi) {
@@ -1786,7 +1799,13 @@ public class MessageService {
         if (incomingMessage == null || !"INCOMING".equals(incomingMessage.getDirection())) {
             return null;
         }
-        String reply = ruleService.autoReply(accountId, incomingMessage.getContent(), incomingMessage.getSessionId());
+        // 买家 id（sender_id 去 @goofish 后缀）用于「买家→最近订单→商品」反查上下文：
+        // sessionId 是会话 cid 而非商品 itemId，单靠它解析不出商品
+        String buyerId = incomingMessage.getSenderId();
+        if (buyerId != null && buyerId.contains("@")) {
+            buyerId = buyerId.split("@")[0].trim();
+        }
+        String reply = ruleService.autoReply(accountId, incomingMessage.getContent(), incomingMessage.getSessionId(), buyerId);
         // 规则/关键词/AI 接管/兜底均未命中 → AI 客服 AUTO 模式接管（此前 AiCsEngine 从未接入真实消息链路）
         if ((reply == null || reply.isBlank()) && aiCsEngine != null
                 && aiCsEngine.isAutoReplyEnabled(accountId)) {

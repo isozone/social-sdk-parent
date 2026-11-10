@@ -749,7 +749,7 @@ function copyWechat() {
   height: 280px;
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  background: #fff;
+  background: var(--bg-surface-1);
   cursor: zoom-in;
 }
 .qr-tip {

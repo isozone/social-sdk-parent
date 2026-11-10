@@ -148,17 +148,23 @@ public class RuleService {
      * 优先级：关键字匹配 > AI 接管 > 兜底自动回复
      */
     public String autoReply(Long accountId, String message) {
-        return autoReply(accountId, message, null);
+        return autoReply(accountId, message, null, null);
     }
 
     /**
      * 自动回复：三层匹配逻辑 — keyword → AI → auto
      * 优先级：关键字匹配 > AI 接管 > 兜底自动回复
      *
-     * @param sessionId 闲鱼会话 ID（格式 {item_id}@goofish），用于反查当前商品上下文喂给 AI；
-     *                  为 null/null/blank 时降级为不带商品上下文。
+     * @param sessionId 闲鱼会话 ID（格式 {cid}@goofish，cid 是会话 id 不是商品 itemId），
+     *                  仅当 cid 恰好能匹配到商品时可作为上下文线索；
+     * @param buyerId   买家用户 id（消息 sender_id 去 @goofish 后缀），用于「买家→最近订单→商品」反查上下文；
+     *                  两者都解析失败时降级为不带商品上下文。
      */
     public String autoReply(Long accountId, String message, String sessionId) {
+        return autoReply(accountId, message, sessionId, null);
+    }
+
+    public String autoReply(Long accountId, String message, String sessionId, String buyerId) {
         // 1. 关键字词匹配（最高优先级）
         List<XianyuKeywordRule> rules = ruleCache.computeIfAbsent(accountId, k -> listRules(k));
         if (rules == null || rules.isEmpty()) {
@@ -180,8 +186,8 @@ public class RuleService {
         // 2. AI 接管（次优先级）
         XianyuAutoReplyConfig config = getAutoReplyConfig(accountId);
         if (config != null && Boolean.TRUE.equals(config.getAiEnabled())) {
-            XianyuProduct productContext = findProductBySessionId(sessionId);
-            String aiReply = callAiReply(config, message, productContext, accountId, sessionId);
+            XianyuProduct productContext = resolveProductContext(accountId, sessionId, buyerId);
+            String aiReply = callAiReply(config, message, productContext, accountId, sessionId, buyerId);
             // 防 echo：AI 原样复述买家消息（如把"好的，收到！麻烦发个快递单号给我"回显回去）视为无效，
             // 记日志后继续走兜底，避免买家收到自己消息的复读。
             if (aiReply != null && !aiReply.isEmpty()
@@ -211,8 +217,51 @@ public class RuleService {
     }
 
     /**
-     * 从闲鱼 sessionId（格式 {item_id}@goofish）解析 item_id，反查本地商品表拿上下文。
-     * 本地查不到返回 null（降级为不带商品上下文）。
+     * 多级解析当前商品上下文（修复：sessionId 是闲鱼会话 cid（9位），不是商品 itemId（12位），
+     * 旧实现按 itemId 查永远落空 → AI 永远拿不到商品上下文）。
+     * <ol>
+     *   <li>路径1：sessionId 前缀恰好能匹配本地商品 item_id 时直接用（兼容历史语义）；</li>
+     *   <li>路径2：买家 buyerId → 该买家最近一笔 SOLD 订单 → 订单的 product_id/item_id 反查商品
+     *       ——买家咨询的几乎总是他拍下或正在咨询的商品；</li>
+     *   <li>都失败返回 null（降级为不带商品上下文的通用回复）。</li>
+     * </ol>
+     */
+    private XianyuProduct resolveProductContext(Long accountId, String sessionId, String buyerId) {
+        // 路径1：历史语义兜底（sessionId 前缀 = item_id）
+        XianyuProduct bySession = findProductBySessionId(sessionId);
+        if (bySession != null) return bySession;
+
+        // 路径2：买家最近 SOLD 订单 → 商品
+        if (buyerId == null || buyerId.isBlank()) return null;
+        try {
+            LambdaQueryWrapper<XianyuOrder> ow = new LambdaQueryWrapper<>();
+            ow.eq(XianyuOrder::getAccountId, accountId)
+                    .eq(XianyuOrder::getType, "SOLD")
+                    .and(w -> w.eq(XianyuOrder::getBuyerId, buyerId)
+                            .or().like(XianyuOrder::getBuyerId, buyerId))
+                    .orderByDesc(XianyuOrder::getUpdatedAt)
+                    .last("LIMIT 1");
+            XianyuOrder order = orderMapper.selectOne(ow);
+            if (order == null) return null;
+            if (order.getProductId() != null) {
+                XianyuProduct p = productMapper.selectById(order.getProductId());
+                if (p != null) return p;
+            }
+            if (order.getItemId() != null && !order.getItemId().isBlank()) {
+                LambdaQueryWrapper<XianyuProduct> pw = new LambdaQueryWrapper<>();
+                pw.eq(XianyuProduct::getItemId, order.getItemId()).last("LIMIT 1");
+                return productMapper.selectOne(pw);
+            }
+            return null;
+        } catch (Exception e) {
+            log.warn("[RuleService] resolveProductContext by buyer failed buyerId={}: {}", buyerId, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * @deprecated 已由 {@link #resolveProductContext} 取代：sessionId 是会话 cid 而非商品 itemId，
+     * 单靠它查不到商品；保留作为路径1 的兜底匹配。
      */
     private XianyuProduct findProductBySessionId(String sessionId) {
         if (sessionId == null || sessionId.isBlank()) return null;
@@ -266,7 +315,7 @@ public class RuleService {
      * 通过 config.aiModelId 找到模型和厂商，构造 systemPrompt 后发起调用
      */
     private String callAiReply(XianyuAutoReplyConfig config, String message) {
-        return callAiReply(config, message, null, null, null);
+        return callAiReply(config, message, null, null, null, null);
     }
 
     /**
@@ -274,7 +323,7 @@ public class RuleService {
      * 商品上下文为 null 时降级为不带商品的通用回复；订单上下文查不到时忽略（不阻塞回复）。
      */
     private String callAiReply(XianyuAutoReplyConfig config, String message, XianyuProduct product,
-                               Long accountId, String sessionId) {
+                               Long accountId, String sessionId, String buyerId) {
         if (config == null || config.getAiModelId() == null) {
             log.warn("[RuleService] callAiReply skipped: aiModelId is null (account config not set?)");
             return null;
@@ -285,7 +334,7 @@ public class RuleService {
                     : DEFAULT_AI_SYSTEM_PROMPT;
             // 身份护栏：始终追加，盖住 AI 自爆身份（用户自定义 prompt 不含身份护栏时也兜底）
             String fullPrompt = basePrompt + "\n\n" + AI_IDENTITY_GUARDRAIL + "\n\n"
-                    + buildProductContext(product) + "\n\n" + buildOrderContext(accountId, sessionId);
+                    + buildProductContext(product) + "\n\n" + buildOrderContext(accountId, sessionId, buyerId);
             String reply = aiChatService.chat(config.getAiModelId(), fullPrompt, message);
             return (reply != null && !reply.isBlank()) ? reply.trim() : null;
         } catch (Exception e) {
@@ -345,24 +394,41 @@ public class RuleService {
     }
 
     /**
-     * 构建订单发货上下文：按 sessionId（格式 {item_id}@goofish）反查该商品最近一笔 SOLD 订单，
-     * 把发货状态 + 快递单号喂给 AI，避免发货后 AI 还说"1-3天内发货"、买家要单号时答不上来。
-     * 查不到订单时返回降级提示（AI 按通用话术回复）。
+     * 构建订单发货上下文：优先用买家 buyerId 反查最近一笔 SOLD 订单
+     * （sessionId 是会话 cid，按它当 itemId 查订单永远落空——已修复），
+     * sessionId 前缀匹配仅作兜底。把发货状态 + 快递单号喂给 AI，
+     * 避免发货后 AI 还说"1-3天内发货"、买家要单号时答不上来。查不到订单时返回降级提示。
      */
-    private String buildOrderContext(Long accountId, String sessionId) {
-        if (accountId == null || sessionId == null || sessionId.isBlank()) {
+    private String buildOrderContext(Long accountId, String sessionId, String buyerId) {
+        if (accountId == null) {
             return "";
         }
         try {
-            String itemId = sessionId.split("@")[0].trim();
-            if (itemId.isEmpty()) return "";
-            LambdaQueryWrapper<XianyuOrder> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(XianyuOrder::getAccountId, accountId)
-                    .eq(XianyuOrder::getItemId, itemId)
-                    .eq(XianyuOrder::getType, "SOLD")
-                    .orderByDesc(XianyuOrder::getUpdatedAt)
-                    .last("LIMIT 1");
-            XianyuOrder order = orderMapper.selectOne(wrapper);
+            XianyuOrder order = null;
+            // 首选：买家最近 SOLD 订单
+            if (buyerId != null && !buyerId.isBlank()) {
+                LambdaQueryWrapper<XianyuOrder> bw = new LambdaQueryWrapper<>();
+                bw.eq(XianyuOrder::getAccountId, accountId)
+                        .eq(XianyuOrder::getType, "SOLD")
+                        .and(w -> w.eq(XianyuOrder::getBuyerId, buyerId)
+                                .or().like(XianyuOrder::getBuyerId, buyerId))
+                        .orderByDesc(XianyuOrder::getUpdatedAt)
+                        .last("LIMIT 1");
+                order = orderMapper.selectOne(bw);
+            }
+            // 兜底：sessionId 前缀恰为 item_id 时按商品查订单
+            if (order == null && sessionId != null && !sessionId.isBlank()) {
+                String itemId = sessionId.split("@")[0].trim();
+                if (!itemId.isEmpty()) {
+                    LambdaQueryWrapper<XianyuOrder> wrapper = new LambdaQueryWrapper<>();
+                    wrapper.eq(XianyuOrder::getAccountId, accountId)
+                            .eq(XianyuOrder::getItemId, itemId)
+                            .eq(XianyuOrder::getType, "SOLD")
+                            .orderByDesc(XianyuOrder::getUpdatedAt)
+                            .last("LIMIT 1");
+                    order = orderMapper.selectOne(wrapper);
+                }
+            }
             if (order == null) return "";
 
             StringBuilder sb = new StringBuilder("【当前订单信息】\n");

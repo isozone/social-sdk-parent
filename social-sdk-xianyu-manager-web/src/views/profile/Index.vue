@@ -332,7 +332,7 @@ onMounted(() => {
   border-radius: 18px;
   padding: 30px 34px;
   margin-bottom: 20px;
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-hover) 100%);
   box-shadow: 0 18px 40px -18px rgba(79, 70, 229, 0.55);
 }
 .hero-orb {
@@ -400,7 +400,7 @@ onMounted(() => {
   height: 16px;
   border-radius: 50%;
   background: #34d399;
-  border: 3px solid #4f46e5;
+  border: 3px solid var(--brand);
 }
 .hero-info {
   flex: 1;
@@ -476,7 +476,7 @@ onMounted(() => {
 /* ===== 卡片 ===== */
 .profile-card {
   border-radius: 14px;
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--border-hairline);
   margin-bottom: 20px;
   transition: box-shadow 0.25s, transform 0.25s;
 }
@@ -501,7 +501,7 @@ onMounted(() => {
   box-shadow: 0 8px 18px rgba(79, 70, 229, 0.22);
 }
 .chip-violet {
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  background: linear-gradient(135deg, var(--brand), var(--brand-hover));
 }
 .chip-cyan {
   background: linear-gradient(135deg, #06b6d4, #22d3ee);

@@ -103,7 +103,7 @@
                       <el-button
                         v-if="parseJsonCard(msg.content).buttonText"
                         size="small"
-                        :color="parseJsonCard(msg.content).buttonBgColor || '#0080E0'"
+                        :color="parseJsonCard(msg.content).buttonBgColor || 'var(--brand)'"
                         class="card-btn"
                         @click="openMedia(parseJsonCard(msg.content).targetUrl)"
                       >{{ parseJsonCard(msg.content).buttonText }}</el-button>
@@ -615,23 +615,14 @@ onUnmounted(() => {
   flex-direction: column;
   height: 100%;
   width: 100%;
-  /* 蓝色调（对齐 Ydisks 闲鱼助手「在线聊天」风格）：仅作用于消息管理页，不改全局主题 */
-  --brand: #0080E0;
-  --brand-2: #409eff;
-  --brand-gradient: linear-gradient(135deg, #0080E0 0%, #409eff 100%);
-  --el-color-primary: #0080E0;
-  --el-color-primary-light-3: #4da3e7;
-  --el-color-primary-light-5: #7fbfef;
-  --el-color-primary-light-7: #b2d7f7;
-  --el-color-primary-light-8: #cce4fb;
-  --el-color-primary-light-9: #e6f1fc;
-  --el-color-primary-dark-2: #0066b3;
-  --msg-accent: #0080E0;
-  --msg-incoming-bg: #e9eaec;
-  --msg-outgoing-bg: #0080E0;
+  /* 局部变量已并入全局 Linear 暗色体系（DESIGN.md）：不再覆盖品牌色/主色，
+     仅保留聊天气泡的差异化配色 */
+  --msg-accent: var(--brand);
+  --msg-incoming-bg: var(--bg-surface-2);
+  --msg-outgoing-bg: var(--brand);
   --msg-outgoing-text: #ffffff;
-  --msg-panel-bg: #eef3f9;
-  --msg-app-bg: #f5f8fc;
+  --msg-panel-bg: var(--bg-canvas);
+  --msg-app-bg: var(--bg-canvas);
 }
 
 /* ==================== 顶部工具栏 ==================== */
@@ -641,7 +632,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 14px;
   padding: 10px 20px;
-  background: #fff;
+  background: var(--bg-surface-1);
   border-bottom: 1px solid var(--border);
 }
 .countdown-tag {
@@ -655,7 +646,7 @@ onUnmounted(() => {
   font-weight: 600;
   padding: 3px 10px;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,128,224,0.28);
+  box-shadow: none;
 }
 .countdown-tag :deep(.el-icon) {
   animation: spin 2s linear infinite;
@@ -674,13 +665,13 @@ onUnmounted(() => {
   flex-direction: row;    /* 左列表 + 右聊天并排 */
   background: var(--msg-app-bg);
 }
-/* nowrap 是关键：el-col 宽度为 25%/75% 百分比，若 flex-wrap 换行且加了 gap，
-   25% + 75% + gap 超过容器宽度会把右侧聊天栏挤到第二行（上下堆叠） */
-.chat-row { height: 100%; flex: 1; flex-wrap: nowrap; }
+/* nowrap 是关键：若 flex-wrap 换行且加了 gap，两栏会被挤到上下堆叠。
+   宽度策略：左栏固定 320px（聊天软件标准做法），右栏 flex:1 自适应。
+   不用 el-col 百分比：25% 相对 auto 宽 flex 父级会循环解析，把 row 撑到内容宽（曾致会话列表占满全屏） */
+.chat-row { height: 100%; flex: 1; min-width: 0; display: flex; flex-wrap: nowrap; }
 .chat-row .el-col { height: 100%; min-width: 0; }
-/* 用内边距模拟两栏间距，避免 gap 改变百分比宽度计算 */
-.chat-row .el-col:first-child { padding-right: 7px; }
-.chat-row .el-col:last-child { padding-left: 7px; }
+.chat-row .el-col:first-child { width: 320px; flex: 0 0 320px; padding-right: 7px; }
+.chat-row .el-col:last-child { flex: 1 1 0; padding-left: 7px; }
 
 /* ==================== 会话列表 ==================== */
 .session-list {
@@ -726,8 +717,8 @@ onUnmounted(() => {
   border-bottom: 1px solid var(--border);
   transition: background 0.15s ease;
 }
-.session-item:hover { background: #eef4fb; }
-.session-item.active { background: #e6f1fc; }
+.session-item:hover { background: var(--bg-surface-2); }
+.session-item.active { background: rgba(94, 106, 210, 0.16); box-shadow: inset 2px 0 0 var(--brand); }
 .unread .name { color: var(--color-danger); font-weight: 600; }
 .unread .last-msg { color: var(--color-danger); }
 .session-info {
@@ -789,7 +780,7 @@ onUnmounted(() => {
 }
 .chat-header {
   padding: 14px 20px;
-  background: #fff;
+  background: var(--bg-surface-1);
   border-bottom: 1px solid var(--border);
 }
 .chat-header.empty {
@@ -858,7 +849,7 @@ onUnmounted(() => {
   background: var(--msg-incoming-bg);
   color: var(--text-1);
   border-top-left-radius: 0;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  box-shadow: none;
 }
 .msg-wrapper.mine .bubble {
   background: var(--msg-outgoing-bg);
@@ -880,7 +871,7 @@ onUnmounted(() => {
 }
 .bubble-card {
   padding: 12px 16px;
-  background: #fff;
+  background: var(--bg-surface-1);
   border-radius: 8px;
   border: 1px solid var(--line-2);
   min-width: 200px;
@@ -953,7 +944,7 @@ onUnmounted(() => {
   color: var(--text-2);
 }
 .quick-reply-label .el-icon {
-  color: var(--brand, #7c3aed);
+  color: var(--brand, var(--brand-hover));
 }
 .quick-reply-bar .el-select {
   width: 260px;
@@ -989,7 +980,7 @@ onUnmounted(() => {
 /* 快捷话术下拉面板（el-select popper 挂载在 body，需全局样式） */
 .quick-reply-popper {
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 .quick-reply-popper .el-select-dropdown__item {
   height: auto;
@@ -1001,10 +992,10 @@ onUnmounted(() => {
   margin: 0 4px;
 }
 .quick-reply-popper .el-select-dropdown__item:hover {
-  background: var(--surface-1, #f5f5f7);
+  background: var(--bg-surface-2);
 }
 .quick-reply-popper .el-select-dropdown__item.is-selected {
-  color: var(--brand, #7c3aed);
+  color: var(--brand, var(--brand-hover));
   font-weight: 600;
 }
 </style>

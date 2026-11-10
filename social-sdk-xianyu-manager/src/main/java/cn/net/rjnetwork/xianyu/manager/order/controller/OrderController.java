@@ -16,10 +16,20 @@ public class OrderController {
 
     private final OrderService orderService;
     private final OrderSyncService orderSyncService;
+    private final cn.net.rjnetwork.xianyu.manager.order.service.RefundMonitorService refundMonitorService;
 
-    public OrderController(OrderService orderService, OrderSyncService orderSyncService) {
+    public OrderController(OrderService orderService, OrderSyncService orderSyncService,
+                           cn.net.rjnetwork.xianyu.manager.order.service.RefundMonitorService refundMonitorService) {
         this.orderService = orderService;
         this.orderSyncService = orderSyncService;
+        this.refundMonitorService = refundMonitorService;
+    }
+
+    /** 手动触发一轮退款分级监控（已发货→自动拒绝话术+通知；未发货→通知人工）。 */
+    @PostMapping("/refund-monitor/run")
+    @Audit("退款监控手动触发")
+    public ApiResponse<Integer> runRefundMonitor() {
+        return ApiResponse.ok(refundMonitorService.runMonitor());
     }
 
     @GetMapping

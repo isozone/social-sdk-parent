@@ -380,7 +380,7 @@ function formatSize(bytes) {
 }
 
 .card {
-  background: #fff;
+  background: var(--bg-surface-1);
   border-radius: var(--radius-lg);
   padding: 20px;
   margin-bottom: var(--space-4);

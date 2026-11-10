@@ -612,7 +612,7 @@ onMounted(() => { loadProviders() })
   padding: 1px 8px;
   font-size: 12px;
   font-weight: 600;
-  color: #7c3aed;
+  color: var(--brand-hover);
   background: #ecf5ff;
   border-radius: 10px;
 }
@@ -630,11 +630,11 @@ onMounted(() => { loadProviders() })
   align-items: center;
   gap: 12px;
   padding: 12px;
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--border-hairline);
   border-left: 3px solid transparent;
   border-radius: 10px;
   cursor: pointer;
-  background: #fff;
+  background: var(--bg-surface-1);
   transition: all 0.18s ease;
 }
 .vendor-item:hover {
@@ -642,8 +642,8 @@ onMounted(() => { loadProviders() })
   background: #f5faff;
 }
 .vendor-item.is-active {
-  border-color: #7c3aed;
-  border-left-color: #7c3aed;
+  border-color: var(--brand-hover);
+  border-left-color: var(--brand-hover);
   background: #ecf5ff;
   box-shadow: 0 2px 8px rgba(64, 158, 255, 0.12);
 }
@@ -791,7 +791,7 @@ onMounted(() => { loadProviders() })
 }
 .fetch-tip code {
   background: #f4f4f5;
-  color: #7c3aed;
+  color: var(--brand-hover);
   padding: 1px 6px;
   border-radius: 4px;
   font-size: 12px;
@@ -800,7 +800,7 @@ onMounted(() => { loadProviders() })
 .remote-model-list {
   max-height: 360px;
   overflow-y: auto;
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--border-hairline);
   border-radius: 10px;
   padding: 6px;
 }
@@ -854,7 +854,7 @@ onMounted(() => { loadProviders() })
   gap: 10px;
   margin-top: 8px;
   padding: 12px;
-  background: #f7f8fa;
+  background: var(--bg-surface-2);
   border-radius: 10px;
   min-height: 120px;
 }
@@ -874,7 +874,7 @@ onMounted(() => { loadProviders() })
 }
 .bubble--user {
   align-self: flex-end;
-  background: #7c3aed;
+  background: var(--brand-hover);
   color: #fff;
   border-bottom-right-radius: 2px;
 }
@@ -884,9 +884,9 @@ onMounted(() => { loadProviders() })
 }
 .bubble--ai {
   align-self: flex-start;
-  background: #fff;
+  background: var(--bg-surface-1);
   color: var(--text-1);
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--border-hairline);
   border-bottom-left-radius: 2px;
 }
 .bubble--hint {

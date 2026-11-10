@@ -126,8 +126,11 @@ public class NotificationService {
             return;
         }
 
-        // 去重冷却
-        String dedupKey = event.getScenario() + "::" + (event.getAccountId() != null ? event.getAccountId() : "global");
+        // 去重冷却：key 必须带业务标识（订单/商品），否则同账号 60s 内第二笔订单的通知会被整单吞掉
+        String bizId = Objects.toString(event.getVars() != null ? event.getVars().get("orderId") : null,
+                Objects.toString(event.getVars() != null ? event.getVars().get("itemId") : null, ""));
+        String dedupKey = event.getScenario() + "::" + (event.getAccountId() != null ? event.getAccountId() : "global")
+                + (bizId.isEmpty() ? "" : "::" + bizId);
         Long last = dedup.getIfPresent(dedupKey);
         long now = System.currentTimeMillis();
         if (last != null && (now - last) < scenario.getCooldownSeconds() * 1000L) {
@@ -140,7 +143,8 @@ public class NotificationService {
         NotifyTemplate tpl = templateMapper.selectOne(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<NotifyTemplate>()
                         .eq(NotifyTemplate::getScenario, event.getScenario())
-                        .eq(NotifyTemplate::getEnabled, true));
+                        .eq(NotifyTemplate::getEnabled, true)
+                        .last("limit 1"));
         String title = TemplateRenderer.render(
                 tpl != null && tpl.getTitleTpl() != null ? tpl.getTitleTpl() : scenario.getDefaultTitle(),
                 event.getVars());
@@ -191,6 +195,11 @@ public class NotificationService {
                 newMessageBufferSince.put(accountId, System.currentTimeMillis());
             }
             buffer.add(event);
+            // flush 线程可能刚把本 buffer 从 map 摘走：补回注册，否则这条消息永久丢失
+            if (!newMessageBuffer.containsKey(accountId)) {
+                newMessageBuffer.put(accountId, buffer);
+                newMessageBufferSince.put(accountId, System.currentTimeMillis());
+            }
             logger.debug("[NotifyLoop] NEW_MESSAGE_BUFFERED accountId={} bufferSize={}",
                     accountId, buffer.size());
 
@@ -235,23 +244,30 @@ public class NotificationService {
         newMessageBufferSince.remove(accountId);
         if (buffer == null || buffer.isEmpty()) return;
 
+        // 在锁内做快照：另一线程可能正持有同一 list 在 synchronized 内 add（防 ConcurrentModificationException）
+        List<NotifyEvent> events;
+        synchronized (buffer) {
+            if (buffer.isEmpty()) return;
+            events = new ArrayList<>(buffer);
+        }
+
         // 取第一条事件作为基准（accountId、accountName 一致）
-        NotifyEvent base = buffer.get(0);
-        int total = buffer.size();
+        NotifyEvent base = events.get(0);
+        int total = events.size();
 
         // 合成聚合摘要标题/正文
         String title = "账号 " + base.getAccountName() + " 收到 " + total + " 条新消息";
         StringBuilder bodySb = new StringBuilder();
         bodySb.append("账号 ").append(base.getAccountName()).append(" 收到来自买家的消息：\n");
         int shown = 0;
-        for (NotifyEvent ev : buffer) {
+        for (NotifyEvent ev : events) {
             if (shown >= 5) {
                 bodySb.append("... 等 ").append(total - 5).append(" 条\n");
                 break;
             }
             Map<String, Object> vars = ev.getVars();
-            String senderName = vars.getOrDefault("senderName", "").toString();
-            String content = vars.getOrDefault("content", "").toString();
+            String senderName = vars.get("senderName") == null ? "" : vars.get("senderName").toString();
+            String content = vars.get("content") == null ? "" : vars.get("content").toString();
             // 截断过长内容
             if (content.length() > 50) content = content.substring(0, 50) + "...";
             bodySb.append("- ").append(senderName.isEmpty() ? "买家" : senderName)
@@ -306,7 +322,8 @@ public class NotificationService {
         NotifyTemplate tpl = templateMapper.selectOne(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<NotifyTemplate>()
                         .eq(NotifyTemplate::getScenario, event.getScenario())
-                        .eq(NotifyTemplate::getEnabled, true));
+                        .eq(NotifyTemplate::getEnabled, true)
+                        .last("limit 1"));
         String title = TemplateRenderer.render(
                 tpl != null && tpl.getTitleTpl() != null ? tpl.getTitleTpl() : scenario.getDefaultTitle(),
                 event.getVars());
@@ -338,9 +355,13 @@ public class NotificationService {
                     && !accountInList(sub.getAccountIds(), event.getAccountId())) {
                 continue;
             }
-            String decrypted = cryptoUtil.decrypt(channel.getConfigJson());
-            channel.setConfigJson(decrypted);
-            List<String> recipients = resolveRecipients(sub, channel);
+            List<String> recipients = List.of();
+            try {
+                // 单条订阅处理全程兜底：解密失败/配置损坏只影响本通道，
+                // 不能让异常冲出循环中断该事件之后的所有订阅（且不留投递日志）
+                String decrypted = cryptoUtil.decrypt(channel.getConfigJson());
+                channel.setConfigJson(decrypted);
+                recipients = resolveRecipients(sub, channel);
 
             int channelRate = 0;
             try {
@@ -369,6 +390,11 @@ public class NotificationService {
                         event.getScenario(), channel.getId(), e.getMessage(), e);
                 writeLog(event, channel, recipients, "FAILED", e.getMessage());
                 retryService.enqueue(event, channel, recipients, title, body, e.getMessage());
+            }
+            } catch (Exception dispatchErr) {
+                logger.warn("[NotifyLoop] EXTERNAL_DISPATCH_FAILED scenario={} channelId={} error={}",
+                        event.getScenario(), channel.getId(), dispatchErr.getMessage());
+                writeLog(event, channel, recipients, "FAILED", dispatchErr.getMessage());
             }
         }
     }
@@ -471,6 +497,10 @@ public class NotificationService {
             logMapper.insert(log);
             logger.info("[NotifyLoop] DELIVERY_LOG_WRITTEN scenario={} channelId={} channelType={} status={} recipient={}",
                     event.getScenario(), channel.getId(), channel.getType(), status, log.getRecipient());
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            // 投递日志写失败至少要留痕，否则审计断档且无从排查
+            logger.warn("[NotifyLoop] DELIVERY_LOG_WRITE_FAILED scenario={} channelId={} error={}",
+                    event.getScenario(), channel.getId(), e.getMessage());
+        }
     }
 }

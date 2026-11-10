@@ -27,7 +27,9 @@ public class CookiesRefreshTask {
      */
     public void runScheduled() {
         try {
-            Long batchId = cookieRenewService.runBatch("SCHEDULER", true);
+            // onlyExpiredOnly=false：把筛选交给计划字段——onlyOnExpired=1 的健康账号在 renewOne 内判 SKIPPED，
+            // onlyOnExpired=0 的保活计划则按 intervalMinutes 定期强制刷新（否则保活模式永远不会被定时触发）
+            Long batchId = cookieRenewService.runBatch("SCHEDULER", false);
             log.info("[A1] cookies refresh batch done, batchId={}", batchId);
         } catch (Exception e) {
             log.warn("[A1] cookies refresh batch failed: {}", e.getMessage());

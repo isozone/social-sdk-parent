@@ -1540,3 +1540,16 @@ CREATE TABLE IF NOT EXISTS item_reply (
     deleted             INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_item_reply_match ON item_reply(account_id, item_id, trigger_scene, enabled, deleted);
+
+-- 退款分级处理防重复记录（RefundMonitorService 启动时也会 CREATE TABLE IF NOT EXISTS 兜底）
+CREATE TABLE IF NOT EXISTS refund_handle_log (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id      INTEGER NOT NULL,
+    order_id        TEXT NOT NULL,
+    refund_status   TEXT,
+    action          TEXT NOT NULL,
+    detail          TEXT,
+    created_at      TEXT DEFAULT (datetime('now')),
+    deleted         INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_refund_handle ON refund_handle_log(account_id, order_id, deleted);

@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import cn.net.rjnetwork.xianyu.proxy.core.ProxyPoolManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,10 @@ import java.util.Map;
 public class ReviewService {
 
     private static final Logger log = LoggerFactory.getLogger(ReviewService.class);
+
+    /** 多账号代理绑定：按账号出口 IP 隔离（未配置代理池时为 null，退化为直连） */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ProxyPoolManager proxyPoolManager;
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final AccountMapper accountMapper;
@@ -42,7 +47,7 @@ public class ReviewService {
     /** 对指定订单发表评价（rating + content） */
     public Map<String, Object> reviewOrder(Long accountId, String orderId, String rating, String content) throws Exception {
         XianyuAccount acc = requireAccount(accountId);
-        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader());
+        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader(), proxyPoolManager, acc.getId());
         JsonNode resp = api.reviewOrder(orderId, rating, content);
         Map<String, Object> ret = new LinkedHashMap<>();
         ret.put("accountId", accountId);
@@ -56,7 +61,7 @@ public class ReviewService {
     /** 拉评价列表（buyerId 为空时用当前账号 userId；旧账号 userId 为空则从登录 cookie 的 unb 兜底） */
     public JsonNode getReviewList(Long accountId, String buyerId, int page, int pageSize) throws Exception {
         XianyuAccount acc = requireAccount(accountId);
-        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader());
+        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader(), proxyPoolManager, acc.getId());
         String ratedUid = firstNotBlank(buyerId, acc.getUserId(), getCookieValue(acc.getCookieHeader(), "unb"));
         JsonNode resp = api.getReviewList(ratedUid, String.valueOf(page), String.valueOf(pageSize));
         enrichReviewOrders(resp, acc);
@@ -66,14 +71,14 @@ public class ReviewService {
     /** 拉用户信用画像（ userId=null 时取自己） */
     public JsonNode getUserCredit(Long accountId, String userId) throws Exception {
         XianyuAccount acc = requireAccount(accountId);
-        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader());
+        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader(), proxyPoolManager, acc.getId());
         return api.getUserCredit(userId != null ? userId : acc.getUserId());
     }
 
     /** 申请退款 */
     public Map<String, Object> applyRefund(Long accountId, String orderId, String reason, String amount) throws Exception {
         XianyuAccount acc = requireAccount(accountId);
-        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader());
+        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader(), proxyPoolManager, acc.getId());
         JsonNode resp = api.applyRefund(orderId, reason, amount);
         Map<String, Object> ret = new LinkedHashMap<>();
         ret.put("accountId", accountId);
@@ -86,14 +91,14 @@ public class ReviewService {
     /** 退款列表 */
     public JsonNode getRefundList(Long accountId, String disputeStatus, int page, int pageSize) throws Exception {
         XianyuAccount acc = requireAccount(accountId);
-        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader());
+        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader(), proxyPoolManager, acc.getId());
         return api.getRefundList(disputeStatus, String.valueOf(page), String.valueOf(pageSize));
     }
 
     /** 退款详情 */
     public JsonNode getRefundDetail(Long accountId, String refundId) throws Exception {
         XianyuAccount acc = requireAccount(accountId);
-        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader());
+        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader(), proxyPoolManager, acc.getId());
         return api.getRefundDetail(refundId);
     }
 

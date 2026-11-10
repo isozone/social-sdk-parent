@@ -14,6 +14,7 @@ import cn.net.rjnetwork.xianyu.manager.order.rate.model.ScheduledRedFlowerLog;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import cn.net.rjnetwork.xianyu.proxy.core.ProxyPoolManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -42,6 +43,10 @@ import java.util.Optional;
 public class RedFlowerService {
 
     private static final Logger log = LoggerFactory.getLogger(RedFlowerService.class);
+
+    /** 多账号代理绑定：按账号出口 IP 隔离（未配置代理池时为 null，退化为直连） */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ProxyPoolManager proxyPoolManager;
     private static final String JOB_TYPE = "red_flower";
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -156,7 +161,7 @@ public class RedFlowerService {
         String targetType = Optional.ofNullable(config.getTargetType()).orElse("buyer");
         try {
             // facade 通过构造器注入 cookie（无 setter），im cookie 暂不传入（送红花走 IM 镜像链路自有 cookie 吸收逻辑）
-            XianyuApiFacade facade = new XianyuApiFacade(account.getCookieHeader());
+            XianyuApiFacade facade = new XianyuApiFacade(account.getCookieHeader(), proxyPoolManager, account.getId());
             JsonNode resp = facade.sendRedFlower(order.getBuyerId(), targetType);
             String ret = resp != null ? resp.path("ret").toString() : "";
             if (ret.contains("FAIL")) {

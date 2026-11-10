@@ -54,13 +54,14 @@ public class CaptchaControlController {
                 <body>
                   <div class=\"bar\">
                     <button onclick=\"refreshShot()\">刷新截图</button>
+                    <button onclick=\"openLoginPage()\">打开登录页（扫码）</button>
                     <button class=\"ok\" onclick=\"checkCookie()\">检查并保存 Cookie</button>
                     <button class=\"warn\" onclick=\"toggleAuto()\" id=\"autoBtn\">自动刷新：开</button>
                     <span id=\"status\">准备中...</span>
                   </div>
                   <div class=\"hint\">
-                    本页是 CDP Chrome 的网页代理控制台，不是普通浏览器登录页。请在下方截图上直接拖动滑块；鼠标事件会转发到已登录的远程 Chrome。<br>
-                    如果看到登录页，请也在这里完成登录；完成后点“检查并保存 Cookie”。
+                    本页是 CDP Chrome 的网页代理控制台。拖动滑块/登录/扫码都在下方截图上直接操作，鼠标事件会转发到远程 Chrome。<br>
+                    <b>登录恢复流程</b>：①点「打开登录页（扫码）」→ ②在截图上用淘宝 App 扫码登录 → ③登录成功回到闲鱼页后点「检查并保存 Cookie」，系统会自动恢复账号登录态并重置续期链路。
                   </div>
                   <div id=\"screenWrap\"><img id=\"screen\" draggable=\"false\" /></div>
                   <pre id=\"debug\"></pre>
@@ -99,6 +100,13 @@ public class CaptchaControlController {
                     img.addEventListener('touchstart',e=>{mouseDown=true;sendMouse('down',e);e.preventDefault()},{passive:false});
                     img.addEventListener('touchmove',e=>{if(mouseDown)sendMouse('move',e);e.preventDefault()},{passive:false});
                     img.addEventListener('touchend',e=>{if(mouseDown){mouseDown=false;sendMouse('up',e);setTimeout(refreshShot,800)}});
+                    async function openLoginPage(){
+                      const q=accountId?('?accountId='+encodeURIComponent(accountId)):'';
+                      setStatus('正在打开登录页...');
+                      const r=await fetch('/captcha-control/navigate-login'+q,{method:'POST'}); const j=await r.json();
+                      if(j.success){setStatus('登录页已打开，请在截图上完成扫码登录'); setTimeout(refreshShot,2500)}
+                      else setStatus('打开失败：'+j.message);
+                    }
                     async function checkCookie(){
                       const q=accountId?('?accountId='+encodeURIComponent(accountId)):'';
                       const r=await fetch('/captcha-control/check-cookie'+q,{method:'POST'}); const j=await r.json();
@@ -134,6 +142,19 @@ public class CaptchaControlController {
         }
     }
 
+    @PostMapping("/navigate-login")
+    @ResponseBody
+    public ApiResponse<String> navigateLogin(@RequestParam(required = false) Long accountId) {
+        try {
+            // 淘宝账号体系登录页，登录成功后回跳 goofish；登录 cookie 会落入受控 Chrome 容器
+            captchaSolver.navigateControlPage(
+                    "https://login.taobao.com/member/login.jhtml?redirectURL=https%3A%2F%2Fwww.goofish.com");
+            return ApiResponse.ok("OK");
+        } catch (Exception e) {
+            return ApiResponse.fail("NAVIGATE_FAILED", e.getMessage());
+        }
+    }
+
     @PostMapping("/check-cookie")
     @ResponseBody
     public ApiResponse<Map<String, Object>> checkCookie(@RequestParam(required = false) Long accountId) {
@@ -144,8 +165,23 @@ public class CaptchaControlController {
             if (usable && accountId != null) {
                 XianyuAccount acc = accountMapper.selectById(accountId);
                 if (acc != null) {
+                    // 扫码登录闭环：同时回写主 cookie + 登录态恢复 + 重置续期链路
                     acc.setImCookieHeader(cookie);
+                    acc.setCookieHeader(cookie);
+                    acc.setStatus("ACTIVE");
+                    acc.setLastError(null);
+                    acc.setLastLoginAt(java.time.LocalDateTime.now());
                     accountMapper.updateById(acc);
+                    try {
+                        org.springframework.jdbc.core.JdbcTemplate jdbc =
+                                new org.springframework.jdbc.core.JdbcTemplate(
+                                        new org.springframework.jdbc.datasource.DriverManagerDataSource(
+                                                "jdbc:sqlite:" + System.getenv().getOrDefault("DB_PATH", "/home/huzhenjie/data/xianyu-manager.db")));
+                        jdbc.update("UPDATE cookie_refresh_schedule SET last_result='SUCCESS', next_run_at=datetime('now','+720 minutes'), last_failure_reason=NULL WHERE account_id=?", accountId);
+                        jdbc.update("UPDATE login_renew_schedule SET last_result='SUCCESS', current_retry=0, last_failure_reason=NULL WHERE account_id=?", accountId);
+                    } catch (Exception ignored) {
+                        // 续期计划重置失败不阻塞登录态回写
+                    }
                 }
             }
             Map<String, Object> data = new LinkedHashMap<>();

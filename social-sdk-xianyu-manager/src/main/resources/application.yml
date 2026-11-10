@@ -132,9 +132,12 @@ notify:
     cron: "0 0 9 * * ?"                       # 每天 09:00 生成昨日摘要
 
 # Chrome 容器配置
-# 默认保持有界面模式以提高滑块兼容性；Linux/Docker 服务器可用 CHROME_HEADLESS=true 覆盖。
+# 服务器（192.168.1.252）无显示器：headless 必须为 true；
+# executable-path 指向免 root 安装的 Chrome for Testing 包装脚本（含 LD_LIBRARY_PATH 注入），
+# 依赖库位于 /home/huzhenjie/chrome-libs（Ubuntu 26.04 服务器未装系统 Chrome）。
 chrome:
-  headless: ${CHROME_HEADLESS:false}
+  headless: ${CHROME_HEADLESS:true}
+  executable-path: ${CHROME_EXECUTABLE_PATH:/home/huzhenjie/chrome/chrome-wrapper.sh}
   headless-mode: ${CHROME_HEADLESS_MODE:new}
   max-active-profiles: ${CHROME_MAX_ACTIVE_PROFILES:3}      # 最多常驻 Chrome 容器数，防止多账号拖垮机器
   idle-timeout-ms: ${CHROME_IDLE_TIMEOUT_MS:1800000}        # 空闲 30 分钟回收 Chrome 容器
@@ -155,6 +158,12 @@ xianyu:
     bill-api: mtop.idle.web.wallet.bill.list
     bankcard-api: mtop.idle.web.wallet.bankcard.list
     withdraw-api: mtop.idle.web.wallet.withdraw
+  product:
+    # 商品定时同步（违规下架自动检测对账）：enabled 关闭后仅剩手动同步
+    auto-sync:
+      enabled: ${XIANYU_AUTO_SYNC_ENABLED:true}
+      initial-delay-minutes: 5
+      interval-minutes: 120
 
 # OpenList 配置
 openlist:

@@ -73,8 +73,9 @@ public class ScheduledPolishService {
         StringBuilder failureSummary = new StringBuilder();
         for (XianyuProduct product : products) {
             long t0 = System.currentTimeMillis();
+            java.util.concurrent.atomic.AtomicReference<String> errRef = new java.util.concurrent.atomic.AtomicReference<>(null);
             try {
-                PolishResult r = polishOne(product);
+                PolishResult r = polishOne(product, errRef);
                 switch (r) {
                     case SUCCESS -> {
                         success++;
@@ -86,16 +87,18 @@ public class ScheduledPolishService {
                         skipped++;
                         batchJobService.recordItem(job.getId(), String.valueOf(product.getId()),
                                 Optional.ofNullable(product.getTitle()).orElse("product#" + product.getItemId()),
-                                "SKIPPED", System.currentTimeMillis() - t0, "skip: " + r.name(), null);
+                                "SKIPPED", System.currentTimeMillis() - t0,
+                                errRef.get() != null ? errRef.get() : "skip: " + r.name(), null);
                     }
                     case FAILED -> {
                         failed++;
+                        String reason = errRef.get() != null ? errRef.get() : "polish failed";
                         if (failureSummary.length() > 0) failureSummary.append("; ");
                         failureSummary.append(Optional.ofNullable(product.getTitle()).orElse("product#" + product.getItemId()))
-                                .append(": polish failed");
+                                .append(": ").append(reason);
                         batchJobService.recordItem(job.getId(), String.valueOf(product.getId()),
                                 Optional.ofNullable(product.getTitle()).orElse("product#" + product.getItemId()),
-                                "FAILED", System.currentTimeMillis() - t0, "polish failed", null);
+                                "FAILED", System.currentTimeMillis() - t0, reason, null);
                     }
                 }
             } catch (Exception e) {
@@ -117,15 +120,17 @@ public class ScheduledPolishService {
         return batch.getId();
     }
 
-    /** 对单商品执行擦亮。 */
+    /** 对单商品执行擦亮。真实错误原因写入 errRef（供批次摘要与 item 记录使用）。 */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public PolishResult polishOne(XianyuProduct product) {
+    public PolishResult polishOne(XianyuProduct product, java.util.concurrent.atomic.AtomicReference<String> errRef) {
         Long accountId = product.getAccountId();
         if (accountId == null || !circuitBreaker.allowRequest(accountId, "POLISH")) {
+            errRef.set("skip: circuit breaker open");
             return PolishResult.SKIPPED;
         }
         XianyuAccount account = accountMapper.selectById(accountId);
         if (account == null || "DISABLED".equals(account.getStatus())) {
+            errRef.set("skip: account missing/disabled");
             return PolishResult.SKIPPED;
         }
         try {
@@ -134,8 +139,24 @@ public class ScheduledPolishService {
             String itemId = String.valueOf(product.getItemId());
             JsonNode resp = facade.polishItem(itemId);
             String ret = resp != null ? resp.path("ret").toString() : "";
+            // 闲鱼限制同一商品短期内重复擦亮：目标状态已达成，按 SKIPPED 处理并记成功，
+            // 绝不能计入熔断失败（否则单个"已擦亮"商品会把整账号擦亮链路永久毒化）
+            if (ret.contains("POLISH_AGAIN") || ret.contains("POLISH_DUPLICATE")) {
+                circuitBreaker.recordSuccess(accountId, "POLISH");
+                errRef.set("skip: 今日已擦亮（闲鱼限制一天一次）");
+                return PolishResult.SKIPPED;
+            }
             if (ret.contains("FAIL")) {
-                circuitBreaker.recordFailure(accountId, "POLISH", "polishItem ret=" + ret);
+                // 账号级问题（风控/会话失效）才计入熔断；商品级业务失败（FAIL_BIZ_*，
+                // 如商品被下架/编辑受限）只记录真实原因，不毒化整个账号的擦亮链路
+                boolean accountLevel = ret.contains("FAIL_SYS") || ret.contains("RGV587")
+                        || ret.contains("SESSION_EXPIRED") || ret.contains("需要登录");
+                if (accountLevel) {
+                    circuitBreaker.recordFailure(accountId, "POLISH", "polishItem ret=" + ret);
+                } else {
+                    circuitBreaker.recordSuccess(accountId, "POLISH");
+                }
+                errRef.set("ret=" + ret);
                 return PolishResult.FAILED;
             }
             // 标最近擦亮时间（便于诊断 + 防短期内重复擦亮）
@@ -144,8 +165,10 @@ public class ScheduledPolishService {
             circuitBreaker.recordSuccess(accountId, "POLISH");
             return PolishResult.SUCCESS;
         } catch (Exception e) {
+            // 网络异常等未知错误：保守计入熔断（真实风控信号）
             circuitBreaker.recordFailure(accountId, "POLISH",
                     e.getClass().getSimpleName() + ": " + e.getMessage());
+            errRef.set(e.getClass().getSimpleName() + ": " + e.getMessage());
             log.warn("[B4] product {} polish failed: {}", product.getId(), e.getMessage());
             return PolishResult.FAILED;
         }

@@ -65,7 +65,8 @@ public class EmailChannelAdapter implements ChannelAdapter {
         helper.setFrom(from);
         helper.setTo(toList.toArray(new String[0]));
         helper.setSubject(title);
-        helper.setText(body, true); // HTML（正文按 markdown 渲染成简单 HTML 更佳，这里兼容纯文本）
+        // 纯文本发送：通知模板是带换行的纯文本，按 HTML 渲染会丢失全部换行
+        helper.setText(body, false);
         mailSender.send(msg);
     }
 
@@ -76,7 +77,9 @@ public class EmailChannelAdapter implements ChannelAdapter {
 
     private int intOf(JsonNode n, String k, int dflt) {
         JsonNode v = n.get(k);
-        return v != null && v.isNumber() ? v.asInt() : dflt;
+        // 兼容字符串形式的数字端口（如 "465"）：只认 number 会静默回退 25 端口致 SSL 发送必败
+        if (v == null || v.isNull()) return dflt;
+        return v.isNumber() ? v.asInt() : dflt;
     }
 
     private boolean boolOf(JsonNode n, String k, boolean dflt) {

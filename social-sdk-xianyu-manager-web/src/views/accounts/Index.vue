@@ -18,6 +18,11 @@
       </div>
 
       <!-- ===== 列表 ===== -->
+      <el-alert
+        v-if="accounts.some(a => ['COOKIE_EXPIRED','OFFLINE'].includes(a.status))"
+        type="info" show-icon :closable="true" class="relogin-guide"
+        title="登录态恢复引导：点击「Chrome 内扫码」打开控制页，服务器 Chrome 会自动导航到登录页；用闲鱼 App 扫码并确认后，点「检查并保存 Cookie」，系统自动回写登录态并恢复自动续期。"
+      />
       <el-table :data="accounts" stripe v-loading="loading" class="accounts-table">
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column prop="accountName" label="账号名称" width="150">
@@ -51,6 +56,11 @@
               size="small" type="danger" text
               @click="reloginAccount(row)"
             >重新登录</el-button>
+            <el-button
+              v-if="['COOKIE_EXPIRED','OFFLINE','FROZEN'].includes(row.status)"
+              size="small" type="success" text
+              @click="openChromeRelogin(row)"
+            >Chrome 内扫码</el-button>
             <el-button size="small" text @click="editStatus(row)">切换状态</el-button>
             <el-button size="small" type="danger" text @click="deleteAccount(row.id)">删除</el-button>
           </template>
@@ -684,8 +694,11 @@ const detailForm = ref({
   shopLevel: '', creditScore: 0, reviewNum: 0, lastLoginAt: '', profileSyncedAt: '', cookieHeader: ''
 })
 
-async function viewDetail(row) {
-  detailForm.value = { ...row }
+function openChromeRelogin(row) {
+  window.open(`/captcha-control?accountId=${row.id}`, '_blank')
+}
+
+async function viewDetail(row) {  detailForm.value = { ...row }
   showDetailDrawer.value = true
   detailLoading.value = true
   try {
@@ -778,7 +791,7 @@ onMounted(loadAccounts)
 
 /* ===== 二维码区域 ===== */
 .qr-wrap { text-align: center; padding: 24px 0; }
-.qr-image { width: 260px; height: 260px; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px; background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+.qr-image { width: 260px; height: 260px; border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px; background: var(--bg-surface-1); box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
 .qr-tip { margin-top: 14px; color: var(--text-2); font-size: var(--font-md); }
 .qr-msg { margin-top: 12px; display: flex; align-items: center; justify-content: center; gap: 6px; }
 .qr-scanned { color: var(--color-success) !important; font-weight: 600; }

@@ -565,7 +565,7 @@ async function viewRefundDetail(orderId) {
 .credit-tags { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .credit-tag-icon { width: 16px; height: 16px; vertical-align: middle; margin-right: 3px; }
 .credit-stat-card {
-  background: #fff; border: 1px solid var(--border);
+  background: var(--bg-surface-1); border: 1px solid var(--border);
   border-radius: var(--radius-md); padding: 14px 12px;
   text-align: center; transition: box-shadow var(--transition-fast);
 }

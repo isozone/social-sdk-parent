@@ -107,6 +107,12 @@ public class MonitorTaskRunner {
                     totalResults = items.size();
                     snapshot.setTotalResults(totalResults);
 
+            snapshot.setSnapshotTime(LocalDateTime.now());
+            snapshot.setDeleted(0);
+            // 先落库拿 id：PriceHistory.snapshotId 依赖 MP insert 时回填的主键，
+            // 若在循环后 insert，snapshotId 恒为 null（非空约束时价格历史整批写不进）
+            snapshotMapper.insert(snapshot);
+
                 for (JsonNode item : items) {
                     try {
                         MonitorResult result = parseItem(item, task);
@@ -151,10 +157,6 @@ public class MonitorTaskRunner {
                 }
             }
 
-            snapshot.setSnapshotTime(LocalDateTime.now());
-            snapshot.setDeleted(0);
-            snapshotMapper.insert(snapshot);
-
             // 更新任务状态
             task.setLastRunAt(LocalDateTime.now());
             task.setRunCount(task.getRunCount() + 1);
@@ -187,7 +189,14 @@ public class MonitorTaskRunner {
 
         MonitorResult r = new MonitorResult();
         r.setTaskId(task.getId());
-        r.setItemId(itemId != null ? itemId : UUID.randomUUID().toString());
+        if (itemId != null) {
+            r.setItemId(itemId);
+        } else {
+            // itemId 缺失时用确定性去重键（taskId+title+卖家）：UUID 会让判重永远 miss，
+            // 导致每轮重复插入 MonitorResult 并重复触发 MONITOR_MATCH 通知
+            r.setItemId(task.getId() + "-" + Integer.toHexString(
+                    ((title == null ? "" : title) + "|" + getText(item, "sellerNickname", "sellerName", "nickname")).hashCode()));
+        }
         r.setItemTitle(title != null ? title : "未知商品");
         r.setPrice(parseDouble(item, "price", "currentPrice", "salePrice"));
         r.setImageUrl(getText(item, "imageUrl", "pic", "imgUrl", "cover"));

@@ -9,6 +9,7 @@ import cn.net.rjnetwork.xianyu.manager.message.closenotice.mapper.ScheduledClose
 import cn.net.rjnetwork.xianyu.manager.message.closenotice.model.ScheduledCloseNoticeLog;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import cn.net.rjnetwork.xianyu.proxy.core.ProxyPoolManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -37,6 +38,10 @@ import java.util.Optional;
 public class CloseNoticeService {
 
     private static final Logger log = LoggerFactory.getLogger(CloseNoticeService.class);
+
+    /** 多账号代理绑定：按账号出口 IP 隔离（未配置代理池时为 null，退化为直连） */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ProxyPoolManager proxyPoolManager;
     private static final String JOB_TYPE = "close_notice";
     private static final String SCENE = "CLOSE_NOTICE";
 
@@ -134,7 +139,7 @@ public class CloseNoticeService {
             return new CloseResult(CloseState.SKIPPED, 0, "no cookie");
         }
         try {
-            XianyuApiFacade facade = new XianyuApiFacade(account.getCookieHeader());
+            XianyuApiFacade facade = new XianyuApiFacade(account.getCookieHeader(), proxyPoolManager, account.getId());
             int closedCount = 0;
             List<String> failedIds = new ArrayList<>();
             // 逐个通知分类调 closeNotice 关闭

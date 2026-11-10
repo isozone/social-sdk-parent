@@ -4,6 +4,7 @@ import cn.net.rjnetwork.xianyu.api.*;
 import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
 import cn.net.rjnetwork.xianyu.manager.account.service.AccountService;
 import cn.net.rjnetwork.xianyu.manager.config.AsyncConfig;
+import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
 import cn.net.rjnetwork.xianyu.manager.product.dto.ProductCreateRequest;
 import cn.net.rjnetwork.xianyu.manager.product.dto.ProductUpdateRequest;
 import cn.net.rjnetwork.xianyu.manager.product.mapper.ProductMapper;
@@ -11,6 +12,7 @@ import cn.net.rjnetwork.xianyu.manager.product.model.XianyuProduct;
 import cn.net.rjnetwork.xianyu.manager.product.service.SyncProgressService;
 import cn.net.rjnetwork.xianyu.manager.product.service.SyncProgressService.Progress;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,8 +30,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -45,6 +49,9 @@ public class ProductService {
     private final SyncProgressService syncProgressService;
     @org.springframework.beans.factory.annotation.Autowired
     private cn.net.rjnetwork.xianyu.manager.sdk.XianyuMtopClientFactory xianyuMtopClientFactory;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @Value("${file.upload-dir:./data/uploads}")
     private String uploadDir;
@@ -886,7 +893,13 @@ public class ProductService {
         }
 
         // 4. 下架原商品（发新成功后才下架，避免丢失在售）
-        try { editApi.shelfOff(itemId); } catch (Exception e) { /* 下架失败不影响主流程，新商品已发 */ }
+        try {
+            editApi.shelfOff(itemId);
+        } catch (Exception e) {
+            // 下架失败不阻塞新商品，但必须留痕：否则同店同品双挂在售且无人感知
+            logger.error("[Product] updatePrice 换品流程：原商品 {} 下架失败，平台侧新旧双挂在售，需人工处理: {}",
+                    itemId, e.getMessage());
+        }
 
         // 5. 解析新商品 itemId
         String newItemId = parseItemIdFromPublishResp(pubResp);
@@ -1140,6 +1153,20 @@ public class ProductService {
                     failed++;
                 }
             }
+
+            // 对账：平台商品列表中消失的商品 → 本地标记 OFF_SALE（违规下架/删除检测）。
+            // 仅当本次成功拉到列表（cards 非空）才对账，避免风控空响应把全库误标下架。
+            if (!cards.isEmpty()) {
+                Set<String> fetchedIds = new LinkedHashSet<>();
+                for (XianyuProduct p : toUpsert) {
+                    fetchedIds.add(p.getItemId());
+                }
+                int takenDown = reconcilePlatformMissing(accountId, fetchedIds);
+                if (takenDown > 0) {
+                    logger.warn("sync: {} products taken down/deleted on platform, account {}", takenDown, accountId);
+                }
+            }
+
             syncProgressService.update(Progress.completed(syncId, inserted, updated, failed));
             syncProgressService.finish(accountId, syncId);
         } catch (Exception e) {
@@ -1466,9 +1493,63 @@ public class ProductService {
         // 字符串形式兜底
         String sl = s.toLowerCase();
         if (sl.contains("onsale") || sl.contains("on_sale") || sl.contains("selling")) return "ON_SALE";
-        if (sl.contains("offsale") || sl.contains("off_sale") || sl.contains("soldout") || sl.contains("off")) return "OFF_SALE";
+        // 注意不要用 contains("off")：会把 offer/soft 等无关词误判为下架
+        if (sl.contains("offsale") || sl.contains("off_sale") || sl.contains("soldout") || sl.startsWith("off")) return "OFF_SALE";
         if (sl.contains("draft") || sl.contains("wait")) return "DRAFT";
+        // 违规下架/删除/屏蔽类状态一律按 OFF_SALE 处理（原始值仍保留在 item_status_raw 供前端展示）
+        if (s.contains("违规") || s.contains("审核") || s.contains("删除") || s.contains("屏蔽") || s.contains("禁")
+                || sl.contains("violation") || sl.contains("deleted") || sl.contains("banned")
+                || sl.contains("forbid") || sl.contains("punish") || sl.contains("audit") || sl.contains("shield")) {
+            return "OFF_SALE";
+        }
         return "ON_SALE"; // 默认按在售处理
+    }
+
+    /**
+     * 平台对账：把「本地 ON_SALE 但平台商品列表已不存在」的商品标记为 OFF_SALE。
+     * <p>闲鱼违规下架/删除的商品会从 getMyProducts 列表消失（或带违规状态），
+     * 旧同步逻辑只 upsert 列表内商品，对消失商品永不感知 —— 本方法补上该缺口。
+     * 仅更新 status/item_status_raw/updated_at 三个字段，不覆盖商品其他信息；
+     * 有实际转下架时发布 PRODUCT_TAKE_DOWN 通知（含商品标题清单）。</p>
+     *
+     * @param fetchedItemIds 本次同步从平台拉到的全部商品 itemId
+     * @return 本次实际转 OFF_SALE 的商品数
+     */
+    private int reconcilePlatformMissing(Long accountId, Set<String> fetchedItemIds) {
+        LambdaQueryWrapper<XianyuProduct> qw = new LambdaQueryWrapper<>();
+        qw.eq(XianyuProduct::getAccountId, accountId)
+                .eq(XianyuProduct::getStatus, "ON_SALE")
+                .isNotNull(XianyuProduct::getItemId);
+        List<XianyuProduct> onSale = productMapper.selectList(qw);
+        if (onSale.isEmpty()) return 0;
+
+        List<String> missingTitles = new ArrayList<>();
+        for (XianyuProduct p : onSale) {
+            String itemId = p.getItemId();
+            if (itemId == null || itemId.isBlank() || fetchedItemIds.contains(itemId)) continue;
+            LambdaUpdateWrapper<XianyuProduct> uw = new LambdaUpdateWrapper<>();
+            uw.eq(XianyuProduct::getId, p.getId())
+                    .set(XianyuProduct::getStatus, "OFF_SALE")
+                    .set(XianyuProduct::getItemStatusRaw, "PLATFORM_MISSING")
+                    .set(XianyuProduct::getUpdatedAt, LocalDateTime.now());
+            productMapper.update(null, uw);
+            missingTitles.add(p.getTitle() != null ? p.getTitle() : itemId);
+        }
+        if (!missingTitles.isEmpty()) {
+            try {
+                XianyuAccount account = accountService.getById(accountId);
+                String accountName = account != null && account.getAccountName() != null
+                        ? account.getAccountName() : String.valueOf(accountId);
+                Map<String, Object> vars = new LinkedHashMap<>();
+                // 模板渲染只从 vars 取值（accountName 是事件独立字段，不会自动合并），必须显式放入
+                vars.put("accountName", accountName);
+                vars.put("items", String.join("、", missingTitles));
+                eventPublisher.publishEvent(new NotifyEvent("PRODUCT_TAKE_DOWN", accountId, accountName, vars));
+            } catch (Exception e) {
+                logger.warn("sync: publish PRODUCT_TAKE_DOWN notify failed: {}", e.getMessage());
+            }
+        }
+        return missingTitles.size();
     }
 
     /** 同步结果统计 */

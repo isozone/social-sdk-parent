@@ -3,6 +3,7 @@ package cn.net.rjnetwork.xianyu.manager.account.task;
 import cn.net.rjnetwork.xianyu.api.XianyuLoginApiService;
 import cn.net.rjnetwork.xianyu.manager.account.mapper.AccountMapper;
 import cn.net.rjnetwork.xianyu.manager.account.model.XianyuAccount;
+import cn.net.rjnetwork.xianyu.manager.account.renew.service.CookieRenewService;
 import cn.net.rjnetwork.xianyu.manager.notify.NotifyEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,10 +25,13 @@ public class AccountHealthTask {
 
     private final AccountMapper accountMapper;
     private final ApplicationEventPublisher eventPublisher;
+    private final CookieRenewService cookieRenewService;
 
-    public AccountHealthTask(AccountMapper accountMapper, ApplicationEventPublisher eventPublisher) {
+    public AccountHealthTask(AccountMapper accountMapper, ApplicationEventPublisher eventPublisher,
+                             CookieRenewService cookieRenewService) {
         this.accountMapper = accountMapper;
         this.eventPublisher = eventPublisher;
+        this.cookieRenewService = cookieRenewService;
     }
 
     /**
@@ -119,9 +123,23 @@ public class AccountHealthTask {
     }
 
     private void publishCookieExpired(XianyuAccount account) {
+        // 边沿触发：仅 ACTIVE→COOKIE_EXPIRED 翻转时发一次（库内已是过期态则静默），
+        // 否则健康检查每 5 分钟发布一次 × 1h 冷却 = 每小时一封的邮件轰炸
+        XianyuAccount dbAccount = accountMapper.selectById(account.getId());
+        if (dbAccount != null && "COOKIE_EXPIRED".equals(dbAccount.getStatus())) {
+            return;
+        }
         String name = account.getDisplayName() != null ? account.getDisplayName() : account.getAccountName();
+        // 与续期失败路径一致：掉线边沿自动把登录页打开待扫（用户点邮件直链即可扫码恢复）
+        try {
+            cookieRenewService.navigatePageTo(account,
+                    cn.net.rjnetwork.xianyu.manager.account.controller.RenewLoginController.LOGIN_URL);
+        } catch (Exception e) {
+            logger.warn("auto-navigate to login page failed for account {}: {}", account.getId(), e.getMessage());
+        }
+        String controlUrl = "http://192.168.1.252:40000/captcha-control?accountId=" + account.getId();
         eventPublisher.publishEvent(new NotifyEvent("ACCOUNT_COOKIE_EXPIRED", account.getId(), name,
-                Map.of("accountName", name)));
+                Map.of("accountName", name, "controlUrl", controlUrl)));
     }
 
     private void publishOffline(XianyuAccount account) {

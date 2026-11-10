@@ -7,6 +7,7 @@ import cn.net.rjnetwork.xianyu.manager.collect.mapper.CollectMapper;
 import cn.net.rjnetwork.xianyu.manager.collect.model.XianyuCollect;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
+import cn.net.rjnetwork.xianyu.proxy.core.ProxyPoolManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,10 @@ import java.util.Map;
 public class CollectService {
 
     private static final Logger log = LoggerFactory.getLogger(CollectService.class);
+
+    /** 多账号代理绑定：按账号出口 IP 隔离（未配置代理池时为 null，退化为直连） */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ProxyPoolManager proxyPoolManager;
 
     private final CollectMapper collectMapper;
     private final AccountMapper accountMapper;
@@ -61,7 +66,7 @@ public class CollectService {
      */
     public XianyuCollect collectAndSync(Long accountId, String itemId, String itemName) throws Exception {
         XianyuAccount acc = requireAccount(accountId);
-        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader());
+        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader(), proxyPoolManager, acc.getId());
         JsonNode resp = api.collectItem(itemId);
         if (isRisk(resp)) {
             throw new IllegalStateException("闲鱼收藏失败（可能触发风控）: " + truncate(resp.toString(), 200));
@@ -92,7 +97,7 @@ public class CollectService {
      */
     public void uncollectAndSync(Long accountId, String itemId) throws Exception {
         XianyuAccount acc = requireAccount(accountId);
-        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader());
+        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader(), proxyPoolManager, acc.getId());
         JsonNode resp = api.uncollectItem(itemId);
         if (isRisk(resp)) {
             throw new IllegalStateException("闲鱼取消收藏失败: " + truncate(resp.toString(), 200));
@@ -109,7 +114,7 @@ public class CollectService {
      */
     public int syncFromXianyu(Long accountId, int page, int pageSize) throws Exception {
         XianyuAccount acc = requireAccount(accountId);
-        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader());
+        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader(), proxyPoolManager, acc.getId());
         JsonNode resp = api.getMyCollectList(String.valueOf(page), String.valueOf(pageSize));
         if (isRisk(resp)) {
             throw new IllegalStateException("闲鱼拉收藏列表失败: " + truncate(resp.toString(), 200));
@@ -164,7 +169,7 @@ public class CollectService {
      */
     public List<Map<String, String>> searchItems(Long accountId, String keyword) {
         XianyuAccount acc = requireAccount(accountId);
-        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader());
+        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader(), proxyPoolManager, acc.getId());
         try {
             JsonNode resp = api.searchProducts(keyword, "1", "20");
             if (isRisk(resp)) {
@@ -203,7 +208,7 @@ public class CollectService {
      */
     public Map<String, String> lookupTarget(Long accountId, String targetType, String targetId) {
         XianyuAccount acc = requireAccount(accountId);
-        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader());
+        XianyuApiFacade api = new XianyuApiFacade(acc.getCookieHeader(), proxyPoolManager, acc.getId());
         Map<String, String> result = new LinkedHashMap<>();
         result.put("targetId", targetId);
         result.put("targetType", targetType);

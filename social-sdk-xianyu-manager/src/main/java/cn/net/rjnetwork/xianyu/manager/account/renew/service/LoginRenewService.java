@@ -133,6 +133,20 @@ public class LoginRenewService {
                         null, "SKIPPED", System.currentTimeMillis() - t0, "account disabled/missing", null);
                 continue;
             }
+            if ("ACTIVE".equals(account.getStatus())) {
+                // 登录态已恢复（人工扫码/A1A2 成功）：重置兜底重试计数并跳过 QR 流程，
+                // 否则 A3 会在健康账号上空跑直至重试耗尽、发出误导性的"登录续期失败"邮件
+                if (schedule.getCurrentRetry() != null && schedule.getCurrentRetry() > 0) {
+                    schedule.setCurrentRetry(0);
+                    schedule.setNextRunAt(LocalDateTime.now().plusHours(6));
+                    scheduleMapper.updateById(schedule);
+                    log.info("[A3] account {} already ACTIVE, reset retry counter and skip", account.getId());
+                }
+                skipped++;
+                batchJobService.recordItem(job.getId(), String.valueOf(schedule.getAccountId()),
+                        null, "SKIPPED", System.currentTimeMillis() - t0, "account already ACTIVE", null);
+                continue;
+            }
             try {
                 RenewResult r = renewOne(account, schedule);
                 switch (r) {
@@ -225,11 +239,11 @@ public class LoginRenewService {
                 Map.of("qrCodeDataUrl", qr.qrCodeDataUrl == null ? "" : qr.qrCodeDataUrl,
                         "sessionId", qr.sessionId,
                         "accountName", Optional.ofNullable(account.getDisplayName()).orElse(account.getAccountName()))));
-        // 本轮不阻塞等扫码（最多 60s），由用户异步扫码；下批次 pollQrStatus 收尾
-        // 这里先尝试短轮询 30s，若仍未扫码则记 WAITING_QR
-        XianyuLoginApiService.QrLoginResult polled = loginApi.waitForLogin(qr.sessionId, 30);
-        if (polled != null && "SUCCESS".equals(polled.status) && qr.cookieHeader != null) {
-            applyNewCookie(account, qr.cookieHeader);
+        // 阻塞等扫码 120s（QR 会话由 SDK 按实例内存管理，跨批次无法续查，须在本轮等住）
+        XianyuLoginApiService.QrLoginResult polled = loginApi.waitForLogin(qr.sessionId, 120);
+        // 注意：cookieHeader 只在登录成功后的 polled 结果里填充，qr.cookieHeader 建会话时必为 null
+        if (polled != null && "SUCCESS".equals(polled.status) && polled.cookieHeader != null) {
+            applyNewCookie(account, polled.cookieHeader);
             return RenewResult.SUCCESS;
         }
         if (polled != null && ("WAITING".equals(polled.status) || "SCANNED".equals(polled.status))) {
