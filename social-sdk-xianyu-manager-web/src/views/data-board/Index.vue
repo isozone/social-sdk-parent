@@ -176,14 +176,14 @@ const kpis = computed(() => {
   const genSpark = () => Array.from({ length: 12 }, () => 0)
 
   return [
-    { title: '总账号数', value: o.totalAccounts || 0, icon: 'User', color: '#00D4FF', gradient: 'linear-gradient(135deg, #00D4FF, #0066FF)', trend: calcTrend(o.totalAccounts || 0, prev.totalAccounts), spark: genSpark() },
-    { title: '在线账号', value: o.onlineAccounts || 0, icon: 'CircleCheck', color: '#00E676', gradient: 'linear-gradient(135deg, #00E676, #00C853)', trend: calcTrend(o.onlineAccounts || 0, prev.onlineAccounts), spark: genSpark() },
-    { title: '总商品数', value: o.totalProducts || 0, icon: 'Goods', color: '#FFAB00', gradient: 'linear-gradient(135deg, #FFAB00, #FF6D00)', trend: calcTrend(o.totalProducts || 0, prev.totalProducts), spark: genSpark() },
+    { title: '总账号数', value: o.totalAccounts || 0, icon: 'User', color: '#5e6ad2', gradient: 'linear-gradient(135deg, #5e6ad2, #5e6ad2)', trend: calcTrend(o.totalAccounts || 0, prev.totalAccounts), spark: genSpark() },
+    { title: '在线账号', value: o.onlineAccounts || 0, icon: 'CircleCheck', color: '#00E676', gradient: 'linear-gradient(135deg, #00E676, #00e676)', trend: calcTrend(o.onlineAccounts || 0, prev.onlineAccounts), spark: genSpark() },
+    { title: '总商品数', value: o.totalProducts || 0, icon: 'Goods', color: '#ffb300', gradient: 'linear-gradient(135deg, #ffb300, #ff8f00)', trend: calcTrend(o.totalProducts || 0, prev.totalProducts), spark: genSpark() },
     { title: '在售商品', value: o.onSaleProducts || 0, icon: 'Shop', color: '#FF4081', gradient: 'linear-gradient(135deg, #FF4081, #F50057)', trend: calcTrend(o.onSaleProducts || 0, prev.onSaleProducts), spark: genSpark() },
-    { title: '今日回复', value: o.todayReplies || 0, icon: 'ChatLineRound', color: '#E040FB', gradient: 'linear-gradient(135deg, #E040FB, #AA00FF)', trend: calcTrend(o.todayReplies || 0, prev.todayReplies), spark: genSpark() },
+    { title: '今日回复', value: o.todayReplies || 0, icon: 'ChatLineRound', color: '#7c6cff', gradient: 'linear-gradient(135deg, #7c6cff, #AA00FF)', trend: calcTrend(o.todayReplies || 0, prev.todayReplies), spark: genSpark() },
     { title: '总浏览量', value: o.totalViews || 0, icon: 'View', color: '#536DFE', gradient: 'linear-gradient(135deg, #536DFE, #304FFE)', trend: calcTrend(o.totalViews || 0, prev.totalViews), spark: genSpark() },
     { title: '总收藏', value: o.totalFavorites || 0, icon: 'Star', color: '#FFD740', gradient: 'linear-gradient(135deg, #FFD740, #FFC400)', trend: calcTrend(o.totalFavorites || 0, prev.totalFavorites), spark: genSpark() },
-    { title: '异常账号', value: o.cookieExpiredAccounts || 0, icon: 'Warning', color: '#FF5252', gradient: 'linear-gradient(135deg, #FF5252, #D50000)', trend: null, spark: genSpark() }
+    { title: '异常账号', value: o.cookieExpiredAccounts || 0, icon: 'Warning', color: '#ff4d6a', gradient: 'linear-gradient(135deg, #ff4d6a, #D50000)', trend: null, spark: genSpark() }
   ]
 })
 
@@ -192,7 +192,7 @@ function statusLabel(status) {
   return { ACTIVE: '在线', DISABLED: '离线', FROZEN: '冻结', COOKIE_EXPIRED: '过期' }[status] || status || '未知'
 }
 function statusColor(status) {
-  return { ACTIVE: '#00E676', DISABLED: '#78909C', FROZEN: '#FF5252', COOKIE_EXPIRED: '#FFAB00' }[status] || '#78909C'
+  return { ACTIVE: '#00E676', DISABLED: '#78909C', FROZEN: '#ff4d6a', COOKIE_EXPIRED: '#ffb300' }[status] || '#78909C'
 }
 
 // ===== 数字格式化 =====
@@ -285,7 +285,7 @@ function updateCharts() {
     xAxis: { type: 'category', data: barCategories, axisLabel: { color: '#78909C', fontSize: 10 }, axisLine: { lineStyle: { color: '#263238' } } },
     yAxis: { type: 'value', axisLabel: { color: '#78909C', fontSize: 10 }, splitLine: { lineStyle: { color: '#1E2A35' } } },
     series: [
-      { name: '商品数', type: 'bar', data: topAccounts.map(a => a.productCount || 0), itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#00D4FF' }, { offset: 1, color: '#0066FF' }]) }, barMaxWidth: 20 },
+      { name: '商品数', type: 'bar', data: topAccounts.map(a => a.productCount || 0), itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#5e6ad2' }, { offset: 1, color: '#5e6ad2' }]) }, barMaxWidth: 20 },
       { name: '浏览量', type: 'bar', data: topAccounts.map(a => a.viewCount || 0), itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#536DFE' }, { offset: 1, color: '#304FFE' }]) }, barMaxWidth: 20 },
       { name: '收藏数', type: 'bar', data: topAccounts.map(a => a.favoriteCount || 0), itemStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#FFD740' }, { offset: 1, color: '#FFC400' }]) }, barMaxWidth: 20 }
     ]
@@ -302,9 +302,9 @@ function updateCharts() {
       type: 'line',
       data: trendHistory.value.map(t => t.value),
       smooth: true,
-      lineStyle: { color: '#E040FB', width: 2 },
+      lineStyle: { color: '#7c6cff', width: 2 },
       areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(224,64,251,0.4)' }, { offset: 1, color: 'rgba(224,64,251,0)' }]) },
-      itemStyle: { color: '#E040FB' },
+      itemStyle: { color: '#7c6cff' },
       symbol: 'circle',
       symbolSize: 4
     }]
@@ -353,8 +353,8 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(94, 106, 210, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(94, 106, 210, 0.03) 1px, transparent 1px);
   background-size: 40px 40px;
   pointer-events: none;
   z-index: 0;
@@ -379,7 +379,7 @@ onBeforeUnmount(() => {
   height: 64px;
   padding: 0 32px;
   background: linear-gradient(180deg, rgba(10, 14, 39, 0.95) 0%, rgba(10, 14, 39, 0.7) 100%);
-  border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+  border-bottom: 1px solid rgba(94, 106, 210, 0.2);
   backdrop-filter: blur(10px);
 }
 .header-left {
@@ -388,13 +388,13 @@ onBeforeUnmount(() => {
   gap: 14px;
 }
 .logo-icon {
-  color: #00D4FF;
-  filter: drop-shadow(0 0 8px rgba(0, 212, 255, 0.6));
+  color: #5e6ad2;
+  filter: drop-shadow(0 0 8px rgba(94, 106, 210, 0.6));
 }
 .header-left h1 {
   font-size: 22px;
   font-weight: 600;
-  background: linear-gradient(90deg, #00D4FF, #E040FB);
+  background: linear-gradient(90deg, #5e6ad2, #7c6cff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -415,14 +415,14 @@ onBeforeUnmount(() => {
   animation: pulse 2s infinite;
 }
 .status-dot.online { background: #00E676; box-shadow: 0 0 8px #00E676; }
-.status-dot.offline { background: #FF5252; box-shadow: 0 0 8px #FF5252; }
+.status-dot.offline { background: #ff4d6a; box-shadow: 0 0 8px #ff4d6a; }
 .status-text { color: #B0BEC5; }
 .divider { color: #263238; }
 .poll-text { color: #546E7A; }
 .header-right .datetime {
   font-size: 15px;
   font-family: 'Courier New', monospace;
-  color: #00D4FF;
+  color: #5e6ad2;
   letter-spacing: 1px;
 }
 
@@ -445,9 +445,33 @@ onBeforeUnmount(() => {
   gap: 14px;
   flex-shrink: 0;
 }
+
+.kpi-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(#5e6ad2, #5e6ad2) top left / 14px 1.5px,
+    linear-gradient(#5e6ad2, #5e6ad2) top left / 1.5px 14px,
+    linear-gradient(#5e6ad2, #5e6ad2) bottom right / 14px 1.5px,
+    linear-gradient(#5e6ad2, #5e6ad2) bottom right / 1.5px 14px;
+  background-repeat: no-repeat;
+  opacity: 0.45;
+  transition: background-size 0.25s ease, opacity 0.25s ease;
+}
+.kpi-card:hover::after {
+  background:
+    linear-gradient(#5e6ad2, #5e6ad2) top left / 22px 2px,
+    linear-gradient(#5e6ad2, #5e6ad2) top left / 2px 22px,
+    linear-gradient(#5e6ad2, #5e6ad2) bottom right / 22px 2px,
+    linear-gradient(#5e6ad2, #5e6ad2) bottom right / 2px 22px;
+  opacity: 0.85;
+}
+
 .kpi-card {
   background: linear-gradient(135deg, rgba(22, 27, 50, 0.9) 0%, rgba(15, 20, 40, 0.9) 100%);
-  border: 1px solid rgba(0, 212, 255, 0.15);
+  border: 1px solid rgba(94, 106, 210, 0.15);
   border-radius: 12px;
   padding: 16px;
   display: flex;
@@ -459,8 +483,8 @@ onBeforeUnmount(() => {
   transition: border-color 0.3s, box-shadow 0.3s;
 }
 .kpi-card:hover {
-  border-color: rgba(0, 212, 255, 0.4);
-  box-shadow: 0 0 20px rgba(0, 212, 255, 0.15);
+  border-color: rgba(94, 106, 210, 0.4);
+  box-shadow: 0 0 20px rgba(94, 106, 210, 0.15);
 }
 .kpi-card::before {
   content: '';
@@ -469,7 +493,7 @@ onBeforeUnmount(() => {
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.5), transparent);
+  background: linear-gradient(90deg, transparent, rgba(94, 106, 210, 0.5), transparent);
 }
 .kpi-icon {
   width: 52px;
@@ -502,7 +526,7 @@ onBeforeUnmount(() => {
   gap: 4px;
 }
 .kpi-trend .up { color: #00E676; }
-.kpi-trend .down { color: #FF5252; }
+.kpi-trend .down { color: #ff4d6a; }
 .trend-label { color: #546E7A; }
 .kpi-sparkline {
   position: absolute;
@@ -528,9 +552,33 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 0;
 }
+
+.chart-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(#5e6ad2, #5e6ad2) top left / 14px 1.5px,
+    linear-gradient(#5e6ad2, #5e6ad2) top left / 1.5px 14px,
+    linear-gradient(#5e6ad2, #5e6ad2) bottom right / 14px 1.5px,
+    linear-gradient(#5e6ad2, #5e6ad2) bottom right / 1.5px 14px;
+  background-repeat: no-repeat;
+  opacity: 0.45;
+  transition: background-size 0.25s ease, opacity 0.25s ease;
+}
+.chart-panel:hover::after {
+  background:
+    linear-gradient(#5e6ad2, #5e6ad2) top left / 22px 2px,
+    linear-gradient(#5e6ad2, #5e6ad2) top left / 2px 22px,
+    linear-gradient(#5e6ad2, #5e6ad2) bottom right / 22px 2px,
+    linear-gradient(#5e6ad2, #5e6ad2) bottom right / 2px 22px;
+  opacity: 0.85;
+}
+
 .chart-panel {
   background: linear-gradient(135deg, rgba(22, 27, 50, 0.9) 0%, rgba(15, 20, 40, 0.9) 100%);
-  border: 1px solid rgba(0, 212, 255, 0.15);
+  border: 1px solid rgba(94, 106, 210, 0.15);
   border-radius: 12px;
   padding: 16px;
   display: flex;
@@ -546,7 +594,7 @@ onBeforeUnmount(() => {
 /* ==================== 账号状态列表 ==================== */
 .table-panel {
   background: linear-gradient(135deg, rgba(22, 27, 50, 0.9) 0%, rgba(15, 20, 40, 0.9) 100%);
-  border: 1px solid rgba(0, 212, 255, 0.15);
+  border: 1px solid rgba(94, 106, 210, 0.15);
   border-radius: 12px;
   padding: 16px;
   flex-shrink: 0;
@@ -564,7 +612,7 @@ onBeforeUnmount(() => {
 .title-dot {
   width: 4px;
   height: 16px;
-  background: linear-gradient(180deg, #00D4FF, #0066FF);
+  background: linear-gradient(180deg, #5e6ad2, #5e6ad2);
   border-radius: 2px;
 }
 .panel-sub {
@@ -588,13 +636,13 @@ onBeforeUnmount(() => {
   transition: border-color 0.3s, box-shadow 0.3s;
 }
 .account-card:hover {
-  border-color: rgba(0, 212, 255, 0.4);
-  box-shadow: 0 0 12px rgba(0, 212, 255, 0.1);
+  border-color: rgba(94, 106, 210, 0.4);
+  box-shadow: 0 0 12px rgba(94, 106, 210, 0.1);
 }
 .account-card.status-active { border-left: 3px solid #00E676; }
 .account-card.status-disabled { border-left: 3px solid #78909C; }
-.account-card.status-frozen { border-left: 3px solid #FF5252; }
-.account-card.status-cookie_expired { border-left: 3px solid #FFAB00; }
+.account-card.status-frozen { border-left: 3px solid #ff4d6a; }
+.account-card.status-cookie_expired { border-left: 3px solid #ffb300; }
 .acc-header {
   display: flex;
   align-items: center;
@@ -619,8 +667,8 @@ onBeforeUnmount(() => {
 }
 .status-active .acc-dot { background: #00E676; box-shadow: 0 0 6px #00E676; animation: pulse 2s infinite; }
 .status-disabled .acc-dot { background: #78909C; }
-.status-frozen .acc-dot { background: #FF5252; box-shadow: 0 0 6px #FF5252; }
-.status-cookie_expired .acc-dot { background: #FFAB00; box-shadow: 0 0 6px #FFAB00; }
+.status-frozen .acc-dot { background: #ff4d6a; box-shadow: 0 0 6px #ff4d6a; }
+.status-cookie_expired .acc-dot { background: #ffb300; box-shadow: 0 0 6px #ffb300; }
 .acc-metrics {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -633,7 +681,7 @@ onBeforeUnmount(() => {
   display: block;
   font-size: 16px;
   font-weight: 700;
-  color: #00D4FF;
+  color: #5e6ad2;
   font-family: 'Courier New', monospace;
 }
 .metric-label {
@@ -649,7 +697,7 @@ onBeforeUnmount(() => {
   background: transparent;
 }
 .account-grid::-webkit-scrollbar-thumb {
-  background: rgba(0, 212, 255, 0.3);
+  background: rgba(94, 106, 210, 0.3);
   border-radius: 2px;
 }
 

@@ -175,7 +175,7 @@ const pieCharts = computed(() => [
     chipIcon: 'UserFilled',
     option: {
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-      legend: { bottom: '5%', left: 'center', textStyle: { color: '#8a8f98', fontSize: 12 } },
+      legend: { bottom: '5%', left: 'center', textStyle: { color: '#5d7ba1', fontSize: 12 } },
       series: [{
         type: 'pie', radius: ['42%', '72%'],
         avoidLabelOverlap: false,
@@ -186,7 +186,7 @@ const pieCharts = computed(() => [
           { name: '离线', value: overview.value.offlineAccounts || 0 },
           { name: 'Cookie 过期', value: overview.value.cookieExpiredAccounts || 0 },
         ],
-        itemStyle: { borderRadius: 4, borderColor: '#141518', borderWidth: 2 },
+        itemStyle: { borderRadius: 4, borderColor: '#0b1220', borderWidth: 2 },
         color: [CHART[3], CHART[5], CHART[4]], // 绿、红、靛蓝
       }]
     }
@@ -196,7 +196,7 @@ const pieCharts = computed(() => [
     chipIcon: 'Goods',
     option: {
       tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-      legend: { bottom: '5%', left: 'center', textStyle: { color: '#8a8f98', fontSize: 12 } },
+      legend: { bottom: '5%', left: 'center', textStyle: { color: '#5d7ba1', fontSize: 12 } },
       series: [{
         type: 'pie', radius: ['42%', '72%'],
         label: { show: false }, emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' } },
@@ -206,7 +206,7 @@ const pieCharts = computed(() => [
           { name: '下架', value: overview.value.offSaleProducts || 0 },
           { name: '草稿', value: overview.value.draftProducts || 0 },
         ],
-        itemStyle: { borderRadius: 4, borderColor: '#141518', borderWidth: 2 },
+        itemStyle: { borderRadius: 4, borderColor: '#0b1220', borderWidth: 2 },
         color: [CHART[3], CHART[5], CHART[2]],
       }]
     }
@@ -219,7 +219,7 @@ const pieCharts = computed(() => [
       const boughtCount = orderTrend.value.reduce((s, d) => s + (d.bought || 0), 0)
       return {
         tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-        legend: { bottom: '5%', left: 'center', textStyle: { color: '#8a8f98', fontSize: 12 } },
+        legend: { bottom: '5%', left: 'center', textStyle: { color: '#5d7ba1', fontSize: 12 } },
         series: [{
           type: 'pie', radius: ['42%', '72%'],
           label: { show: false }, emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' } },
@@ -228,7 +228,7 @@ const pieCharts = computed(() => [
             { name: '卖出', value: soldCount },
             { name: '买入', value: boughtCount },
           ],
-          itemStyle: { borderRadius: 4, borderColor: '#141518', borderWidth: 2 },
+          itemStyle: { borderRadius: 4, borderColor: '#0b1220', borderWidth: 2 },
           color: [CHART[0], CHART[5]],
         }]
       }
@@ -243,30 +243,30 @@ const lineCharts = computed(() => [
     chipIcon: 'TrendCharts',
     option: {
       tooltip: { trigger: 'axis' },
-      legend: { data: ['卖出', '买入'], bottom: 0, textStyle: { color: '#8a8f98', fontSize: 12 } },
+      legend: { data: ['卖出', '买入'], bottom: 0, textStyle: { color: '#5d7ba1', fontSize: 12 } },
       grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
-      xAxis: { type: 'category', boundaryGap: false, data: orderTrend.value.map(d => d.date), axisLabel: { color: '#8a8f98' } },
-      yAxis: { type: 'value', minInterval: 1, axisLabel: { color: '#8a8f98' }, splitLine: { lineStyle: { color: '#26282e' } } },
+      xAxis: { type: 'category', boundaryGap: false, data: orderTrend.value.map(d => d.date), axisLabel: { color: '#5d7ba1' } },
+      yAxis: { type: 'value', minInterval: 1, axisLabel: { color: '#5d7ba1' }, splitLine: { lineStyle: { color: '#1c2c48' } } },
       series: [
         {
-          name: '卖出', type: 'line', smooth: true, lineStyle: { width: 2 },
+          name: '卖出', type: 'line', smooth: true, lineStyle: { width: 2.5, shadowBlur: 10, shadowColor: 'rgba(94,106,210,0.45)' },
           data: orderTrend.value.map(d => d.sold || 0),
           itemStyle: { color: CHART[0] },
           areaStyle: {
             color: {
               type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
               colorStops: [
-                { offset: 0, color: 'rgba(124,58,237,0.25)' },
-                { offset: 1, color: 'rgba(124,58,237,0.02)' }
+                { offset: 0, color: 'rgba(94,106,210,0.25)' },
+                { offset: 1, color: 'rgba(94,106,210,0.02)' }
               ]
             }
           },
         },
         {
-          name: '买入', type: 'line', smooth: true, lineStyle: { width: 2 },
+          name: '买入', type: 'line', smooth: true, lineStyle: { width: 2.5, shadowBlur: 10, shadowColor: 'rgba(94,106,210,0.45)' },
           data: orderTrend.value.map(d => d.bought || 0),
           itemStyle: { color: CHART[5] }, areaStyle: { color: new graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(239,68,68,0.20)' }, { offset: 1, color: 'rgba(239,68,68,0.02)' }
+            { offset: 0, color: 'rgba(255,77,106,0.20)' }, { offset: 1, color: 'rgba(255,77,106,0.02)' }
           ])},
         },
       ]
@@ -277,23 +277,23 @@ const lineCharts = computed(() => [
     chipIcon: 'ChatDotRound',
     option: {
       tooltip: { trigger: 'axis' },
-      legend: { data: ['收到', '回复'], bottom: 0, textStyle: { color: '#8a8f98', fontSize: 12 } },
+      legend: { data: ['收到', '回复'], bottom: 0, textStyle: { color: '#5d7ba1', fontSize: 12 } },
       grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
-      xAxis: { type: 'category', boundaryGap: false, data: messageActivity.value.map(d => d.date), axisLabel: { color: '#8a8f98' } },
-      yAxis: { type: 'value', minInterval: 1, axisLabel: { color: '#8a8f98' }, splitLine: { lineStyle: { color: '#26282e' } } },
+      xAxis: { type: 'category', boundaryGap: false, data: messageActivity.value.map(d => d.date), axisLabel: { color: '#5d7ba1' } },
+      yAxis: { type: 'value', minInterval: 1, axisLabel: { color: '#5d7ba1' }, splitLine: { lineStyle: { color: '#1c2c48' } } },
       series: [
         {
-          name: '收到', type: 'line', smooth: true, lineStyle: { width: 2 },
+          name: '收到', type: 'line', smooth: true, lineStyle: { width: 2.5, shadowBlur: 10, shadowColor: 'rgba(94,106,210,0.45)' },
           data: messageActivity.value.map(d => d.incoming || 0),
           itemStyle: { color: CHART[3] }, areaStyle: { color: new graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(16,185,129,0.25)' }, { offset: 1, color: 'rgba(16,185,129,0.02)' }
+            { offset: 0, color: 'rgba(0,230,118,0.25)' }, { offset: 1, color: 'rgba(0,230,118,0.02)' }
           ])},
         },
         {
-          name: '回复', type: 'line', smooth: true, lineStyle: { width: 2 },
+          name: '回复', type: 'line', smooth: true, lineStyle: { width: 2.5, shadowBlur: 10, shadowColor: 'rgba(94,106,210,0.45)' },
           data: messageActivity.value.map(d => d.outgoing || 0),
           itemStyle: { color: CHART[2] }, areaStyle: { color: new graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(245,158,11,0.20)' }, { offset: 1, color: 'rgba(245,158,11,0.02)' }
+            { offset: 0, color: 'rgba(255,179,0,0.20)' }, { offset: 1, color: 'rgba(255,179,0,0.02)' }
           ])},
         },
       ]
@@ -303,17 +303,17 @@ const lineCharts = computed(() => [
 
 const accountOverviewOption = computed(() => ({
   tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-  legend: { data: ['在售商品', '今日回复', '浏览量', '收藏数'], bottom: 0, textStyle: { color: '#8a8f98', fontSize: 12 } },
+  legend: { data: ['在售商品', '今日回复', '浏览量', '收藏数'], bottom: 0, textStyle: { color: '#5d7ba1', fontSize: 12 } },
   grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
   xAxis: {
     type: 'category', data: accounts.value.map(a => a.displayName || a.accountName || ('账号' + a.accountId)),
-    axisLabel: { rotate: accounts.value.length > 6 ? 30 : 0, color: '#8a8f98' },
+    axisLabel: { rotate: accounts.value.length > 6 ? 30 : 0, color: '#5d7ba1' },
     axisLine: { lineStyle: { color: '#e5e5e5' } },
   },
   yAxis: {
     type: 'value', minInterval: 1,
-    axisLabel: { color: '#8a8f98' },
-    splitLine: { lineStyle: { color: '#26282e' } },
+    axisLabel: { color: '#5d7ba1' },
+    splitLine: { lineStyle: { color: '#1c2c48' } },
   },
   series: [
     { name: '在售商品', type: 'bar', data: accounts.value.map(a => a.onSaleCount || 0), itemStyle: { color: CHART[0], borderRadius: [3,3,0,0] } },
@@ -401,14 +401,14 @@ onMounted(() => { loadDashboard() })
   display: flex; align-items: center; justify-content: center;
   color: #fff; flex-shrink: 0;
 }
-.stat-icon.icon-user   { background: linear-gradient(135deg, var(--brand-hover), #a855f7); box-shadow: 0 6px 16px rgba(124,58,237,.22); }
-.stat-icon.icon-check  { background: linear-gradient(135deg, #059669, #10b981); box-shadow: 0 6px 16px rgba(16,185,129,.22); }
-.stat-icon.icon-goods  { background: linear-gradient(135deg, #d97706, #f59e0b); box-shadow: 0 6px 16px rgba(245,158,11,.22); }
-.stat-icon.icon-shop   { background: linear-gradient(135deg, #dc2626, #ef4444); box-shadow: 0 6px 16px rgba(239,68,68,.22); }
+.stat-icon.icon-user   { background: linear-gradient(135deg, var(--brand-hover), #a855f7); box-shadow: 0 6px 16px rgba(94,106,210,.22); }
+.stat-icon.icon-check  { background: linear-gradient(135deg, #059669, #10b981); box-shadow: 0 6px 16px rgba(0,230,118,.22); }
+.stat-icon.icon-goods  { background: linear-gradient(135deg, #d97706, #f59e0b); box-shadow: 0 6px 16px rgba(255,179,0,.22); }
+.stat-icon.icon-shop   { background: linear-gradient(135deg, #dc2626, #ef4444); box-shadow: 0 6px 16px rgba(255,77,106,.22); }
 .stat-icon.icon-chat   { background: linear-gradient(135deg, #0891b2, #22d3ee); box-shadow: 0 6px 16px rgba(6,182,212,.22); }
 .stat-icon.icon-view   { background: linear-gradient(135deg, var(--brand), #6366f1); box-shadow: 0 6px 16px rgba(79,70,229,.22); }
-.stat-icon.icon-star   { background: linear-gradient(135deg, #d97706, #fbbf24); box-shadow: 0 6px 16px rgba(245,158,11,.22); }
-.stat-icon.icon-warn   { background: linear-gradient(135deg, #dc2626, #f87171); box-shadow: 0 6px 16px rgba(239,68,68,.22); }
+.stat-icon.icon-star   { background: linear-gradient(135deg, #d97706, #fbbf24); box-shadow: 0 6px 16px rgba(255,179,0,.22); }
+.stat-icon.icon-warn   { background: linear-gradient(135deg, #dc2626, #f87171); box-shadow: 0 6px 16px rgba(255,77,106,.22); }
 
 /* ========== 图表卡片 ========== */
 .chart-row, .table-row { flex-shrink: 0; }

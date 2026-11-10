@@ -77,7 +77,7 @@
       </el-tabs>
 
       <div v-if="loginMode === 'qr'" class="dialog-body">
-        <el-form :model="qrForm" label-width="80px">
+        <el-form :model="qrForm" label-width="90px">
           <el-form-item label="账号名称">
             <el-input v-model="qrForm.accountName" placeholder="如：账号A" clearable />
           </el-form-item>
@@ -121,7 +121,7 @@
       </div>
 
       <div v-if="loginMode === 'cookie'" class="dialog-body">
-        <el-form :model="loginForm" label-width="80px">
+        <el-form :model="loginForm" label-width="90px">
           <el-form-item label="账号名称">
             <el-input v-model="loginForm.accountName" placeholder="如：账号A" clearable />
           </el-form-item>
@@ -149,7 +149,7 @@
 
     <!-- 切换状态对话框 -->
     <el-dialog v-model="showStatusDialog" title="切换状态" width="360px" center>
-      <el-form :model="statusForm" label-width="80px">
+      <el-form :model="statusForm" label-width="90px">
         <el-form-item label="状态">
           <el-select v-model="statusForm.status" style="width:100%;">
             <el-option label="活跃" value="ACTIVE" />
@@ -169,7 +169,7 @@
 
     <!-- 编辑账号对话框 -->
     <el-dialog v-model="showEditDialog" title="编辑账号" width="520px" center>
-      <el-form :model="editForm" label-width="100px">
+      <el-form :model="editForm" label-width="90px">
         <el-form-item label="账号名称">
           <el-input v-model="editForm.accountName" placeholder="账号名称" />
         </el-form-item>

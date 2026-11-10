@@ -55,10 +55,10 @@
           <el-button v-if="activeTab === 'xianyu'" type="primary" :disabled="!filters.accountId" :loading="syncing" @click="handleSyncFromXianyu">
             <el-icon><Refresh /></el-icon> 同步闲鱼
           </el-button>
-          <el-button v-if="activeTab === 'xianyu'" type="success" @click="showAiOptimizeDialog = true">
+          <el-button v-if="activeTab === 'xianyu'" type="primary" plain @click="showAiOptimizeDialog = true">
             <el-icon><MagicStick /></el-icon> AI 优化文案
           </el-button>
-          <el-button v-if="activeTab === 'local'" type="success" :loading="batchPublishing" @click="handleBatchPublish">
+          <el-button v-if="activeTab === 'local'" type="primary" :loading="batchPublishing" @click="handleBatchPublish">
             <el-icon><UploadFilled /></el-icon> 批量发布
           </el-button>
           <el-tooltip :content="selectedLocalProducts.length ? '批量删除选中商品' : '请先勾选商品'" placement="top">
@@ -296,7 +296,7 @@
 
     <!-- AI 优化文案对话框 -->
     <el-dialog v-model="showAiOptimizeDialog" title="AI 商品文案优化" width="600px">
-      <el-form :model="aiForm" label-width="100px">
+      <el-form :model="aiForm" label-width="90px">
         <el-form-item label="AI 模型">
           <el-select v-model="aiForm.modelId" placeholder="选择 AI 模型" style="width: 100%;">
             <el-option v-for="m in aiModels" :key="m.id" :label="`${m.modelName} (${m.providerName})`" :value="m.id" />

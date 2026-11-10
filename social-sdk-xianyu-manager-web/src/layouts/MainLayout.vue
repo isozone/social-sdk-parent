@@ -19,7 +19,7 @@
         class="sidebar-menu"
         background-color="transparent"
         text-color="var(--text-2)"
-        active-text-color="#00e5ff"
+        active-text-color="#5e6ad2"
       >
         <el-menu-item index="/app/dashboard">
           <span class="menu-icon-box"><el-icon><DataAnalysis /></el-icon></span>
@@ -731,16 +731,16 @@ async function handleBrowserReset() {
   inset: 0;
   width: 100%;
   z-index: 2000;
-  background:
-    radial-gradient(ellipse 900px 500px at 50% -10%, rgba(0, 229, 255, 0.10), transparent),
-    linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px),
-    rgba(6, 10, 19, 0.92);
+  background: rgba(8, 9, 11, 0.92);
   backdrop-filter: blur(14px);
   overflow-y: auto;
   border-right: none;
 }
-.overlay-inner { min-height: 100%; padding-bottom: 32px; }
+.overlay-inner {
+  min-height: 100%;
+  padding-bottom: 32px;
+  position: relative;
+}
 .overlay-close {
   margin-left: auto;
   width: 38px; height: 38px;
@@ -752,7 +752,7 @@ async function handleBrowserReset() {
   cursor: pointer;
   transition: all var(--transition-fast);
 }
-.overlay-close:hover { color: var(--brand); border-color: var(--brand); box-shadow: var(--brand-glow); }
+.overlay-close:hover { color: var(--text-1); border-color: var(--border-hairline-strong); background: var(--bg-surface-2); }
 
 /* 菜单展开/收起过渡 + 菜单项交错入场 */
 .menu-fade-enter-active, .menu-fade-leave-active { transition: opacity 0.25s ease, transform 0.25s ease; }
@@ -787,27 +787,23 @@ async function handleBrowserReset() {
 .logo-icon {
   width: 38px;
   height: 38px;
-  background: var(--brand-gradient);
+  background: var(--bg-surface-2);
   border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #06121f;
+  color: var(--text-2);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.5px;
   flex-shrink: 0;
-  box-shadow: var(--brand-glow-strong);
 }
 .logo-text { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
 .logo-title {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: 3px;
-  background: var(--brand-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--text-1);
 }
 .logo-tag { font-size: 10.5px; color: var(--text-3); letter-spacing: 2px; font-weight: 500; }
 
@@ -823,42 +819,37 @@ async function handleBrowserReset() {
   padding: 0 24px;
   z-index: 10;
 }
-/* 底边发光扫描线 */
-.header::after {
-  content: "";
-  position: absolute;
-  left: 0; right: 0; bottom: -1px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.6), transparent);
-}
+/* 底边 hairline（Linear：无扫描线无角框） */
+.header::after { content: none; }
+.header::before { content: none; }
 .header-left { display: flex; align-items: center; gap: 12px; min-width: 0; z-index: 1; }
-/* 悬浮菜单按钮：三横线发光 */
+/* 悬浮菜单按钮：Linear 式图标按钮（hairline 边框，无发光） */
 .menu-fab {
-  width: 40px; height: 40px;
-  border-radius: 10px;
-  border: 1px solid rgba(0, 229, 255, 0.45);
-  background: rgba(0, 229, 255, 0.08);
+  width: 36px; height: 36px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-hairline);
+  background: var(--bg-surface-2);
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  box-shadow: var(--brand-glow);
   transition: all var(--transition-fast);
 }
-.menu-fab:hover { background: rgba(0, 229, 255, 0.16); box-shadow: var(--brand-glow-strong); transform: translateY(-1px); }
-.fab-line { width: 16px; height: 2px; background: var(--brand); border-radius: 2px; box-shadow: 0 0 6px rgba(0,229,255,.6); }
+.menu-fab:hover { background: var(--bg-surface-3); border-color: var(--border-hairline-strong); }
+.fab-line { width: 15px; height: 1.5px; background: var(--text-2); border-radius: 1px; }
 .page-icon-box {
   width: 30px; height: 30px;
-  background: rgba(0, 229, 255, 0.10);
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border-hairline);
   border-radius: 7px;
   display: flex; align-items: center; justify-content: center;
-  color: var(--brand); font-size: 15px; flex-shrink: 0;
+  color: var(--text-3); font-size: 15px; flex-shrink: 0;
 }
 .page-title-area { display: flex; flex-direction: column; line-height: 1.3; }
 .page-title { font-size: 15px; font-weight: 600; color: var(--text-1); letter-spacing: 1px; }
-/* 居中大标题：绝对定位 + 霓虹渐变发光 */
+/* 居中标题：Linear 式精密排版（无发光无渐变） */
 .header-center {
   position: absolute;
   left: 50%; top: 50%;
@@ -867,17 +858,17 @@ async function handleBrowserReset() {
   pointer-events: none;
 }
 .brand-title {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: 10px;
-  text-indent: 10px;
-  background: linear-gradient(180deg, #eaffff 0%, #7df3ff 55%, #00e5ff 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  filter: drop-shadow(0 0 14px rgba(0, 229, 255, 0.45));
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--text-1);
 }
-.brand-sub { font-size: 10px; color: var(--text-3); letter-spacing: 5px; margin-top: 2px; }
+.brand-sub {
+  font-size: 10px;
+  color: var(--text-3);
+  letter-spacing: 3px;
+  margin-top: 2px;
+}
 
 .header-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; z-index: 1; }
 .header-right .el-button { color: var(--text-2); }
@@ -932,7 +923,7 @@ async function handleBrowserReset() {
 .sidebar-menu :deep(.el-menu-item-group__title) {
   padding: 20px 6px 8px;
   font-size: 11px;
-  color: var(--brand);
+  color: var(--text-3);
   font-weight: 700;
   letter-spacing: 3px;
   text-transform: uppercase;
@@ -940,46 +931,37 @@ async function handleBrowserReset() {
   align-items: center;
   gap: 10px;
 }
-.sidebar-menu :deep(.el-menu-item-group__title)::before {
-  content: "";
-  width: 8px; height: 8px;
-  background: var(--brand);
-  box-shadow: var(--brand-glow);
-  transform: rotate(45deg);
-}
 .sidebar-menu :deep(.el-menu-item-group__title)::after {
   content: "";
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, var(--border-hairline-strong), transparent);
+  background: var(--border-hairline);
 }
-/* 二级菜单项：横向网格大卡片，hover 霓虹描边 */
+/* 二级菜单项：横向网格卡片，hover 提亮边框（Linear 式，无发光） */
 .sidebar-menu :deep(.el-menu-item) {
   display: inline-flex;
   width: calc(25% - 12px);
-  margin: 6px;
+  margin: 5px;
   border-radius: var(--radius-md);
-  height: 52px; line-height: 52px;
+  height: 48px; line-height: 48px;
   color: var(--text-2);
   font-size: 13.5px;
   padding: 0 14px !important;
-  border: 1px solid var(--border-hairline);
-  background: rgba(16, 26, 44, 0.65);
-  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+  background: transparent;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
   box-sizing: border-box;
 }
 .sidebar-menu :deep(.el-menu-item:hover) {
-  background: rgba(0, 229, 255, 0.08) !important;
+  background: var(--bg-surface-2) !important;
   color: var(--text-1);
-  border-color: rgba(0, 229, 255, 0.5);
-  box-shadow: var(--brand-glow);
+  border-color: var(--border-hairline);
 }
 .sidebar-menu :deep(.el-menu-item.is-active) {
-  background: linear-gradient(135deg, rgba(0, 229, 255, 0.16), rgba(46, 124, 246, 0.10)) !important;
-  color: var(--brand) !important;
-  font-weight: 600;
-  border-color: var(--brand);
-  box-shadow: var(--brand-glow), inset 0 0 20px rgba(0, 229, 255, 0.06);
+  background: var(--bg-surface-2) !important;
+  color: var(--brand-hover) !important;
+  font-weight: 500;
+  border-color: var(--border-hairline-strong);
 }
 .menu-icon-box {
   display: inline-flex;
@@ -992,9 +974,9 @@ async function handleBrowserReset() {
   flex-shrink: 0;
   transition: background 0.2s ease, color 0.2s ease;
 }
-.sidebar-menu :deep(.el-menu-item:hover) .menu-icon-box { background: rgba(0, 229, 255, 0.14); color: var(--brand); }
+.sidebar-menu :deep(.el-menu-item:hover) .menu-icon-box { background: var(--bg-surface-3); color: var(--text-1); }
 .sidebar-menu :deep(.el-menu-item.is-active) .menu-icon-box {
-  background: rgba(0, 229, 255, 0.16); color: var(--brand);
+.sidebar-menu :deep(.el-menu-item.is-active) .menu-icon-box { background: var(--bg-surface-2); color: var(--brand-hover); }
 }
 
 /* ========== 页脚 ========== */
